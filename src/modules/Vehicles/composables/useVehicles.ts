@@ -180,9 +180,7 @@ export function useVehicles() {
     vinDecodingLoading.value = true
     vinError.value = ''
     try {
-      const response = await api.post<VinDecodeApiResponse>(ApiEndpoints.VEHICLES_DECODE_VIN, {
-        vin,
-      })
+      const response = await api.post<VinDecodeApiResponse>(ApiEndpoints.VEHICLES_DECODE_VIN, vin)
       const result = response.data?.successResult
       if (!result || result.isValid === false) {
         vinError.value = 'Vehicle not found for this VIN'
