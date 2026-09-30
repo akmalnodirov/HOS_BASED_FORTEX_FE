@@ -386,13 +386,8 @@ export function useCompany() {
     try {
       const request = buildCarrierRequest(formData)
       await api.put(ApiEndpoints.CARRIERS_BY_ID(company.value.carrierId), request)
+      await loadCompany(company.value.carrierId)
       toast.success('Company updated successfully')
-
-      // Update local state
-      company.value = {
-        ...company.value,
-        ...formData,
-      }
     } catch (error: any) {
       console.error('Error updating company:', error)
       toast.error('Failed to update company')
@@ -403,13 +398,11 @@ export function useCompany() {
   }
 
   const addTerminal = async (terminalData: TerminalFormData) => {
-    // Add terminal to local state and save via update
     const newTerminal: Terminal = {
       id: '',
       ...terminalData,
     }
     company.value.terminals.push(newTerminal)
-    toast.success('Terminal added')
   }
 
   const updateTerminal = async (terminalId: string, terminalData: TerminalFormData) => {

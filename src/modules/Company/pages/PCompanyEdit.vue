@@ -788,10 +788,13 @@ const closeTerminalModal = () => {
 }
 
 const handleAddTerminal = async (terminalData: TerminalFormData) => {
+  const previousTerminals = [...company.value.terminals]
   try {
     await addTerminal(terminalData)
+    await updateCompany(formData.value)
     closeTerminalModal()
   } catch (error) {
+    company.value.terminals = previousTerminals
     console.error('Error adding terminal:', error)
   }
 }

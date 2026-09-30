@@ -124,8 +124,13 @@
               id="homeTerminalAddress"
               v-model="formData.homeTerminalAddress"
               placeholder="Home terminal address"
+              :class="errors.homeTerminalAddress && 'border-destructive'"
               :disabled="isSubmitting"
+              @input="clearError('homeTerminalAddress')"
             />
+            <p v-if="errors.homeTerminalAddress" class="text-sm text-red-600 dark:text-red-400">
+              {{ errors.homeTerminalAddress }}
+            </p>
           </div>
 
           <div class="space-y-2">
@@ -539,6 +544,11 @@ const validateForm = (): boolean => {
     isValid = false
   }
 
+  if (!formData.value.homeTerminalAddress.trim()) {
+    errors.value.homeTerminalAddress = 'Home terminal address is required'
+    isValid = false
+  }
+
   // Email validation if provided
   if (formData.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email)) {
     errors.value.email = 'Invalid email format'
@@ -613,7 +623,16 @@ const handleSubmit = async () => {
       city: formData.value.city,
       zipCode: formData.value.zipcode,
       issuerStateId: formData.value.issuerState,
-      carrierTerminals: [],
+      carrierTerminals: [
+        {
+          id: null,
+          timeZoneId: formData.value.timezone,
+          street: formData.value.homeTerminalAddress,
+          city: formData.value.city,
+          zipCode: formData.value.zipcode,
+          issuerStateId: formData.value.issuerState,
+        },
+      ],
       carrierDriverLogSetting: null,
     }
 
