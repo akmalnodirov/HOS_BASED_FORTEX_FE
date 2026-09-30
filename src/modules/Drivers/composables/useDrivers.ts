@@ -15,6 +15,8 @@ import type {
   DriverApiRequest,
   SortKey,
   NameWithId,
+  IssuerStateOption,
+  VehicleOption,
 } from '@/modules/Drivers/types'
 import dayjs from 'dayjs'
 
@@ -30,7 +32,13 @@ interface SingleDriverResponse {
 }
 
 interface ConfigResponse<T> {
-  successResult: T[]
+  successResult: T[] | { data: T[] }
+}
+
+interface ListConfigResponse<T> {
+  successResult: {
+    data: T[]
+  }
 }
 
 interface CarrierDetailResponse {
@@ -48,6 +56,11 @@ interface CarrierDetailResponse {
 
 export function useDrivers() {
   const api = useApi()
+
+  const unwrapOptions = <T>(result: T[] | { data: T[] } | undefined): T[] => {
+    if (!result) return []
+    return Array.isArray(result) ? result : result.data || []
+  }
 
   // State
   const drivers = ref<Driver[]>([])
@@ -76,8 +89,9 @@ export function useDrivers() {
   const cargoTypes = ref<NameWithId[]>([])
   const restarts = ref<NameWithId[]>([])
   const restBreaks = ref<NameWithId[]>([])
-  const issuerStates = ref<any[]>([])
-  const vehicles = ref<any[]>([])
+  const issuerStateParents = ref<IssuerStateOption[]>([])
+  const issuerStates = ref<IssuerStateOption[]>([])
+  const vehicles = ref<VehicleOption[]>([])
   const homeTerminals = ref<Array<{ id: string; name: string }>>([])
 
   // Format event time for display
@@ -145,13 +159,23 @@ export function useDrivers() {
   // Fetch configuration data
   const fetchConfigData = async () => {
     try {
-      const [hosRes, cargoRes, restartRes, restBreakRes, issuerRes, vehicleRes, carrierRes] =
+      const [
+        hosRes,
+        cargoRes,
+        restartRes,
+        restBreakRes,
+        issuerParentRes,
+        issuerRes,
+        vehicleRes,
+        carrierRes,
+      ] =
         await Promise.allSettled([
           api.get<ConfigResponse<NameWithId>>(ApiEndpoints.HOS_RULE_URL),
           api.get<ConfigResponse<NameWithId>>(ApiEndpoints.CARGO_TYPE_URL),
           api.get<ConfigResponse<NameWithId>>(ApiEndpoints.RESTART_URL),
           api.get<ConfigResponse<NameWithId>>(ApiEndpoints.REST_BREAK_URL),
-          api.get<ConfigResponse<any>>(ApiEndpoints.ISSUER_STATE_URL),
+          api.get<ConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_PARENT_URL),
+          api.get<ListConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_URL),
           api.post<{ successResult: { data: any[] } }>(ApiEndpoints.VEHICLES_FILTER, {
             carrierId: getCarrierId(),
           }),
@@ -159,19 +183,22 @@ export function useDrivers() {
         ])
 
       if (hosRes.status === 'fulfilled' && hosRes.value.data?.successResult) {
-        hosRoles.value = hosRes.value.data.successResult
+        hosRoles.value = unwrapOptions(hosRes.value.data.successResult)
       }
       if (cargoRes.status === 'fulfilled' && cargoRes.value.data?.successResult) {
-        cargoTypes.value = cargoRes.value.data.successResult
+        cargoTypes.value = unwrapOptions(cargoRes.value.data.successResult)
       }
       if (restartRes.status === 'fulfilled' && restartRes.value.data?.successResult) {
-        restarts.value = restartRes.value.data.successResult
+        restarts.value = unwrapOptions(restartRes.value.data.successResult)
       }
       if (restBreakRes.status === 'fulfilled' && restBreakRes.value.data?.successResult) {
-        restBreaks.value = restBreakRes.value.data.successResult
+        restBreaks.value = unwrapOptions(restBreakRes.value.data.successResult)
       }
-      if (issuerRes.status === 'fulfilled' && issuerRes.value.data?.successResult) {
-        issuerStates.value = issuerRes.value.data.successResult
+      if (issuerParentRes.status === 'fulfilled' && issuerParentRes.value.data?.successResult) {
+        issuerStateParents.value = unwrapOptions(issuerParentRes.value.data.successResult)
+      }
+      if (issuerRes.status === 'fulfilled' && issuerRes.value.data?.successResult?.data) {
+        issuerStates.value = issuerRes.value.data.successResult.data
       }
       if (vehicleRes.status === 'fulfilled' && vehicleRes.value.data?.successResult?.data) {
         vehicles.value = vehicleRes.value.data.successResult.data
@@ -387,6 +414,7 @@ export function useDrivers() {
     restarts,
     restBreaks,
     issuerStates,
+    issuerStateParents,
     vehicles,
     homeTerminals,
 

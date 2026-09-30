@@ -12,12 +12,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Driver, DriverFormData } from '@/modules/Drivers/types'
+import type {
+  Driver,
+  DriverFormData,
+  IssuerStateOption,
+  NameWithId,
+  VehicleOption,
+} from '@/modules/Drivers/types'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/custom/modal'
 
 interface Props {
   open: boolean
   driver?: Driver | null
+  homeTerminals: NameWithId[]
+  vehicles: VehicleOption[]
+  issuerStateParents: IssuerStateOption[]
+  issuerStates: IssuerStateOption[]
+  hosRoles: NameWithId[]
+  cargoTypes: NameWithId[]
+  restarts: NameWithId[]
+  restBreaks: NameWithId[]
 }
 
 const props = defineProps<Props>()
@@ -56,14 +70,24 @@ const formData = ref<DriverFormData>({
 const errors = ref<Partial<Record<keyof DriverFormData, string>>>({})
 const isSubmitting = ref(false)
 
-// Options
-const homeTerminalOptions = ['Terminal 1', 'Terminal 2', 'Terminal 3']
-const vehicleOptions = ['Vehicle 1', 'Vehicle 2', 'Vehicle 3', 'Vehicle 4']
-const stateOptions = ['California', 'Texas', 'Florida', 'New York']
-const hosRoleOptions = ['Property', 'Passenger', 'Oil & Gas']
-const cargoTypeOptions = ['General', 'Hazmat', 'Refrigerated']
-const restartOptions = ['34-hour restart', '24-hour restart']
-const restBreakOptions = ['30 minutes', '45 minutes', '1 hour']
+const filteredIssuerStates = computed(() => {
+  if (!formData.value.issuerStateParent) return []
+  return props.issuerStates.filter(
+    (state) => state.parentId === formData.value.issuerStateParent
+  )
+})
+
+watch(
+  () => formData.value.issuerStateParent,
+  () => {
+    if (
+      formData.value.issuerState &&
+      !filteredIssuerStates.value.some((state) => state.id === formData.value.issuerState)
+    ) {
+      formData.value.issuerState = ''
+    }
+  }
+)
 
 // Load form data when driver prop changes
 watch(
@@ -195,6 +219,29 @@ const validateForm = (): boolean => {
     isValid = false
   }
 
+  const requiredSelections: Array<[keyof DriverFormData, string]> = [
+    ['homeTerminal', 'Home terminal is required'],
+    ['issuerStateParent', 'Issuer state parent is required'],
+    ['issuerState', 'Issuer state is required'],
+    ['hosRoles', 'HOS role is required'],
+    ['cargoType', 'Cargo type is required'],
+    ['restart', 'Restart rule is required'],
+    ['restBreak', 'Rest break rule is required'],
+  ]
+
+  requiredSelections.forEach(([field, message]) => {
+    const value = formData.value[field]
+    if (typeof value !== 'string' || !value) {
+      errors.value[field] = message
+      isValid = false
+    }
+  })
+
+  if (!formData.value.driverLicenseNumber.trim()) {
+    errors.value.driverLicenseNumber = 'Driver license number is required'
+    isValid = false
+  }
+
   return isValid
 }
 
@@ -206,7 +253,6 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
     emit('save', { ...formData.value })
   } catch (error) {
     console.error('Error saving driver:', error)
@@ -346,30 +392,36 @@ const clearError = (field: keyof DriverFormData) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="homeTerminal">Home terminal</Label>
-            <Select v-model="formData.homeTerminal" :disabled="isSubmitting">
-              <SelectTrigger id="homeTerminal">
+            <Select v-model="formData.homeTerminal" :disabled="isSubmitting" @update:model-value="clearError('homeTerminal')">
+              <SelectTrigger id="homeTerminal" :class="errors.homeTerminal && 'border-red-500'">
                 <SelectValue placeholder="Select terminal" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in homeTerminalOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in homeTerminals" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.homeTerminal" class="text-sm text-red-600 dark:text-red-400">{{ errors.homeTerminal }}</p>
+            <p v-else-if="homeTerminals.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
+              No home terminal is configured for this carrier. Add one on the Company page first.
+            </p>
           </div>
 
           <div class="space-y-2">
             <Label for="vehicles">Vehicles</Label>
-            <Select :disabled="isSubmitting">
-              <SelectTrigger id="vehicles">
-                <SelectValue placeholder="Select vehicles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in vehicleOptions" :key="option" :value="option">
-                  {{ option }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              id="vehicles"
+              v-model="formData.vehicles"
+              multiple
+              :disabled="isSubmitting"
+              class="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
+                {{ vehicle.unit }}{{ vehicle.make ? ` — ${vehicle.make} ${vehicle.model || ''}` : '' }}
+              </option>
+            </select>
+            <p class="text-xs text-muted-foreground">Hold Ctrl (Windows) or Command (Mac) to select multiple vehicles.</p>
           </div>
         </div>
 
@@ -377,30 +429,32 @@ const clearError = (field: keyof DriverFormData) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="issuerStateParent">Issuer state parent</Label>
-            <Select v-model="formData.issuerStateParent" :disabled="isSubmitting">
-              <SelectTrigger id="issuerStateParent">
-                <SelectValue placeholder="Select state" />
+            <Select v-model="formData.issuerStateParent" :disabled="isSubmitting" @update:model-value="clearError('issuerStateParent')">
+              <SelectTrigger id="issuerStateParent" :class="errors.issuerStateParent && 'border-red-500'">
+                <SelectValue placeholder="Select country" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in stateOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in issuerStateParents" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.issuerStateParent" class="text-sm text-red-600 dark:text-red-400">{{ errors.issuerStateParent }}</p>
           </div>
 
           <div class="space-y-2">
             <Label for="issuerState">Issuer state</Label>
-            <Select v-model="formData.issuerState" :disabled="isSubmitting">
-              <SelectTrigger id="issuerState">
+            <Select v-model="formData.issuerState" :disabled="isSubmitting || !formData.issuerStateParent" @update:model-value="clearError('issuerState')">
+              <SelectTrigger id="issuerState" :class="errors.issuerState && 'border-red-500'">
                 <SelectValue placeholder="Select state" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in stateOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in filteredIssuerStates" :key="option.id" :value="option.id">
+                  {{ option.name }}{{ option.stateCode ? ` (${option.stateCode})` : '' }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.issuerState" class="text-sm text-red-600 dark:text-red-400">{{ errors.issuerState }}</p>
           </div>
         </div>
 
@@ -411,8 +465,11 @@ const clearError = (field: keyof DriverFormData) => {
             id="driverLicenseNumber"
             v-model="formData.driverLicenseNumber"
             placeholder="Driver license number"
+            :class="errors.driverLicenseNumber && 'border-red-500'"
             :disabled="isSubmitting"
+            @input="clearError('driverLicenseNumber')"
           />
+          <p v-if="errors.driverLicenseNumber" class="text-sm text-red-600 dark:text-red-400">{{ errors.driverLicenseNumber }}</p>
         </div>
 
         <!-- Home Terminal Checkboxes -->
@@ -527,30 +584,32 @@ const clearError = (field: keyof DriverFormData) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="hosRoles">HOS roles</Label>
-            <Select v-model="formData.hosRoles" :disabled="isSubmitting">
-              <SelectTrigger id="hosRoles">
+            <Select v-model="formData.hosRoles" :disabled="isSubmitting" @update:model-value="clearError('hosRoles')">
+              <SelectTrigger id="hosRoles" :class="errors.hosRoles && 'border-red-500'">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in hosRoleOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in hosRoles" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.hosRoles" class="text-sm text-red-600 dark:text-red-400">{{ errors.hosRoles }}</p>
           </div>
 
           <div class="space-y-2">
             <Label for="cargoType">Cargo type</Label>
-            <Select v-model="formData.cargoType" :disabled="isSubmitting">
-              <SelectTrigger id="cargoType">
+            <Select v-model="formData.cargoType" :disabled="isSubmitting" @update:model-value="clearError('cargoType')">
+              <SelectTrigger id="cargoType" :class="errors.cargoType && 'border-red-500'">
                 <SelectValue placeholder="Select cargo type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in cargoTypeOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in cargoTypes" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.cargoType" class="text-sm text-red-600 dark:text-red-400">{{ errors.cargoType }}</p>
           </div>
         </div>
 
@@ -558,30 +617,32 @@ const clearError = (field: keyof DriverFormData) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="restart">Restart</Label>
-            <Select v-model="formData.restart" :disabled="isSubmitting">
-              <SelectTrigger id="restart">
+            <Select v-model="formData.restart" :disabled="isSubmitting" @update:model-value="clearError('restart')">
+              <SelectTrigger id="restart" :class="errors.restart && 'border-red-500'">
                 <SelectValue placeholder="Select restart" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in restartOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in restarts" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.restart" class="text-sm text-red-600 dark:text-red-400">{{ errors.restart }}</p>
           </div>
 
           <div class="space-y-2">
             <Label for="restBreak">Rest break</Label>
-            <Select v-model="formData.restBreak" :disabled="isSubmitting">
-              <SelectTrigger id="restBreak">
+            <Select v-model="formData.restBreak" :disabled="isSubmitting" @update:model-value="clearError('restBreak')">
+              <SelectTrigger id="restBreak" :class="errors.restBreak && 'border-red-500'">
                 <SelectValue placeholder="Select break" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in restBreakOptions" :key="option" :value="option">
-                  {{ option }}
+                <SelectItem v-for="option in restBreaks" :key="option.id" :value="option.id">
+                  {{ option.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.restBreak" class="text-sm text-red-600 dark:text-red-400">{{ errors.restBreak }}</p>
           </div>
         </div>
 

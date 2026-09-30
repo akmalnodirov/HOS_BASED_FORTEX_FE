@@ -198,7 +198,7 @@ export class ApiEndpoints {
   static readonly VEHICLES_BY_ID = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}`
   static readonly VEHICLES_STATE = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}/state`
   static readonly VEHICLES_SLEEP_STATE = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}/sleep-state`
-  static readonly VEHICLES_DECODE_VIN = `${this.VEHICLES_URL}/multi-decode-vin`
+  static readonly VEHICLES_DECODE_VIN = `${this.VEHICLES_URL}/decode-vin`
 
   // Drivers endpoints (CRUD)
   static readonly DRIVERS_BY_ID = (id: string) => `${ApiEndpoints.DRIVERS_URL}/${id}`

@@ -127,6 +127,14 @@
     <AddDriverModal
       :open="isModalOpen"
       :driver="editingDriver"
+      :home-terminals="homeTerminals"
+      :vehicles="vehicles"
+      :issuer-state-parents="issuerStateParents"
+      :issuer-states="issuerStates"
+      :hos-roles="hosRoles"
+      :cargo-types="cargoTypes"
+      :restarts="restarts"
+      :rest-breaks="restBreaks"
       @close="closeModal"
       @save="handleSaveDriver"
     />
@@ -203,6 +211,14 @@ const {
   isStatusModalOpen,
   statusModalDriver,
   isStatusChanging,
+  homeTerminals,
+  vehicles,
+  issuerStateParents,
+  issuerStates,
+  hosRoles,
+  cargoTypes,
+  restarts,
+  restBreaks,
   addDriver,
   updateDriver,
 } = useDrivers()
@@ -221,11 +237,11 @@ const openEditModal = (driver: Driver) => {
   isModalOpen.value = true
 }
 
-const handleSaveDriver = (driverData: DriverFormData) => {
+const handleSaveDriver = async (driverData: DriverFormData) => {
   if (editingDriver.value) {
-    updateDriver(editingDriver.value.id, driverData)
+    await updateDriver(editingDriver.value.id, driverData)
   } else {
-    addDriver(driverData)
+    await addDriver(driverData)
   }
 
   isModalOpen.value = false

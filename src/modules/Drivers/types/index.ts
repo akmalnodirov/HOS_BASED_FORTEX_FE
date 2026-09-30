@@ -31,6 +31,18 @@ export interface NameWithId {
   name: string
 }
 
+export interface IssuerStateOption extends NameWithId {
+  parentId: string | null
+  stateCode?: string | null
+}
+
+export interface VehicleOption {
+  id: string
+  unit: string
+  make?: string | null
+  model?: string | null
+}
+
 export interface HomeTerminalResponse {
   id: string
   street: string
