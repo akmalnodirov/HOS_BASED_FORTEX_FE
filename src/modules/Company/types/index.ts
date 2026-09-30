@@ -80,10 +80,10 @@ export interface CarrierTerminalRequest {
 
 export interface DriverLogSettingsRequest {
   exemptDriver?: boolean | null
-  hosRuleId?: string | null
-  cargoTypeId?: string | null
-  restartId?: string | null
-  restBreakId?: string | null
+  hosRuleId: string
+  cargoTypeId: string
+  restartId: string
+  restBreakId: string
   shortHaulException?: boolean | null
   allowYardMoves?: boolean | null
   allowPersonalUse?: boolean | null

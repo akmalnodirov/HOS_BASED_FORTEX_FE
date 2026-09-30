@@ -309,20 +309,29 @@ export function useCompany() {
       issuerStateId: t.stateId,
     }))
 
-    const logSettings: DriverLogSettingsRequest = {
-      exemptDriver: formData.exemptDriver,
-      hosRuleId: formData.hosRuleId || null,
-      cargoTypeId: formData.cargoTypeId || null,
-      restartId: formData.restartId || null,
-      restBreakId: formData.restBreakId || null,
-      shortHaulException: formData.shortHaulException,
-      allowYardMoves: formData.allowYardMoves,
-      allowPersonalUse: formData.allowPersonalUse,
-      startingTime24HourPeriod: formData.periodStartingTime || '000000',
-      allowIFTA: formData.allowIFTA,
-      allowTracking: formData.allowTracking,
-      isAllowedSleep: formData.isAllowedSleep ?? true,
-    }
+    const hasCompleteLogSettings = [
+      formData.hosRuleId,
+      formData.cargoTypeId,
+      formData.restartId,
+      formData.restBreakId,
+    ].every(Boolean)
+
+    const logSettings: DriverLogSettingsRequest | null = hasCompleteLogSettings
+      ? {
+          exemptDriver: formData.exemptDriver,
+          hosRuleId: formData.hosRuleId,
+          cargoTypeId: formData.cargoTypeId,
+          restartId: formData.restartId,
+          restBreakId: formData.restBreakId,
+          shortHaulException: formData.shortHaulException,
+          allowYardMoves: formData.allowYardMoves,
+          allowPersonalUse: formData.allowPersonalUse,
+          startingTime24HourPeriod: formData.periodStartingTime || '000000',
+          allowIFTA: formData.allowIFTA,
+          allowTracking: formData.allowTracking,
+          isAllowedSleep: formData.isAllowedSleep ?? true,
+        }
+      : null
 
     return {
       providerId: company.value.providerId || authStore.providerId || '',
