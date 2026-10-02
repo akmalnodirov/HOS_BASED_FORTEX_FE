@@ -1,5 +1,8 @@
 <template>
-  <div class="min-h-screen w-full flex items-center justify-center bg-[#E5E5E5] dark:bg-background p-4">
+  <div
+    class="relative min-h-screen w-full flex items-center justify-center bg-[#E5E5E5] dark:bg-background p-4"
+  >
+    <CThemeToggle class="absolute right-5 top-5" />
     <div class="w-full max-w-[434px]">
       <!-- Card -->
       <div class="bg-white dark:bg-card rounded-lg shadow-sm dark:shadow-lg border border-gray-200 dark:border-border p-8">
@@ -138,6 +141,7 @@
 import { ref } from 'vue'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
+import CThemeToggle from '@/components/custom/CThemeToggle.vue'
 import { useLogin } from '@/modules/Auth/composables/useLogin'
 
 const { username, password, isLoading, errors, clearError, handleSubmit } = useLogin()

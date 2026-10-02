@@ -11,14 +11,14 @@ import { useSorting } from '@/composables/useSorting'
 import { useModalState } from '@/composables/useModalState'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
-import { getCarrierId } from '@/utils/carrier'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
+import { getCompanyId } from '@/utils/company'
 import { toast } from 'vue-sonner'
 
 export type SortKey =
   | 'id'
-  | 'providerName'
-  | 'carrierName'
+  | 'clientName'
+  | 'companyName'
   | 'driverName'
   | 'startDate'
   | 'endDate'
@@ -43,10 +43,10 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
   const totalCount = ref(0)
 
   // Carriers and drivers from shared composable
-  const { carriers, drivers, fetchCarriers, fetchDrivers } = useCarriersDrivers()
+  const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
 
   // Filters
-  const selectedCarrier = ref<string | null>(getCarrierId())
+  const selectedCompany = ref<string | null>(getCompanyId())
   const selectedDriver = ref<string | null>(null)
   const selectedTag = ref<'all' | 'enabled' | 'disabled'>('all')
 
@@ -73,7 +73,7 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
   })
 
   // Computed options for dropdowns
-  const carrierOptions = computed(() => [...carriers.value])
+  const companyOptions = computed(() => [...companies.value])
 
   const driverOptions = computed(() => [...drivers.value])
 
@@ -97,13 +97,13 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
       }
 
       // Add carrier filter
-      if (selectedCarrier.value && selectedCarrier.value !== 'all') {
-        params.CarrierId = selectedCarrier.value
+      if (selectedCompany.value && selectedCompany.value !== 'all') {
+        params.CompanyId = selectedCompany.value
       } else {
         // Use current carrier from localStorage
-        const carrierId = getCarrierId()
-        if (carrierId) {
-          params.CarrierId = carrierId
+        const companyId = getCompanyId()
+        if (companyId) {
+          params.CompanyId = companyId
         }
       }
 
@@ -134,7 +134,7 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
   }
 
   // Watch carrier change to reload drivers and dot inspections
-  watch(selectedCarrier, async (newValue) => {
+  watch(selectedCompany, async (newValue) => {
     if (isSettingFilters.value) return
     pagination.resetPage()
     selectedDriver.value = null
@@ -191,8 +191,8 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
       // Update filter selects to show the newly created item
       isSettingFilters.value = true
       try {
-        selectedCarrier.value = data.carrierId
-        await fetchDrivers(data.carrierId)
+        selectedCompany.value = data.companyId
+        await fetchDrivers(data.companyId)
         selectedDriver.value = data.driverId
         pagination.resetPage()
         await fetchDotInspections()
@@ -271,9 +271,9 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
   // Auto-fetch on mount
   if (autoFetch) {
     onMounted(async () => {
-      await fetchCarriers()
-      if (selectedCarrier.value) {
-        await fetchDrivers(selectedCarrier.value)
+      await fetchCompanies()
+      if (selectedCompany.value) {
+        await fetchDrivers(selectedCompany.value)
         if (drivers.value.length > 0 && !selectedDriver.value) {
           selectedDriver.value = drivers.value[0].id
         }
@@ -287,21 +287,21 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
     dotInspections,
     isLoading,
     error,
-    carriers,
+    companies,
     drivers,
-    carrierOptions,
+    companyOptions,
     driverOptions,
 
     // For backward compatibility with page
-    systemOptions: carrierOptions,
+    systemOptions: companyOptions,
 
     // Filters
-    selectedCarrier,
+    selectedCompany,
     selectedDriver,
     selectedTag,
 
     // For backward compatibility
-    selectedSystem: selectedCarrier,
+    selectedSystem: selectedCompany,
 
     // Modal state
     isCreateModalOpen: createModal.isOpen,
@@ -333,7 +333,7 @@ export function useDotIns(options: UseDotInspectionOptions = {}) {
 
     // Functions
     fetchDotInspections,
-    fetchCarriers,
+    fetchCompanies,
     fetchDrivers,
     createDotInspection,
     handleConfirmAction,

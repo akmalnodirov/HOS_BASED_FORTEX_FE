@@ -1,215 +1,105 @@
-// src/composables/useCompanies.ts
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
-import type { ProvidersResponse, Provider, Carrier } from '@/types/company'
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-vue-next'
 import { usePagination } from '@/composables/usePagination'
+import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
+import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 
-export type SortKey = 'providerName' | 'carrierCount'
+export type SortKey = 'name' | 'dotNumber' | 'isActive'
 export type SortOrder = 'asc' | 'desc'
 
-export interface UseCompaniesOptions {
-  autoFetch?: boolean
-}
-
-export function useCompanies(options: UseCompaniesOptions = {}) {
-  const { autoFetch = true } = options
+export function useCompanies() {
   const api = useApi()
-
-  // API State
-  const providers = ref<Provider[]>([])
+  const router = useRouter()
+  const companies = ref<RouteEldCompany[]>([])
   const isLoading = ref(false)
+  const selectingCompanyId = ref<string | null>(null)
   const error = ref<string | null>(null)
-
-  // Modal state
-  const isCreateModalOpen = ref(false)
-
-  // Search filters
   const searchCompany = ref('')
   const searchUsdot = ref('')
-
-  // Debounced search
-  const debouncedSearchCompany = ref('')
-  const debouncedSearchUsdot = ref('')
-  let searchTimeout: ReturnType<typeof setTimeout>
-
-  // Sorting
-  const sortKey = ref<SortKey>('providerName')
+  const sortKey = ref<SortKey>('name')
   const sortOrder = ref<SortOrder>('asc')
 
-  watch([searchCompany, searchUsdot], () => {
-    if (searchTimeout) clearTimeout(searchTimeout)
-    searchTimeout = setTimeout(() => {
-      debouncedSearchCompany.value = searchCompany.value
-      debouncedSearchUsdot.value = searchUsdot.value
-    }, 300)
-  })
+  const filteredCompanies = computed(() => {
+    const name = searchCompany.value.trim().toLowerCase()
+    const dot = searchUsdot.value.trim().toLowerCase()
+    const result = companies.value.filter(
+      (company) =>
+        (!name || company.name.toLowerCase().includes(name)) &&
+        (!dot || company.dotNumber.toLowerCase().includes(dot))
+    )
 
-  // Filtered providers
-  const filteredProviders = computed(() => {
-    let filtered = providers.value
-
-    // Filter by provider/carrier name
-    if (debouncedSearchCompany.value) {
-      const search = debouncedSearchCompany.value.toLowerCase()
-      filtered = filtered.filter(
-        (provider) =>
-          provider.providerName.toLowerCase().includes(search) ||
-          provider.carriers.some((carrier) => carrier.name.toLowerCase().includes(search))
-      )
-    }
-
-    // Filter by USDOT
-    if (debouncedSearchUsdot.value) {
-      filtered = filtered.filter((provider) =>
-        provider.carriers.some((carrier) =>
-          carrier.usdotNumber.includes(debouncedSearchUsdot.value)
-        )
-      )
-    }
-
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let aVal: any
-      let bVal: any
-
-      if (sortKey.value === 'providerName') {
-        aVal = a.providerName
-        bVal = b.providerName
-      } else if (sortKey.value === 'carrierCount') {
-        aVal = a.carriers.length
-        bVal = b.carriers.length
-      }
-
-      if (typeof aVal === 'number') {
-        return sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal
-      }
-
-      if (aVal < bVal) return sortOrder.value === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortOrder.value === 'asc' ? 1 : -1
-      return 0
+    return [...result].sort((left, right) => {
+      const leftValue = left[sortKey.value]
+      const rightValue = right[sortKey.value]
+      const comparison = String(leftValue).localeCompare(String(rightValue))
+      return sortOrder.value === 'asc' ? comparison : -comparison
     })
-
-    return sorted
   })
 
-  // Setup pagination
   const pagination = usePagination(
-    computed(() => filteredProviders.value.length),
-    {
-      itemsPerPage: 10,
-    }
+    computed(() => filteredCompanies.value.length),
+    { itemsPerPage: 10 }
   )
+  const paginatedCompanies = computed(() => pagination.paginateData(filteredCompanies.value))
 
-  // Paginated providers
-  const paginatedProviders = computed(() => pagination.paginateData(filteredProviders.value))
-
-  // Functions
-  const handleSort = (key: SortKey) => {
-    if (sortKey.value === key) {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-    } else {
-      sortKey.value = key
-      sortOrder.value = 'asc'
-    }
-  }
-
-  const getSortIcon = (key: SortKey) => {
-    if (sortKey.value !== key) return ArrowUpDown
-    return sortOrder.value === 'asc' ? ArrowUp : ArrowDown
-  }
-
-  const toggleCarrierStatus = (providerId: string, carrierId: string) => {
-    const provider = providers.value.find((p) => p.providerId === providerId)
-    if (provider) {
-      const carrier = provider.carriers.find((c) => c.carrierId === carrierId)
-      if (carrier) {
-        // Toggle status logic here
-        console.log('Toggle carrier status:', carrierId)
-      }
-    }
-  }
-
-  // Fetch providers from API
-  const fetchProviders = async () => {
+  const fetchCompanies = async () => {
     isLoading.value = true
     error.value = null
-
     try {
-      const response = await api.get<ProvidersResponse>('/api/providers/providers/filter')
-
-      if (response.data?.successResult) {
-        providers.value = response.data.successResult
-      } else {
-        throw new Error('Invalid response format')
-      }
-    } catch (err: any) {
-      error.value = err.response?.data?.message || err.message || 'Failed to fetch providers'
-      console.error('Error fetching providers:', err)
+      const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
+      companies.value = response.data?.successResult ?? []
+    } catch (exception: any) {
+      error.value =
+        exception.response?.data?.message || exception.message || 'Failed to load companies'
     } finally {
       isLoading.value = false
     }
   }
 
-  // Refresh providers list
-  const refreshProviders = async () => {
-    await fetchProviders()
-  }
-
-  // Get provider by ID
-  const getProviderById = (providerId: string): Provider | undefined => {
-    return providers.value.find((provider) => provider.providerId === providerId)
-  }
-
-  // Create company
-  const handleCreateCompany = async (companyData: any) => {
+  const selectCompany = async (company: RouteEldCompany) => {
+    if (!company.isActive || selectingCompanyId.value) return false
+    selectingCompanyId.value = company.id
     try {
-      // TODO: Implement create company API call
-      console.log('Create company:', companyData)
-      isCreateModalOpen.value = false
-      await refreshProviders()
-    } catch (err) {
-      console.error('Error creating company:', err)
-      throw err
+      await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
+      setCompanyId(company.id)
+      setCompanyTimeZoneId('UTC')
+      await router.push('/eld/logs')
+      return true
+    } catch (exception: any) {
+      toast.error(
+        exception.response?.data?.message || exception.message || 'Failed to synchronize company'
+      )
+      return false
+    } finally {
+      selectingCompanyId.value = null
     }
   }
 
-  // Modal actions
-  const openCreateModal = () => {
-    isCreateModalOpen.value = true
+  const handleSort = (key: SortKey) => {
+    if (sortKey.value === key) sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    else {
+      sortKey.value = key
+      sortOrder.value = 'asc'
+    }
   }
 
-  const closeCreateModal = () => {
-    isCreateModalOpen.value = false
-  }
-
-  // Auto-fetch on mount if enabled
-  if (autoFetch) {
-    onMounted(async () => {
-      await fetchProviders()
-    })
-  }
+  watch([searchCompany, searchUsdot], () => pagination.resetPage())
+  onMounted(fetchCompanies)
 
   return {
-    // API State
-    providers,
+    companies,
     isLoading,
+    selectingCompanyId,
     error,
-
-    // Modal state
-    isCreateModalOpen,
-
-    // Search
     searchCompany,
     searchUsdot,
-    debouncedSearchCompany,
-    debouncedSearchUsdot,
-
-    // Sorting
     sortKey,
     sortOrder,
-
-    // Pagination
+    filteredCompanies,
+    paginatedCompanies,
     currentPage: pagination.currentPage,
     itemsPerPage: pagination.itemsPerPage,
     totalPages: pagination.totalPages,
@@ -218,20 +108,8 @@ export function useCompanies(options: UseCompaniesOptions = {}) {
     goToPage: pagination.goToPage,
     nextPage: pagination.nextPage,
     previousPage: pagination.previousPage,
-
-    // Computed
-    filteredProviders,
-    paginatedProviders,
-
-    // Functions
-    fetchProviders,
-    refreshProviders,
-    getProviderById,
+    fetchCompanies,
+    selectCompany,
     handleSort,
-    getSortIcon,
-    toggleCarrierStatus,
-    handleCreateCompany,
-    openCreateModal,
-    closeCreateModal,
   }
 }

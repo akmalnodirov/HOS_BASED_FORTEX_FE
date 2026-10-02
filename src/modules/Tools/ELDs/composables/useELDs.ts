@@ -7,12 +7,12 @@ import type { EldInfo, EldsListResponse, UpdateEldFileRequest } from '../types'
 export type ConnectionFilter = 'all' | 'active' | 'inactive'
 
 export interface UseELDsOptions {
-  carrierId: string
+  companyId: string
   autoFetch?: boolean
 }
 
 export function useELDs(options: UseELDsOptions) {
-  const { carrierId, autoFetch = false } = options
+  const { companyId, autoFetch = false } = options
   const api = useApi()
 
   // State
@@ -37,7 +37,7 @@ export function useELDs(options: UseELDsOptions) {
 
     try {
       const params: Record<string, any> = {
-        CarrierId: carrierId,
+        CompanyId: companyId,
         pageNumber: pagination.currentPage.value,
         pageSize: pagination.itemsPerPage.value,
       }

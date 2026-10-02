@@ -21,7 +21,7 @@ export interface RoleResponse {
 export interface RoleRequest {
   name: string
   type: number
-  providerId: string
+  clientId: string
   permissionIds: string[]
 }
 

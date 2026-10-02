@@ -4,7 +4,9 @@
     <div class="overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow class="bg-[#f0f0f0] dark:bg-muted/50 border-0 hover:bg-[#f0f0f0] dark:hover:bg-muted/50">
+          <TableRow
+            class="bg-[#f0f0f0] dark:bg-muted/50 border-0 hover:bg-[#f0f0f0] dark:hover:bg-muted/50"
+          >
             <TableHead class="w-16">
               <button
                 @click="handleSort('id')"
@@ -68,9 +70,6 @@
                 <SortIcon class="w-4 h-4" />
               </button>
             </TableHead>
-            <TableHead>
-              <span class="font-medium dark:text-gray-300">Actions</span>
-            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -86,23 +85,22 @@
             <TableCell class="p-2">{{ vehicle.eld }}</TableCell>
             <TableCell class="p-2">{{ vehicle.vin }}</TableCell>
             <TableCell class="p-2">
-              <Switch :model-value="vehicle.status" @update:model-value="toggleVehicleStatus(vehicle)" />
-            </TableCell>
-            <TableCell class="p-2">
-              <Button
-                @click="(e: MouseEvent) => handleEditClick(vehicle, e)"
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
+              <span
+                class="rounded-full px-2.5 py-1 text-xs font-medium"
+                :class="
+                  vehicle.status
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-muted text-muted-foreground'
+                "
               >
-                <Pencil class="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              </Button>
+                {{ vehicle.status ? 'Active' : 'Inactive' }}
+              </span>
             </TableCell>
           </TableRow>
 
           <!-- No results -->
           <TableRow v-if="paginatedVehicles.length === 0">
-            <TableCell colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400">
+            <TableCell colspan="7" class="text-center py-8 text-gray-500 dark:text-gray-400">
               No vehicles found
             </TableCell>
           </TableRow>
@@ -186,7 +184,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronLeft, ChevronRight, Pencil } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -204,7 +202,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Switch } from '@/components/ui/switch'
 import { Vehicle } from '@/modules/Vehicles/types'
 import type { SortKey } from '../composables/useVehicles'
 
@@ -224,8 +221,6 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'sort', key: SortKey): void
   (e: 'goToPage', page: number): void
-  (e: 'toggleStatus', vehicle: Vehicle): void
-  (e: 'edit', vehicle: Vehicle): void
   (e: 'update:itemsPerPage', value: number): void
 }>()
 
@@ -235,21 +230,11 @@ const localItemsPerPage = computed({
   set: (value) => emit('update:itemsPerPage', value),
 })
 
-
-const handleEditClick = (vehicle: Vehicle, event: MouseEvent) => {
-  event.stopPropagation()
-  emit('edit', vehicle)
-}
-
 const handleSort = (key: SortKey) => {
   emit('sort', key)
 }
 
 const goToPage = (page: number) => {
   emit('goToPage', page)
-}
-
-const toggleVehicleStatus = (vehicle: Vehicle) => {
-  emit('toggleStatus', vehicle)
 }
 </script>

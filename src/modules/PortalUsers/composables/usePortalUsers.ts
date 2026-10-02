@@ -6,7 +6,7 @@ import { sortArray, commonTransformers, type SortOrder } from '@/utils/sort'
 import { usePagination } from '@/composables/usePagination'
 import { useSorting } from '@/composables/useSorting'
 import { ApiEndpoints } from '@/api/endpoints'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type {
   PortalUser,
@@ -81,8 +81,8 @@ export function usePortalUsers() {
       const params = {
         pageNumber: pagination.currentPage.value,
         pageSize: pagination.itemsPerPage.value,
-        providerId: authStore.providerId,
-        carrierId: getCarrierId(),
+        clientId: authStore.clientId,
+        companyId: getCompanyId(),
       }
 
       const response = await api.get<PortalUsersListResponse>(ApiEndpoints.PORTAL_USERS_FILTER, {
@@ -138,12 +138,12 @@ export function usePortalUsers() {
   // Since we use server-side pagination, paginatedUsers = filteredUsers (already paginated by server)
   const paginatedUsers = computed(() => filteredUsers.value)
 
-  // Fetch roles — pass providerId to get roles scoped to this provider (same as useUsers.ts)
+  // Fetch roles — pass clientId to get roles scoped to this provider (same as useUsers.ts)
   const fetchRoles = async () => {
     isLoadingRoles.value = true
     try {
       const response = await api.get<RolesResponse>(ApiEndpoints.ROLES_URL, {
-        params: { providerId: authStore.providerId },
+        params: { clientId: authStore.clientId },
       })
       if (response.data?.successResult) {
         const result = response.data.successResult
@@ -212,8 +212,8 @@ export function usePortalUsers() {
         phoneNumber: userData.phoneNumber,
         password: userData.password,
         passwordConfirm: userData.confirmPassword,
-        providerId: authStore.providerId,
-        carrierId: getCarrierId(),
+        clientId: authStore.clientId,
+        companyId: getCompanyId(),
         roleId: selectedRole?.id || null,
       }
 
@@ -243,8 +243,8 @@ export function usePortalUsers() {
         phoneNumber: userData.phoneNumber || null,
         password: userData.password || null,
         passwordConfirm: userData.confirmPassword || null,
-        providerId: authStore.providerId,
-        carrierId: getCarrierId(),
+        clientId: authStore.clientId,
+        companyId: getCompanyId(),
         roleId: selectedRole?.id || null,
       }
 

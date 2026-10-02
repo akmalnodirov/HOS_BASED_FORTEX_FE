@@ -29,12 +29,12 @@ export interface IftaGenerateRequest {
   vehicleIds: string[]
   startDate: string
   endDate: string
-  carrierId: string
+  companyId: string
 }
 
 // API request for fetching IFTA list
 export interface IftaFilterRequest {
-  carrierId: string
+  companyId: string
   pageNumber?: number
   pageSize?: number
 }

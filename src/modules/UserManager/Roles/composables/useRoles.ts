@@ -30,7 +30,7 @@ export function useRoles() {
   const searchQuery = ref('')
   const isMounted = ref(true) // Track component mount state to prevent memory leaks
 
-  // Auth store for getting providerId
+  // Auth store for getting clientId
   const authStore = useAuthStore()
   const { getUser: user } = storeToRefs(authStore)
 
@@ -52,17 +52,17 @@ export function useRoles() {
   })
 
   /**
-   * Get providerId from auth store (falls back to carrierId if providerId is not available)
+   * Get clientId from auth store (falls back to companyId if clientId is not available)
    * Uses carrier.provider.id from current-user API response
    */
-  const getProviderId = (): string | null => {
-    return authStore.providerId || authStore.carrierId || null
+  const getClientId = (): string | null => {
+    return authStore.clientId || authStore.companyId || null
   }
 
   /**
    * Fetch roles from API
    * Fixed: Checks isMounted before updating state to prevent memory leaks
-   * ProviderId is always sent as query parameter if available (like RouteApp)
+   * ClientId is always sent as query parameter if available (like RouteApp)
    */
   const fetchRoles = async () => {
     if (!isMounted.value) return
@@ -71,20 +71,20 @@ export function useRoles() {
     error.value = null
 
     try {
-      const providerId = getProviderId()
-      // Always include providerId in params if available (like RouteApp)
+      const clientId = getClientId()
+      // Always include clientId in params if available (like RouteApp)
       const params: {
         pageNumber: number
         pageSize: number
-        providerId?: string
+        clientId?: string
       } = {
         pageNumber: pagination.currentPage.value,
         pageSize: pagination.itemsPerPage.value,
       }
 
-      // Add providerId to query params if available (like RouteApp does)
-      if (providerId) {
-        params.providerId = providerId
+      // Add clientId to query params if available (like RouteApp does)
+      if (clientId) {
+        params.clientId = clientId
       }
 
       const response = await roleService.getRoles(params)
@@ -221,15 +221,15 @@ export function useRoles() {
     if (!isMounted.value) return
 
     try {
-      const providerId = getProviderId()
-      if (!providerId) {
-        throw new Error('Provider ID is required')
+      const clientId = getClientId()
+      if (!clientId) {
+        throw new Error('Client ID is required')
       }
 
       await roleService.createRole({
         name: data.name,
         type: parseInt(data.type, 10) || 5,
-        providerId: providerId,
+        clientId: clientId,
         permissionIds: Array.isArray(data.permissions) ? data.permissions : [],
       })
 
@@ -248,15 +248,15 @@ export function useRoles() {
     if (!isMounted.value) return
 
     try {
-      const providerId = getProviderId()
-      if (!providerId) {
-        throw new Error('Provider ID is required')
+      const clientId = getClientId()
+      if (!clientId) {
+        throw new Error('Client ID is required')
       }
 
       await roleService.updateRole(String(id), {
         name: data.name,
         type: parseInt(data.type, 10) || 5,
-        providerId: providerId,
+        clientId: clientId,
         permissionIds: Array.isArray(data.permissions) ? data.permissions : [],
       })
 

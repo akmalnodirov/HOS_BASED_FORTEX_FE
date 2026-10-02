@@ -42,12 +42,12 @@ export interface MonitoringDriver {
   timeZone?: string
 }
 
-export interface MonitoringCarrier {
-  carrierId: string
-  carrierName: string
+export interface MonitoringCompany {
+  companyId: string
+  companyName: string
   hasProblem: boolean
   monitoringDrivers: MonitoringDriver[]
-  providerName: string
+  clientName: string
   timeZone: string
   timeZoneInfo: {
     id: string
@@ -61,7 +61,7 @@ export interface MonitoringCarrier {
 
 export interface MonitoringResponse {
   successResult: {
-    data: MonitoringCarrier[]
+    data: MonitoringCompany[]
     totalCount: number
   }
 }
@@ -72,7 +72,7 @@ export interface MonitoringStats {
   mostCommonError: string
 }
 
-// Carrier Detail Types
+// Company Detail Types
 export interface IssuerState {
   id: string
   name: string
@@ -89,7 +89,7 @@ export interface TimeZoneInfo {
   ianaId: string
 }
 
-export interface CarrierTerminal {
+export interface CompanyTerminal {
   id: string
   timeZoneInfo: TimeZoneInfo
   street: string
@@ -118,7 +118,7 @@ export interface RestBreak {
   name: string
 }
 
-export interface CarrierDriverLogSetting {
+export interface CompanyDriverLogSetting {
   id: string
   exemptDriver: boolean
   shortHaulException: boolean
@@ -133,7 +133,7 @@ export interface CarrierDriverLogSetting {
   allowTracking: boolean
 }
 
-export interface Provider {
+export interface Client {
   id: string
   name: string
   email: string
@@ -145,7 +145,7 @@ export interface Provider {
   permissions: unknown[]
 }
 
-export interface CarrierDetail {
+export interface CompanyDetail {
   id: string
   name: string
   usdotNumber: string
@@ -156,13 +156,13 @@ export interface CarrierDetail {
   zipCode: string
   issuerState: IssuerState
   timeZoneInfo: TimeZoneInfo
-  carrierTerminals: CarrierTerminal[]
-  carrierDriverLogSetting: CarrierDriverLogSetting
-  provider: Provider
+  carrierTerminals: CompanyTerminal[]
+  carrierDriverLogSetting: CompanyDriverLogSetting
+  provider: Client
 }
 
-export interface CarrierDetailResponse {
-  successResult: CarrierDetail
+export interface CompanyDetailResponse {
+  successResult: CompanyDetail
 }
 
 // Monitoring Event/Error Types

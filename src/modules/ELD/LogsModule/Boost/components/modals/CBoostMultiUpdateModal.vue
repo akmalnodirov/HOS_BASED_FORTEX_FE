@@ -145,7 +145,7 @@ import {
 } from '@/components/ui/select'
 import dayjs from 'dayjs'
 import type { BoostUiEventRow } from '../../composables/useBoost.ts'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 
 const SHIFT_FIELDS = [
   { key: 'days' as const, label: 'Day', placeholder: '00', max: undefined },
@@ -177,7 +177,7 @@ const emit = defineEmits<{
   }]
 }>()
 
-const { drivers, fetchDrivers } = useCarriersDrivers()
+const { drivers, fetchDrivers } = useCompaniesDrivers()
 const isDriversLoading = ref(false)
 
 const form = reactive({ trailer: '', doc: '', coDriverId: '' })

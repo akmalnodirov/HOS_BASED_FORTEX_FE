@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useAuditStore } from '../store/auditStore'
 import { useDriverDailyForm } from '@/modules/ELD/LogsModule/[Id]/composables/useDriverDailyForm'
@@ -62,7 +62,7 @@ export function useAuditDetail() {
   const tripNumbers = ref<number[]>(JSON.parse(localStorage.getItem('tripNumbers') || '[]'))
 
   // Drivers (for edit profile modal)
-  const { drivers, fetchDrivers } = useCarriersDrivers()
+  const { drivers, fetchDrivers } = useCompaniesDrivers()
 
   // Edit profile modal
   const editProfileModal = ref(false)

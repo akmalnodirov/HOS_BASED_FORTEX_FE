@@ -58,7 +58,7 @@ export interface VehicleSimple {
   unit?: string | null
 }
 
-export interface CarrierResponse {
+export interface CompanyResponse {
   id: string
   name?: string
   carrierTerminals?: HomeTerminalResponse[]
@@ -84,8 +84,31 @@ export interface DriverApiResponse {
   allowYardMoves: boolean
   unlimitedShippingDocuments: boolean
   deviceInfo?: DeviceInfo | null
-  carrier: CarrierResponse
+  carrier: CompanyResponse
   isActive: boolean
+}
+
+export interface RouteEldDriverApiResponse {
+  driverId: string
+  hasVan: boolean
+  trailers: string | null
+  disableSleeperBerth: boolean
+}
+
+export interface RouteEldDriverUpdateFormData {
+  password: string
+  confirmPassword: string
+  hasVan: boolean
+  trailers: string
+  disableSleeperBerth: boolean
+}
+
+export interface RouteEldDriverUpdateRequest {
+  password: string
+  passwordConfirm: string
+  hasVan: boolean
+  trailers: string | null
+  disableSleeperBerth: boolean
 }
 
 // API request shape for creating/updating
@@ -111,7 +134,10 @@ export interface DriverApiRequest {
   cargoTypeId: string
   restartId: string
   restBreakId: string
-  carrierId: string
+  companyId: string
+  hasVan: boolean
+  trailers: string | null
+  disableSleeperBerth: boolean
 }
 
 // UI display shape (used by table component)
@@ -142,6 +168,10 @@ export interface Driver {
   cargoType?: string
   restart?: string
   restBreak?: string
+  isRouteEldDriver?: boolean
+  hasVan?: boolean
+  trailers?: string
+  disableSleeperBerth?: boolean
 }
 
 export interface DriverFormData {
@@ -167,6 +197,10 @@ export interface DriverFormData {
   cargoType: string
   restart: string
   restBreak: string
+  isRouteEldDriver: boolean
+  hasVan: boolean
+  trailers: string
+  disableSleeperBerth: boolean
 }
 
 export type DriverFilter = 'all' | 'active' | 'inactive'

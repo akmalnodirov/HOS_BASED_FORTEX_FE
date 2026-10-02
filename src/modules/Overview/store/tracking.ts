@@ -88,9 +88,9 @@ export const useTrackingStore = defineStore('tracking', () => {
     }
   }
 
-  async function getDriverLastTrackings(carrierId: string, search?: string) {
+  async function getDriverLastTrackings(companyId: string, search?: string) {
     try {
-      const params: any = { carrierId }
+      const params: any = { companyId }
       if (search) {
         params.searchQuery = search
       }

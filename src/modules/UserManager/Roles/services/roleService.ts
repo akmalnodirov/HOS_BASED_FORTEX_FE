@@ -21,7 +21,7 @@ class RoleService {
   async getRoles(params?: {
     pageNumber?: number
     pageSize?: number
-    providerId?: string
+    clientId?: string
   }): Promise<RoleListResponse> {
     const response = await this.api.get<RoleListResponse>(
       ApiEndpoints.ROLES_URL,

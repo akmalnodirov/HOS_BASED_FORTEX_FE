@@ -3,11 +3,11 @@ import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 
-export interface CarrierItem {
+export interface CompanyItem {
   id: string
   name: string
   timeZoneInfo?: { ianaId: string }
-  provider?: { name: string }
+  client?: { name: string }
 }
 
 export interface DriverItem {
@@ -16,29 +16,34 @@ export interface DriverItem {
   user?: { firstName: string; lastName: string }
 }
 
-export function useCarriersDrivers() {
+export function useCompaniesDrivers() {
   const api = useApi()
   const authStore = useAuthStore()
 
-  const carriers = ref<CarrierItem[]>([])
+  const companies = ref<CompanyItem[]>([])
   const drivers = ref<DriverItem[]>([])
 
-  async function fetchCarriers() {
+  async function fetchCompanies() {
     try {
-      const response = await api.post<{ successResult: { data: CarrierItem[] } }>(
-        ApiEndpoints.CARRIERS_FILTER,
-        { pageNumber: null, pageSize: null, providerId: authStore.providerId }
+      const response = await api.post<{
+        successResult: { data: Array<Omit<CompanyItem, 'client'> & { provider?: { name: string } }> }
+      }>(
+        ApiEndpoints.COMPANIES_FILTER,
+        { pageNumber: null, pageSize: null, clientId: authStore.clientId }
       )
-      carriers.value = response.data?.successResult?.data ?? []
+      companies.value = (response.data?.successResult?.data ?? []).map((company) => ({
+        ...company,
+        client: company.provider,
+      }))
     } catch (err) {
-      console.error('Error fetching carriers:', err)
+      console.error('Error fetching companies:', err)
     }
   }
 
-  async function fetchDrivers(carrierId?: string | null) {
+  async function fetchDrivers(companyId?: string | null) {
     try {
       const payload: Record<string, unknown> = { pageNumber: null, pageSize: null }
-      if (carrierId && carrierId !== 'all') payload.carrierId = carrierId
+      if (companyId && companyId !== 'all') payload.companyId = companyId
 
       const response = await api.post<{ successResult: { data: any[] } | any[] }>(
         ApiEndpoints.DRIVERS_FILTER,
@@ -58,5 +63,5 @@ export function useCarriersDrivers() {
     }
   }
 
-  return { carriers, drivers, fetchCarriers, fetchDrivers }
+  return { companies, drivers, fetchCompanies, fetchDrivers }
 }

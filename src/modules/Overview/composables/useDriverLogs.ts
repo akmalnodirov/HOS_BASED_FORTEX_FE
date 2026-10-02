@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { useApi } from '@/composables/useAxiosService'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import type { DriversLastEventsResponse, MonitoringDriver, DriverLastEvent } from '../types'
 
 export function useDriverLogs() {
@@ -104,10 +104,10 @@ export function useDriverLogs() {
 
   // Fetch driver logs
   const fetchDriverLogs = async () => {
-    const currentCarrierId = getCarrierId()
-    if (!currentCarrierId) {
-      error.value = 'Carrier ID is required'
-      console.warn('fetchDriverLogs: Carrier ID is not available')
+    const currentCompanyId = getCompanyId()
+    if (!currentCompanyId) {
+      error.value = 'Company ID is required'
+      console.warn('fetchDriverLogs: Company ID is not available')
       return
     }
 
@@ -116,7 +116,7 @@ export function useDriverLogs() {
 
     try {
       const params: Record<string, string | number> = {
-        CarrierId: currentCarrierId,
+        CompanyId: currentCompanyId,
       }
 
       if (searchQuery.value.trim()) {

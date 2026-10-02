@@ -94,7 +94,7 @@ const handleCompanySelect = (value: string) => {
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
 
-    <!-- Table — always visible with all carriers -->
+    <!-- Table — always visible with all companies -->
     <CompanyTable
       v-else
       :companies="tableCompanies"

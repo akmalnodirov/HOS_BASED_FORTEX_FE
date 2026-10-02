@@ -33,6 +33,6 @@ export interface CompanyDetailedResponse {
   successResult: Company
 }
 
-export interface AdminProvidersResponse {
+export interface AdminClientsResponse {
   successResult: { id: string; name: string }[]
 }

@@ -284,14 +284,14 @@ import {
 import CDvirTable from '@/modules/Dvir/components/CDvirTable.vue'
 import CDvirModal from '@/modules/Dvir/components/CDvirModal.vue'
 import { useDvir } from '@/modules/Dvir/composables/useDvir'
-import { getCarrierIdOrThrow } from '@/utils/carrier'
+import { getCompanyIdOrThrow } from '@/utils/company'
 import dayjs from 'dayjs'
 import type { DateRange, DateValue } from 'reka-ui'
 import { CalendarDate } from '@internationalized/date'
 import { cn } from '@/lib/utils'
 
-// Get carrierId from localStorage
-const carrierId = getCarrierIdOrThrow()
+// Get companyId from localStorage
+const companyId = getCompanyIdOrThrow()
 
 const {
   // State
@@ -349,7 +349,7 @@ const {
   deleteDvir,
   fetchSignaturesByDriver,
 } = useDvir({
-  carrierId: carrierId,
+  companyId: companyId,
   autoFetch: true,
 })
 

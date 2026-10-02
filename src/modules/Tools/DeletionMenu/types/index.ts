@@ -15,8 +15,8 @@ export interface Driver {
 
 export interface DeletionMenuItem {
   id: string
-  providerId: string
-  providerName: string
+  clientId: string
+  clientName: string
   name: string // carrier name
   drivers: Driver[]
 }
@@ -30,15 +30,15 @@ export interface DeletionMenuListResponse {
 
 export interface AssignTestDriverRequest {
   driverId: string
-  carrierId: string
+  companyId: string
   isTestDriver: boolean
 }
 
-export interface DeletionMenuProvider {
+export interface DeletionMenuClient {
   id: string
   name: string
 }
 
-export interface DeletionMenuProvidersResponse {
-  successResult: DeletionMenuProvider[]
+export interface DeletionMenuClientsResponse {
+  successResult: DeletionMenuClient[]
 }

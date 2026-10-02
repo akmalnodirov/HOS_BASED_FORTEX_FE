@@ -6,15 +6,8 @@
 
     <div v-else class="space-y-6">
       <!-- Header -->
-      <div class="flex items-center justify-between">
+      <div>
         <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Company</h2>
-        <Button
-          @click="goToEdit"
-          class="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900"
-        >
-          <Pencil class="w-4 h-4 mr-2" />
-          Edit
-        </Button>
       </div>
 
       <!-- General Information Section -->
@@ -26,22 +19,22 @@
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="space-y-1">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Carrier ID</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Company ID</p>
             <div
               class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3"
             >
               <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ company.carrierId }}
+                {{ company.companyId }}
               </p>
             </div>
           </div>
           <div class="space-y-1">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Carrier name</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Company name</p>
             <div
               class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3"
             >
               <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ company.carrierName }}
+                {{ company.companyName }}
               </p>
             </div>
           </div>
@@ -67,7 +60,7 @@
           </div>
 
           <div class="space-y-1">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Carrier address</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Company address</p>
             <div
               class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3"
             >
@@ -79,7 +72,7 @@
         </div>
       </div>
 
-      <!-- Carrier Settings Section -->
+      <!-- Company Settings Section -->
       <div
         class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
       >
@@ -218,17 +211,9 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { Pencil } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
 import { useCompany } from '@/modules/Company/composables/useCompany'
 
-const router = useRouter()
 const { company, isLoading, loadCompany, initializeData } = useCompany()
-
-const goToEdit = () => {
-  router.push({ name: 'CompanyEdit' })
-}
 
 onMounted(async () => {
   await initializeData()

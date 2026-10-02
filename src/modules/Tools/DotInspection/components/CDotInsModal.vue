@@ -16,20 +16,20 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import type { CreateDotInspectionRequest } from '@/modules/Tools/DotInspection/types'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { DateRange, DateValue } from 'reka-ui'
 import { CalendarDate } from '@internationalized/date'
 import { cn } from '@/lib/utils'
 
-interface Carrier {
+interface Company {
   id: string
   name: string
 }
 
 interface Props {
   open: boolean
-  carriers: Carrier[]
+  companies: Company[]
 }
 
 const props = defineProps<Props>()
@@ -38,7 +38,7 @@ const emit = defineEmits<{
   (e: 'submit', data: CreateDotInspectionRequest): void
 }>()
 
-const { drivers, fetchDrivers } = useCarriersDrivers()
+const { drivers, fetchDrivers } = useCompaniesDrivers()
 const isDriversLoading = ref(false)
 
 // Default to last two days (yesterday and today)
@@ -59,19 +59,19 @@ const errors = ref<Record<string, string>>({})
 const isSubmitting = ref(false)
 const isCalendarOpen = ref(false)
 
-const companyOptions = computed(() => props.carriers || [])
+const companyOptions = computed(() => props.companies || [])
 const driverOptions = computed(() => drivers.value)
 
 // Fetch drivers when company changes
 watch(
   () => formData.value.company,
-  async (carrierId) => {
+  async (companyId) => {
     formData.value.driver = ''
     drivers.value = []
-    if (!carrierId) return
+    if (!companyId) return
     isDriversLoading.value = true
     try {
-      await fetchDrivers(carrierId)
+      await fetchDrivers(companyId)
     } finally {
       isDriversLoading.value = false
     }
@@ -193,7 +193,7 @@ const handleSubmit = async () => {
     }
 
     const payload: CreateDotInspectionRequest = {
-      carrierId: formData.value.company,
+      companyId: formData.value.company,
       driverId: formData.value.driver,
       startDate: formData.value.blockDate[0].format('YYYY-MM-DD'),
       endDate: formData.value.blockDate[1].format('YYYY-MM-DD'),

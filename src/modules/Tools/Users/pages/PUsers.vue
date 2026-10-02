@@ -186,8 +186,8 @@
     <!-- Create User Modal -->
     <UserModal
       :open="isCreateModalOpen"
-      :roles="providerRoles"
-      :provider-id="providerId"
+      :roles="clientRoles"
+      :client-id="clientId"
       :form-errors="formErrors"
       mode="create"
       @close="closeCreateModal"
@@ -197,8 +197,8 @@
     <!-- Edit User Modal -->
     <UserModal
       :open="isEditModalOpen"
-      :roles="providerRoles"
-      :provider-id="providerId"
+      :roles="clientRoles"
+      :client-id="clientId"
       :form-errors="formErrors"
       :user="selectedUser"
       mode="edit"
@@ -234,7 +234,7 @@ import type { CreateUserRequest, UpdateUserRequest } from '@/modules/Tools/Users
 
 const {
   // State
-  providerRoles,
+  clientRoles,
   isLoading,
   error,
 
@@ -290,7 +290,7 @@ const {
   getStatusBadgeClass,
 
   // Auth
-  providerId,
+  clientId,
 } = useUsers()
 
 const handleCreateSubmit = (data: CreateUserRequest | UpdateUserRequest) => {

@@ -79,11 +79,11 @@
           v-if="selectedTripIndex === ind"
           ref="formRefs"
           :order="ind + 1"
-          :carriers="carriers"
+          :companies="companies"
           :drivers="drivers"
           :disabled="loading || tripsSaved"
           :constants="{
-            carrierId: auditFormAll.carrierId,
+            companyId: auditFormAll.companyId,
             driverId: auditFormAll.driverId,
             startTime: auditFormAll.startTime as TimeValue,
             endTime: auditFormAll.endTime as TimeValue,
@@ -119,7 +119,7 @@ import type { TimeValue } from '../types'
 const {
   loading,
   tripsSaved,
-  carriers,
+  companies,
   drivers,
   auditFormAll,
   auditId,

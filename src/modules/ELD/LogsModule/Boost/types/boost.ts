@@ -11,8 +11,8 @@ export interface SessionRequest {
 export interface SessionResponse {
   id: string
   type: number | null
-  carrierId: string
-  carrierName: string
+  companyId: string
+  companyName: string
   driverId: string
   driverName: string
   status: number

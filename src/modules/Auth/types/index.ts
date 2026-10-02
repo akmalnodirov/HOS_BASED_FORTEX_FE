@@ -56,8 +56,8 @@ export interface TimeZoneInfo {
   ianaId: string
 }
 
-// Provider from carrier
-export interface Provider {
+// Client from carrier
+export interface Client {
   id: string
   name: string
   email: string
@@ -69,8 +69,8 @@ export interface Provider {
   permissions: Permission[]
 }
 
-// Carrier from current-user API
-export interface CurrentUserCarrier {
+// Company from current-user API
+export interface CurrentUserCompany {
   id: string
   name: string
   usdotNumber: string
@@ -83,21 +83,21 @@ export interface CurrentUserCarrier {
   timeZoneInfo: TimeZoneInfo
   carrierTerminals?: unknown[]
   carrierDriverLogSetting?: unknown | null
-  provider: Provider | null
+  client: Client | null
 }
 
 // Current User API Response
 export interface CurrentUserResponse {
   successResult?: {
     user: User
-    carrier: CurrentUserCarrier | null
+    carrier: (Omit<CurrentUserCompany, 'client'> & { provider: Client | null }) | null
   }
 }
 
 // Auth Store State
 export interface AuthState {
   user: User | null
-  carrier: CurrentUserCarrier | null
+  company: CurrentUserCompany | null
   loggedIn: boolean
   token: string | null
   refreshToken: string | null

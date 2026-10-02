@@ -20,15 +20,15 @@ export function useStatisticCompany() {
   const api = useApi()
   const authStore = useAuthStore()
 
-  const providerId = computed(() => authStore.providerId || '')
+  const clientId = computed(() => authStore.clientId || '')
 
-  // Table data — always shows all carriers
+  // Table data — always shows all companies
   const tableCompanies = ref<Company[]>([])
   const companyNames = ref<CompanyName[]>([])
   const isLoadingTable = ref(false)
 
   // Chart data — only populated when a carrier is selected
-  const detailedCarrier = ref<Company | null>(null)
+  const detailedCompany = ref<Company | null>(null)
   const detailedSession = ref<Company | null>(null)
   const isLoadingChart = ref(false)
 
@@ -43,7 +43,7 @@ export function useStatisticCompany() {
   async function fetchCompanyNames() {
     try {
       const response = await api.get<CompanyNamesResponse>(ApiEndpoints.STATISTICS_COMPANY_NAMES, {
-        params: { providerId: providerId.value },
+        params: { clientId: clientId.value },
       })
       if (response.data?.successResult) {
         companyNames.value = response.data.successResult
@@ -57,7 +57,7 @@ export function useStatisticCompany() {
   async function fetchTableStatistics() {
     isLoadingTable.value = true
     try {
-      const params = { type: timeFilterValue.value, providerId: providerId.value }
+      const params = { type: timeFilterValue.value, clientId: clientId.value }
       const response = await api.get<CompaniesStatisticsResponse>(ApiEndpoints.STATISTICS_COMPANY, {
         params,
       })
@@ -77,9 +77,9 @@ export function useStatisticCompany() {
   async function fetchDetailedStatistics(companyId: string) {
     isLoadingChart.value = true
     try {
-      const params = { type: timeFilterValue.value, providerId: providerId.value }
+      const params = { type: timeFilterValue.value, clientId: clientId.value }
 
-      const [carrierRes, sessionRes] = await Promise.allSettled([
+      const [companyRes, sessionRes] = await Promise.allSettled([
         api.get<CompanyDetailedResponse>(ApiEndpoints.STATISTICS_COMPANY_DETAILED(companyId), {
           params,
         }),
@@ -89,8 +89,8 @@ export function useStatisticCompany() {
         ),
       ])
 
-      detailedCarrier.value =
-        carrierRes.status === 'fulfilled' ? carrierRes.value.data?.successResult || null : null
+      detailedCompany.value =
+        companyRes.status === 'fulfilled' ? companyRes.value.data?.successResult || null : null
       detailedSession.value =
         sessionRes.status === 'fulfilled' ? sessionRes.value.data?.successResult || null : null
     } catch (err) {
@@ -102,18 +102,18 @@ export function useStatisticCompany() {
 
   // Clear chart data
   function clearChartData() {
-    detailedCarrier.value = null
+    detailedCompany.value = null
     detailedSession.value = null
   }
 
   // Chart data for TrucksChart — empty if no carrier selected
   const trucksChartData = computed(() => {
-    if (!detailedCarrier.value) {
+    if (!detailedCompany.value) {
       return { categories: [] as string[], series: [] as number[] }
     }
     return {
-      categories: detailedCarrier.value.data?.map((d) => d.name) || [],
-      series: detailedCarrier.value.data?.map((d) => d.quantity) || [],
+      categories: detailedCompany.value.data?.map((d) => d.name) || [],
+      series: detailedCompany.value.data?.map((d) => d.quantity) || [],
     }
   })
 

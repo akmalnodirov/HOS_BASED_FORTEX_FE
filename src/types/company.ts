@@ -1,4 +1,4 @@
-// Company/Provider Types
+// Company/Client Types
 
 export interface TimeZoneInfo {
   id: string
@@ -9,8 +9,8 @@ export interface TimeZoneInfo {
   ianaId: string
 }
 
-export interface Carrier {
-  carrierId: string
+export interface Company {
+  companyId: string
   name: string
   usdotNumber: string
   phoneNumber: string
@@ -18,14 +18,27 @@ export interface Carrier {
   timeZoneInfo: TimeZoneInfo
 }
 
-export interface Provider {
-  providerId: string
-  providerName: string
-  carriers: Carrier[]
+export interface Client {
+  clientId: string
+  clientName: string
+  companies: Company[]
 }
 
-export interface ProvidersResponse {
-  successResult: Provider[]
+export interface ClientsResponse {
+  successResult: Client[]
+}
+
+export interface RouteEldCompany {
+  id: string
+  externalCompanyId: string
+  name: string
+  dotNumber: string
+  isActive: boolean
+  lastSyncedAt?: string | null
+}
+
+export interface RouteEldCompaniesResponse {
+  successResult: RouteEldCompany[]
 }
 
 // Flattened company for table display
@@ -38,8 +51,8 @@ export interface CompanyTableItem {
   status: 'Active' | 'Inactive'
   createdAt: Date
   // Original data
-  providerId: string
-  carrierId?: string
+  clientId: string
+  companyId?: string
   usdotNumber?: string
   timeZone?: string
 }

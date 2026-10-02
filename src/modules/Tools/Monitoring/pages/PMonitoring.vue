@@ -7,13 +7,13 @@
           <h2 class="text-2xl font-semibold text-foreground">Monitoring</h2>
 
           <div class="flex items-center gap-3">
-            <!-- Carrier Filter -->
-            <Select v-model="selectedCarrier">
+            <!-- Company Filter -->
+            <Select v-model="selectedCompany">
               <SelectTrigger class="w-48 dark:bg-card border-border">
-                <SelectValue placeholder="All carriers" />
+                <SelectValue placeholder="All companies" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in carrierOptions" :key="option.id" :value="option.id">
+                <SelectItem v-for="option in companyOptions" :key="option.id" :value="option.id">
                   {{ option.name }}
                 </SelectItem>
               </SelectContent>
@@ -38,7 +38,7 @@
 
       <!-- Loading State -->
       <div
-        v-if="isLoading && filteredCarriers.length === 0"
+        v-if="isLoading && filteredCompanies.length === 0"
         class="flex items-center justify-center py-12"
       >
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -52,8 +52,8 @@
       <!-- Accordion -->
       <div v-else class="py-6">
         <MonitoringAccordion
-          :carriers="filteredCarriers"
-          :get-carrier-stats="getCarrierStats"
+          :companies="filteredCompanies"
+          :get-company-stats="getCompanyStats"
           :get-event-name="getEventName"
           :get-event-badge-class="getEventBadgeClass"
           :format-duration="formatDuration"
@@ -77,27 +77,27 @@ import ProgressBar from '@/modules/Tools/Monitoring/components/CMonitoringProgre
 import MonitoringAccordion from '@/modules/Tools/Monitoring/components/CMonitoringAccordion.vue'
 import { useMonitoring } from '@/modules/Tools/Monitoring/composables/useMonitoring'
 
-// TODO: Get providerId from auth/route
-const providerId = '019a9110-6ac5-73ea-8f1c-af3bebbd7c2d'
+// TODO: Get clientId from auth/route
+const clientId = '019a9110-6ac5-73ea-8f1c-af3bebbd7c2d'
 
 const {
   // State
   isLoading,
   error,
-  carrierOptions,
+  companyOptions,
 
   // Filters
-  selectedCarrier,
+  selectedCompany,
 
   // Computed
-  filteredCarriers,
+  filteredCompanies,
   getProgressSegments,
 
   // Functions
-  getCarrierStats,
+  getCompanyStats,
   getEventName,
   getEventBadgeClass,
   formatDuration,
   handleSync,
-} = useMonitoring({ providerId })
+} = useMonitoring({ clientId })
 </script>

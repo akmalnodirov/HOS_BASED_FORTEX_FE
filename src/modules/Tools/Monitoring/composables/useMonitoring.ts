@@ -4,37 +4,37 @@ import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import type {
   MonitoringResponse,
-  MonitoringCarrier,
+  MonitoringCompany,
   MonitoringStats,
 } from '@/modules/Tools/Monitoring/types'
 
 export interface UseMonitoringOptions {
   autoFetch?: boolean
-  providerId: string
+  clientId: string
 }
 
 export function useMonitoring(options: UseMonitoringOptions) {
-  const { autoFetch = true, providerId } = options
+  const { autoFetch = true, clientId } = options
   const api = useApi()
 
   // State
-  const carriers = ref<MonitoringCarrier[]>([])
+  const companies = ref<MonitoringCompany[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
   // Filters
-  const selectedCarrier = ref<string | null>(null)
+  const selectedCompany = ref<string | null>(null)
 
-  // Mock carriers for dropdown
-  const carrierOptions = ref([{ id: 'all', name: 'All carriers' }])
+  // Mock companies for dropdown
+  const companyOptions = ref([{ id: 'all', name: 'All companies' }])
 
-  // Calculate stats for each carrier
-  const getCarrierStats = (carrier: MonitoringCarrier): MonitoringStats => {
+  // Calculate stats for each company
+  const getCompanyStats = (company: MonitoringCompany): MonitoringStats => {
     let warnings = 0
     let errors = 0
     const errorMessages: Record<string, number> = {}
 
-    carrier.monitoringDrivers.forEach((driver) => {
+    company.monitoringDrivers.forEach((driver) => {
       if (driver.hasViolation) {
         errors++
       }
@@ -108,21 +108,21 @@ export function useMonitoring(options: UseMonitoringOptions) {
     error.value = null
 
     try {
-      const response = await api.get<MonitoringResponse>(ApiEndpoints.MONITORING_PROVIDER, {
+      const response = await api.get<MonitoringResponse>(ApiEndpoints.MONITORING_CLIENT, {
         params: {
-          ProviderId: providerId,
+          ClientId: clientId,
           PageNumber: 1,
           PageSize: 10,
         },
       })
 
       if (response.data?.successResult?.data) {
-        carriers.value = response.data.successResult.data
+        companies.value = response.data.successResult.data
 
-        // Populate carrier options
-        carrierOptions.value = [
-          { id: 'all', name: 'All carriers' },
-          ...carriers.value.map((c) => ({ id: c.carrierId, name: c.carrierName })),
+        // Populate company options
+        companyOptions.value = [
+          { id: 'all', name: 'All companies' },
+          ...companies.value.map((c) => ({ id: c.companyId, name: c.companyName })),
         ]
       }
     } catch (err: any) {
@@ -133,12 +133,12 @@ export function useMonitoring(options: UseMonitoringOptions) {
     }
   }
 
-  // Filtered carriers
-  const filteredCarriers = computed(() => {
-    if (!selectedCarrier.value || selectedCarrier.value === 'all') {
-      return carriers.value
+  // Filtered companies
+  const filteredCompanies = computed(() => {
+    if (!selectedCompany.value || selectedCompany.value === 'all') {
+      return companies.value
     }
-    return carriers.value.filter((c) => c.carrierId === selectedCarrier.value)
+    return companies.value.filter((c) => c.companyId === selectedCompany.value)
   })
 
   // Sync action
@@ -155,21 +155,21 @@ export function useMonitoring(options: UseMonitoringOptions) {
 
   return {
     // State
-    carriers,
+    companies,
     isLoading,
     error,
-    carrierOptions,
+    companyOptions,
 
     // Filters
-    selectedCarrier,
+    selectedCompany,
 
     // Computed
-    filteredCarriers,
+    filteredCompanies,
     getProgressSegments,
 
     // Functions
     fetchMonitoring,
-    getCarrierStats,
+    getCompanyStats,
     getEventName,
     getEventBadgeClass,
     formatDuration,

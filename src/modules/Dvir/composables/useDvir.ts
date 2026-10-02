@@ -28,11 +28,11 @@ export type SortKey = 'id' | 'driverName' | 'time' | 'vehicle' | 'status' | 'def
 
 export interface UseDvirOptions {
   autoFetch?: boolean
-  carrierId: string
+  companyId: string
 }
 
 export function useDvir(options: UseDvirOptions) {
-  const { autoFetch = true, carrierId } = options
+  const { autoFetch = true, companyId } = options
   const api = useApi()
   const { formatToUTC, getStartOf, getEndOf, convertToTimeZone, acceptAsTimeZone } =
     useTimeZoneHelper()
@@ -131,7 +131,7 @@ export function useDvir(options: UseDvirOptions) {
     isLoadingVehicles.value = true
     try {
       const response = await api.post<VehiclesResponse>('/api/vehicles/filter', {
-        carrierId: carrierId,
+        companyId: companyId,
       })
       if (response.data?.successResult?.data) {
         vehicles.value = response.data.successResult.data
@@ -165,7 +165,7 @@ export function useDvir(options: UseDvirOptions) {
     isLoadingDrivers.value = true
     try {
       const response = await api.post<DriversListResponse>(ApiEndpoints.DRIVERS_FILTER, {
-        carrierId,
+        companyId,
         pageNumber: null,
         pageSize: null,
       })
@@ -229,7 +229,7 @@ export function useDvir(options: UseDvirOptions) {
         endDate: formatToUTC(getEndOf(dateRange.value[1])),
         vehicleId: selectedVehicle.value,
         driverId: null,
-        carrierId: carrierId,
+        companyId: companyId,
       }
 
       const response = await api.get<DvirListResponse>('/api/edit-dvirs/filter', { params })

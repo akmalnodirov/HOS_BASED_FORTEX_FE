@@ -123,7 +123,7 @@ import type { Role, User, CreateUserRequest, UpdateUserRequest } from '@/modules
 interface Props {
   open: boolean
   roles: Role[]
-  providerId: string
+  clientId: string
   user?: User | null
   mode: 'create' | 'edit'
   formErrors?: Record<string, string>
@@ -203,7 +203,7 @@ const handleSubmit = () => {
     userName: form.value.userName,
     roleId: form.value.roleId,
     isActive: form.value.isActive,
-    providerId: props.providerId,
+    clientId: props.clientId,
     ...(props.mode === 'create' || form.value.password
       ? {
           password: form.value.password,

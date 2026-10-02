@@ -25,7 +25,7 @@
       <div class="mt-4 grid grid-cols-2 border border-border rounded-lg overflow-hidden">
         <ProfileItem label="Driver" :value="driverName" />
         <ProfileItem label="Vehicles" :value="vehiclesText" />
-        <ProfileItem label="Carrier" :value="driverDailyForm?.carrier?.name" />
+        <ProfileItem label="Company" :value="driverDailyForm?.carrier?.name" />
         <ProfileItem label="Co-Drivers" :value="coDriverName" />
         <ProfileItem label="DOT Number" :value="driverDailyForm?.carrier?.usdotNumber" />
         <ProfileItem label="Trailers" :value="trailersText" />

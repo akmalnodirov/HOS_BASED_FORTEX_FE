@@ -28,6 +28,8 @@
           </TabsList>
         </Tabs>
 
+        <CThemeToggle />
+
         <!-- Unione Team Button -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
@@ -64,6 +66,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { User, LogOut, ChevronDown } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import CThemeToggle from '@/components/custom/CThemeToggle.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,

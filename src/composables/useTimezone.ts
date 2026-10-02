@@ -19,7 +19,7 @@ export const setApiTimeZone = (ianaId: string) => {
     apiTimezoneId = ianaId
     // Also save to localStorage for persistence
     if (typeof window !== 'undefined') {
-      localStorage.setItem('carrier_timezoneid', ianaId)
+      localStorage.setItem('company_timezoneid', ianaId)
     }
   }
 }
@@ -45,7 +45,7 @@ const getCurrentTimeZone = () => {
 
   // Priority 2: localStorage
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('carrier_timezoneid')
+    const stored = localStorage.getItem('company_timezoneid')
     if (stored) {
       return stored
     }

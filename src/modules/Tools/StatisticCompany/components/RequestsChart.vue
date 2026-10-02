@@ -121,7 +121,7 @@ onUnmounted(() => {
         v-else-if="!hasData()"
         class="absolute inset-0 flex items-center justify-center text-muted-foreground"
       >
-        Select a carrier to view statistics
+        Select a company to view statistics
       </div>
     </CardContent>
   </Card>

@@ -16,12 +16,12 @@ export interface IssuerStateResponse {
   stateCode: string
 }
 
-export interface ServiceProviderResponse {
+export interface ClientResponse {
   id: string
   name: string
 }
 
-export interface CarrierTerminalApiResponse {
+export interface CompanyTerminalApiResponse {
   id: string
   timeZoneInfo: TimeZoneInfoResponse
   street: string
@@ -35,7 +35,7 @@ export interface NamedEntity {
   name: string
 }
 
-export interface CarrierDriverLogSetting {
+export interface CompanyDriverLogSetting {
   id: string
   exemptDriver: boolean
   hosRule: NamedEntity | null
@@ -51,7 +51,7 @@ export interface CarrierDriverLogSetting {
   isAllowedSleep: boolean
 }
 
-export interface CarrierApiResponse {
+export interface CompanyApiResponse {
   id: string
   name: string
   usdotNumber: string
@@ -62,14 +62,14 @@ export interface CarrierApiResponse {
   zipCode: string | null
   issuerState: IssuerStateResponse
   timeZoneInfo: TimeZoneInfoResponse
-  carrierTerminals: CarrierTerminalApiResponse[]
-  carrierDriverLogSetting: CarrierDriverLogSetting | null
-  provider: ServiceProviderResponse
+  carrierTerminals: CompanyTerminalApiResponse[]
+  carrierDriverLogSetting: CompanyDriverLogSetting | null
+  provider: ClientResponse
 }
 
 // ============ API Request Types ============
 
-export interface CarrierTerminalRequest {
+export interface CompanyTerminalRequest {
   id?: string | null
   timeZoneId: string
   street: string
@@ -93,8 +93,8 @@ export interface DriverLogSettingsRequest {
   isAllowedSleep: boolean
 }
 
-export interface CarrierRequest {
-  providerId: string
+export interface CompanyRequest {
+  clientId: string
   name: string
   usdotNumber: string
   timeZoneId: string
@@ -104,7 +104,7 @@ export interface CarrierRequest {
   city: string
   zipCode: string
   issuerStateId: string
-  carrierTerminals: CarrierTerminalRequest[]
+  carrierTerminals: CompanyTerminalRequest[]
   carrierDriverLogSetting: DriverLogSettingsRequest | null
 }
 
@@ -128,8 +128,8 @@ export interface Terminal {
 
 export interface Company {
   id: string
-  carrierId: string
-  carrierName: string
+  companyId: string
+  companyName: string
   dotNumber: string
   timeZone: string
   timeZoneId: string
@@ -143,7 +143,7 @@ export interface Company {
   stateId: string
   cityCode: string
   zipCode: string
-  // Carrier Settings
+  // Company Settings
   exemptDriver: boolean
   periodStartingTime: string
   hosRoles: string
@@ -163,14 +163,14 @@ export interface Company {
   // Plan Features
   allowTracking: boolean
   allowIFTA: boolean
-  // Provider
-  providerId: string
+  // Client
+  clientId: string
   // Terminals
   terminals: Terminal[]
 }
 
 export interface CompanyFormData {
-  carrierName: string
+  companyName: string
   dotNumber: string
   timeZone: string
   timeZoneId: string
@@ -184,7 +184,7 @@ export interface CompanyFormData {
   stateId: string
   cityCode: string
   zipCode: string
-  // Carrier Settings
+  // Company Settings
   exemptDriver: boolean
   periodStartingTime: string
   hosRoles: string

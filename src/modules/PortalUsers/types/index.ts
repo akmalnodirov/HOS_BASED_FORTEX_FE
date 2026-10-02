@@ -54,8 +54,8 @@ export interface PortalUserRequest {
   phoneNumber: string | null
   password: string | null
   passwordConfirm: string | null
-  providerId: string | null
-  carrierId?: string | null
+  clientId: string | null
+  companyId?: string | null
   roleId?: string | null
 }
 

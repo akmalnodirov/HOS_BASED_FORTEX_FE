@@ -3,12 +3,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 import { usePagination } from '@/composables/usePagination'
 import { useDebounceSearch } from '@/composables/useDebounceSearch'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useUnidentifiedStore } from '../store/unidentifiedStore'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { formatTime } from '@/utils/time'
 import { formatDuration } from '@/utils/time'
 import { events } from '@/utils/events'
@@ -50,7 +50,7 @@ export function useUnidentified() {
 
   // Driver reassign
   const selectedDriver = ref<string | null>(null)
-  const { drivers, fetchDrivers } = useCarriersDrivers()
+  const { drivers, fetchDrivers } = useCompaniesDrivers()
   const driverListFiltered = ref(drivers.value)
   const { searchQuery: searchDriver, debouncedSearchQuery } = useDebounceSearch({ delay: 300 })
 
@@ -112,7 +112,7 @@ export function useUnidentified() {
       startDate: startDate.value ? formatToUTC(startDate.value) : null,
       endDate: endDate.value ? formatToUTC(endDate.value) : null,
       vehicleId: selectedVehicle.value === 'all' ? null : selectedVehicle.value,
-      carrierId: getCarrierId(),
+      companyId: getCompanyId(),
       pageNumber: pagination.currentPage.value,
       pageSize: pageSize.value,
     })

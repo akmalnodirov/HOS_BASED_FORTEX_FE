@@ -2,16 +2,16 @@ import { ref, computed } from 'vue'
 import { useApi } from '@/composables/useAxiosService'
 import { toast } from 'vue-sonner'
 import { ApiEndpoints } from '@/api/endpoints'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type {
   Company,
   CompanyFormData,
   Terminal,
   TerminalFormData,
-  CarrierApiResponse,
-  CarrierRequest,
-  CarrierTerminalRequest,
+  CompanyApiResponse,
+  CompanyRequest,
+  CompanyTerminalRequest,
   DriverLogSettingsRequest,
 } from '@/modules/Company/types'
 
@@ -50,8 +50,8 @@ export function useCompany() {
   // State
   const company = ref<Company>({
     id: '',
-    carrierId: '',
-    carrierName: '',
+    companyId: '',
+    companyName: '',
     dotNumber: '',
     timeZone: '',
     timeZoneId: '',
@@ -83,7 +83,7 @@ export function useCompany() {
     isAllowedSleep: true,
     allowTracking: false,
     allowIFTA: false,
-    providerId: '',
+    clientId: '',
     terminals: [],
   })
 
@@ -182,7 +182,7 @@ export function useCompany() {
   const fetchTimeZones = async () => {
     try {
       const response = await api.get<{ successResult: TimeZoneOption[] }>(
-        ApiEndpoints.CARRIERS_TIME_ZONES
+        ApiEndpoints.COMPANIES_TIME_ZONES
       )
       timeZones.value = response.data?.successResult || []
     } catch (error: any) {
@@ -232,13 +232,13 @@ export function useCompany() {
 
   // ============ Map API Response to UI ============
 
-  const mapApiToCompany = (data: CarrierApiResponse): Company => {
+  const mapApiToCompany = (data: CompanyApiResponse): Company => {
     const logSettings = data.carrierDriverLogSetting
 
     return {
       id: data.id,
-      carrierId: data.id,
-      carrierName: data.name,
+      companyId: data.id,
+      companyName: data.name,
       dotNumber: data.usdotNumber,
       timeZone: data.timeZoneInfo?.displayName || '',
       timeZoneId: data.timeZoneInfo?.id || '',
@@ -252,7 +252,7 @@ export function useCompany() {
       stateId: data.issuerState?.id || '',
       cityCode: data.city || '',
       zipCode: data.zipCode || '',
-      // Carrier Settings
+      // Company Settings
       exemptDriver: logSettings?.exemptDriver ?? false,
       periodStartingTime: logSettings?.startingTime24HourPeriod || '000000',
       hosRoles: logSettings?.hosRule?.name || '',
@@ -272,8 +272,8 @@ export function useCompany() {
       // Plan Features
       allowTracking: logSettings?.allowTracking ?? false,
       allowIFTA: logSettings?.allowIFTA ?? false,
-      // Provider
-      providerId: data.provider?.id || '',
+      // Client
+      clientId: data.provider?.id || '',
       // Terminals
       terminals: (data.carrierTerminals || []).map((terminal, index) => {
         // Find parent country ID from issuer state
@@ -299,8 +299,8 @@ export function useCompany() {
 
   // ============ Map UI Form to API Request ============
 
-  const buildCarrierRequest = (formData: CompanyFormData): CarrierRequest => {
-    const terminals: CarrierTerminalRequest[] = company.value.terminals.map((t) => ({
+  const buildCompanyRequest = (formData: CompanyFormData): CompanyRequest => {
+    const terminals: CompanyTerminalRequest[] = company.value.terminals.map((t) => ({
       id: t.id || null,
       timeZoneId: t.timeZoneId,
       street: t.address,
@@ -334,8 +334,8 @@ export function useCompany() {
       : null
 
     return {
-      providerId: company.value.providerId || authStore.providerId || '',
-      name: formData.carrierName,
+      clientId: company.value.clientId || authStore.clientId || '',
+      name: formData.companyName,
       usdotNumber: formData.dotNumber,
       timeZoneId: formData.timeZoneId,
       phoneNumber: formData.phoneNumber || '',
@@ -352,16 +352,16 @@ export function useCompany() {
   // ============ CRUD Operations ============
 
   const loadCompany = async (id?: string) => {
-    const carrierId = id || getCarrierId()
-    if (!carrierId) {
-      console.error('No carrier ID available')
+    const companyId = id || getCompanyId()
+    if (!companyId) {
+      console.error('No company ID available')
       return
     }
 
     isLoading.value = true
     try {
-      const response = await api.get<{ successResult: CarrierApiResponse }>(
-        ApiEndpoints.CARRIERS_BY_ID(carrierId)
+      const response = await api.get<{ successResult: CompanyApiResponse }>(
+        ApiEndpoints.COMPANIES_BY_ID(companyId)
       )
 
       if (response.data?.successResult) {
@@ -393,9 +393,9 @@ export function useCompany() {
   const updateCompany = async (formData: CompanyFormData) => {
     isSaving.value = true
     try {
-      const request = buildCarrierRequest(formData)
-      await api.put(ApiEndpoints.CARRIERS_BY_ID(company.value.carrierId), request)
-      await loadCompany(company.value.carrierId)
+      const request = buildCompanyRequest(formData)
+      await api.put(ApiEndpoints.COMPANIES_BY_ID(company.value.companyId), request)
+      await loadCompany(company.value.companyId)
       toast.success('Company updated successfully')
     } catch (error: any) {
       console.error('Error updating company:', error)

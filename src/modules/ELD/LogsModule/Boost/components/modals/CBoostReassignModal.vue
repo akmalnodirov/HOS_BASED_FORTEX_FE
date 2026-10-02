@@ -30,20 +30,20 @@
           </Button>
         </div>
 
-        <!-- Carrier select -->
+        <!-- Company select -->
         <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground">Carrier</label>
-          <Select v-model="selectedCarrierId" @update:model-value="onCarrierChange">
-            <SelectTrigger :disabled="isCarriersLoading">
-              <SelectValue :placeholder="isCarriersLoading ? 'Loading carriers...' : 'Select carrier'" />
+          <label class="text-xs font-medium text-muted-foreground">Company</label>
+          <Select v-model="selectedCompanyId" @update:model-value="onCompanyChange">
+            <SelectTrigger :disabled="isCompaniesLoading">
+              <SelectValue :placeholder="isCompaniesLoading ? 'Loading companies...' : 'Select company'" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
-                v-for="carrier in carriers"
-                :key="carrier.id"
-                :value="carrier.id"
+                v-for="company in companies"
+                :key="company.id"
+                :value="company.id"
               >
-                {{ carrier.name }}
+                {{ company.name }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -52,7 +52,7 @@
         <!-- Driver select -->
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">To Driver</label>
-          <Select v-model="toDriverId" :disabled="!selectedCarrierId || isDriversLoading">
+          <Select v-model="toDriverId" :disabled="!selectedCompanyId || isDriversLoading">
             <SelectTrigger>
               <SelectValue :placeholder="isDriversLoading ? 'Loading drivers...' : 'Select driver'" />
             </SelectTrigger>
@@ -90,7 +90,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 
 const props = withDefaults(
   defineProps<{
@@ -108,12 +108,12 @@ const emit = defineEmits<{
   (e: 'submit', payload: { toDriverId: string; actionType: 'reassign' | 'replicate' }): void
 }>()
 
-const { carriers, drivers, fetchCarriers, fetchDrivers } = useCarriersDrivers()
+const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
 
 const toDriverId = ref('')
-const selectedCarrierId = ref('')
+const selectedCompanyId = ref('')
 const actionType = ref<'reassign' | 'replicate'>('reassign')
-const isCarriersLoading = ref(false)
+const isCompaniesLoading = ref(false)
 const isDriversLoading = ref(false)
 
 watch(
@@ -121,22 +121,22 @@ watch(
   async (open) => {
     if (!open) return
     toDriverId.value = ''
-    selectedCarrierId.value = ''
+    selectedCompanyId.value = ''
     actionType.value = 'reassign'
-    isCarriersLoading.value = true
+    isCompaniesLoading.value = true
     try {
-      await fetchCarriers()
+      await fetchCompanies()
     } finally {
-      isCarriersLoading.value = false
+      isCompaniesLoading.value = false
     }
   }
 )
 
-async function onCarrierChange(carrierId: string) {
+async function onCompanyChange(companyId: string) {
   toDriverId.value = ''
   isDriversLoading.value = true
   try {
-    await fetchDrivers(carrierId)
+    await fetchDrivers(companyId)
   } finally {
     isDriversLoading.value = false
   }

@@ -9,14 +9,6 @@ const routes: Readonly<RouteRecordRaw[]> = [
       layout: 'default',
     },
   },
-  {
-    path: '/company/edit',
-    name: 'CompanyEdit',
-    component: () => import('@/modules/Company/pages/PCompanyEdit.vue'),
-    meta: {
-      layout: 'default',
-    },
-  },
 ]
 
 export default routes

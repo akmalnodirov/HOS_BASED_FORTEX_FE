@@ -1,16 +1,16 @@
 <template>
   <div class="grid grid-cols-2 gap-3">
-    <!-- Top Row: Carrier, Driver, BOL, Trailer -->
+    <!-- Top Row: Company, Driver, BOL, Trailer -->
     <div class="col-span-2 rounded-lg border border-border bg-card p-4 space-y-4">
       <div class="grid grid-cols-4 gap-x-6">
         <div class="space-y-1.5">
-          <Label>Carrier</Label>
-          <Select v-model="form.carrier" :disabled="disabled">
+          <Label>Company</Label>
+          <Select v-model="form.company" :disabled="disabled">
             <SelectTrigger>
-              <SelectValue placeholder="Select carrier" />
+              <SelectValue placeholder="Select company" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="c in carriers" :key="c.id" :value="c.id">
+              <SelectItem v-for="c in companies" :key="c.id" :value="c.id">
                 {{ c.name }}
               </SelectItem>
             </SelectContent>
@@ -277,15 +277,15 @@ import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { formatTime } from '@/utils/time'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import type { AuditCarrier, AuditDriver, Trip, FuelLocationItem, TimeValue } from '../types'
+import type { AuditCompany, AuditDriver, Trip, FuelLocationItem, TimeValue } from '../types'
 
 interface Props {
-  carriers: AuditCarrier[]
+  companies: AuditCompany[]
   drivers: AuditDriver[]
   order: number
   disabled: boolean
   constants: {
-    carrierId: string
+    companyId: string
     driverId: string
     startTime: TimeValue
     endTime: TimeValue
@@ -313,7 +313,7 @@ const geoLocationsStore = useGeoLocationsStore()
 const { convertToTimeZone } = useTimeZoneHelper()
 
 const form = reactive({
-  carrier: props.constants.carrierId || '',
+  company: props.constants.companyId || '',
   driver: props.constants.driverId || '',
   bolNumber: '',
   trailerNumber: '',
@@ -359,7 +359,7 @@ const startTimeString = computed({
 watch(
   () => props.constants,
   (newVal) => {
-    form.carrier = newVal.carrierId
+    form.company = newVal.companyId
     form.driver = newVal.driverId
     form.startDateTime.date = newVal.startDate
     form.startDateTime.time = newVal.startTime
@@ -373,7 +373,7 @@ watch(
 // Emit constants changes back to parent
 watch(
   [
-    () => form.carrier,
+    () => form.company,
     () => form.driver,
     () => form.startDateTime.date,
     () => form.startDateTime.time,
@@ -381,9 +381,9 @@ watch(
     () => form.insertInfo.engHours,
     () => form.insertInfo.dailyDistance,
   ],
-  ([carrier, driver, startDate, startTime, odometer, engHours, distance]) => {
+  ([company, driver, startDate, startTime, odometer, engHours, distance]) => {
     emit('constants:update', {
-      carrierId: carrier,
+      companyId: company,
       driverId: driver,
       startDate,
       endDate: startDate,

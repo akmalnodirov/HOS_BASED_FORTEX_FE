@@ -12,7 +12,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useSorting } from '@/composables/useSorting'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
 import { toast } from 'vue-sonner'
 import dayjs, { type Dayjs } from 'dayjs'
 
@@ -66,7 +66,7 @@ export function useActivity(options: UseActivityOptions = {}) {
   const selectedRollbackId = ref<string | null>(null)
 
   // Filters
-  const carrierSearch = ref<string | null>(null)
+  const companySearch = ref<string | null>(null)
   const driverSearch = ref<string | null>(null)
   const dateRange = ref<[Dayjs, Dayjs]>([
     getStartOf(dayjs().subtract(7, 'days')),
@@ -81,7 +81,7 @@ export function useActivity(options: UseActivityOptions = {}) {
   })
 
   // Carriers and drivers from shared composable
-  const { carriers, drivers, fetchCarriers, fetchDrivers } = useCarriersDrivers()
+  const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
 
   // Transform activities to table items
   const tableItems = computed<ActivityTableItem[]>(() => {
@@ -103,8 +103,8 @@ export function useActivity(options: UseActivityOptions = {}) {
         name: `${activity.operator.firstName} ${activity.operator.lastName}`,
         tool: SessionType[activity.type] || 'Unknown',
         toolType: activity.type,
-        company: activity.carrierName,
-        carrierId: activity.carrierId,
+        company: activity.companyName,
+        companyId: activity.companyId,
         driver: activity.driverName,
         driverId: activity.driverId,
         period: `${acceptAsTimeZone(activity.startDate).format('YYYY-MM-DD')} -> ${acceptAsTimeZone(activity.endDate).format('YYYY-MM-DD')}`,
@@ -142,8 +142,8 @@ export function useActivity(options: UseActivityOptions = {}) {
       }
 
       // Add carrier filter
-      if (carrierSearch.value) {
-        params.CarrierId = carrierSearch.value
+      if (companySearch.value) {
+        params.CompanyId = companySearch.value
       }
 
       // Add driver filter
@@ -220,15 +220,15 @@ export function useActivity(options: UseActivityOptions = {}) {
   // Row select - navigate to logs page
   const rowSelect = async (item: ActivityTableItem) => {
     // Set carrier in localStorage if found
-    const carrier = carriers.value.find((c) => c.id === item.carrierId)
-    if (carrier) {
-      localStorage.setItem('carrierId', carrier.id)
-      localStorage.setItem('carrierName', carrier.name)
-      if (carrier.timeZoneInfo?.ianaId) {
-        localStorage.setItem('carrierTimeZoneId', carrier.timeZoneInfo.ianaId)
+    const company = companies.value.find((itemCompany) => itemCompany.id === item.companyId)
+    if (company) {
+      localStorage.setItem('companyId', company.id)
+      localStorage.setItem('companyName', company.name)
+      if (company.timeZoneInfo?.ianaId) {
+        localStorage.setItem('companyTimeZoneId', company.timeZoneInfo.ianaId)
       }
-      if (carrier.provider?.name) {
-        localStorage.setItem('carrierGroupName', carrier.provider.name)
+      if (company.client?.name) {
+        localStorage.setItem('companyGroupName', company.client.name)
       }
     }
 
@@ -249,7 +249,7 @@ export function useActivity(options: UseActivityOptions = {}) {
       toDate: acceptAsTimeZone(item.endDate).format('YYYY-MM-DDTHH:mm:ss'),
       sessionId: item.id,
       activity: 'true',
-      carrierId: item.carrierId,
+      companyId: item.companyId,
       driverId: item.driverId,
     }
 
@@ -274,7 +274,7 @@ export function useActivity(options: UseActivityOptions = {}) {
   }
 
   // Watch carrier change to reload drivers
-  watch(carrierSearch, async (newValue) => {
+  watch(companySearch, async (newValue) => {
     driverSearch.value = null
     if (newValue) {
       await fetchDrivers(newValue)
@@ -318,7 +318,7 @@ export function useActivity(options: UseActivityOptions = {}) {
 
   // Initialize on mount
   onMounted(async () => {
-    await fetchCarriers()
+    await fetchCompanies()
   })
 
   return {
@@ -327,13 +327,13 @@ export function useActivity(options: UseActivityOptions = {}) {
     isLoading,
     hasLoaded,
     error,
-    carriers,
+    companies,
     drivers,
     rollbackLoading,
     selectedRollbackId,
 
     // Filters
-    carrierSearch,
+    companySearch,
     driverSearch,
     dateRange,
     selectedTag,
@@ -358,7 +358,7 @@ export function useActivity(options: UseActivityOptions = {}) {
 
     // Functions
     fetchActivities,
-    fetchCarriers,
+    fetchCompanies,
     fetchDrivers,
     handleSort: sorting.handleSort,
     handleLoad,

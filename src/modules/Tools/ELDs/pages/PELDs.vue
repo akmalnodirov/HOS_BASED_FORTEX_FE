@@ -149,10 +149,10 @@ import {
 import CELDTables from '@/modules/Tools/ELDs/components/CELDTables.vue'
 import CELDModal from '@/modules/Tools/ELDs/components/CELDModal.vue'
 import { useELDs } from '@/modules/Tools/ELDs/composables/useELDs'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { computed } from 'vue'
 
-const carrierId = getCarrierId() || '' // fallback to empty, assuming auth validation happens elsewhere or mock
+const companyId = getCompanyId() || '' // fallback to empty, assuming auth validation happens elsewhere or mock
 
 const {
   // State
@@ -180,7 +180,7 @@ const {
   // Actions
   updateEldFile,
 } = useELDs({
-  carrierId,
+  companyId,
   autoFetch: true,
 })
 </script>

@@ -22,7 +22,7 @@ export const useUnidentifiedStore = defineStore('unidentifiedEvents', () => {
     startDate: string | Dayjs | null
     endDate: string | Dayjs | null
     vehicleId: string | null
-    carrierId: string | null
+    companyId: string | null
     pageNumber: number
     pageSize: number
   }) {

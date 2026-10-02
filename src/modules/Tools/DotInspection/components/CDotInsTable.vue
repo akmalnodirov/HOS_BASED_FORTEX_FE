@@ -57,16 +57,16 @@ const formatDateTime = (dateTime: string) => {
           </TableHead>
           <TableHead class="px-4 py-3">
             <button
-              @click="emit('sort', 'providerName')"
+              @click="emit('sort', 'clientName')"
               class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
             >
-              Provider
+              Client
               <SortIcon class="w-3 h-3" />
             </button>
           </TableHead>
           <TableHead class="px-4 py-3">
             <button
-              @click="emit('sort', 'carrierName')"
+              @click="emit('sort', 'companyName')"
               class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
             >
               Company
@@ -118,10 +118,10 @@ const formatDateTime = (dateTime: string) => {
             {{ index + 1 }}
           </TableCell>
           <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ dot.providerName }}
+            {{ dot.clientName }}
           </TableCell>
           <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ dot.carrierName }}
+            {{ dot.companyName }}
           </TableCell>
           <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
             {{ dot.driverName }}

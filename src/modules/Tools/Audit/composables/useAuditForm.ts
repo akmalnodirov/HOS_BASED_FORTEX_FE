@@ -6,8 +6,8 @@ import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useAuditStore } from '../store/auditStore'
 import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { useCarriersDrivers } from '@/composables/useCarriersDrivers'
-import { getCarrierId } from '@/utils/carrier'
+import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
+import { getCompanyId } from '@/utils/company'
 import { formatTime } from '@/utils/time'
 import { clearObject } from '@/utils/object'
 import { toast } from 'vue-sonner'
@@ -46,11 +46,11 @@ export function useAuditForm() {
   const tripsSaved = ref(false)
 
   // Carriers and drivers from shared composable
-  const { carriers, drivers, fetchCarriers, fetchDrivers } = useCarriersDrivers()
+  const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
 
   // Audit form - shared fields across all trips
   const auditFormAll = reactive<AuditRequest>({
-    carrierId: '',
+    companyId: '',
     driverId: '',
     startDate: convertToTimeZone(),
     startTime: {
@@ -79,7 +79,7 @@ export function useAuditForm() {
   )
 
   const disableAuditForm = computed(() => {
-    if (!auditFormAll.carrierId || !auditFormAll.driverId) return true
+    if (!auditFormAll.companyId || !auditFormAll.driverId) return true
 
     for (const trip of auditFormAll.trips) {
       if (
@@ -139,7 +139,7 @@ export function useAuditForm() {
   }
 
   function updateConstants(newConstants: {
-    carrierId: string
+    companyId: string
     driverId: string
     startDate: Dayjs
     endDate: Dayjs
@@ -150,7 +150,7 @@ export function useAuditForm() {
     distance: number
   }) {
     auditFormAll.driverId = newConstants.driverId
-    auditFormAll.carrierId = newConstants.carrierId
+    auditFormAll.companyId = newConstants.companyId
     auditFormAll.startDate = newConstants.startDate
     auditFormAll.endDate = newConstants.endDate
     auditFormAll.startTime = newConstants.startTime
@@ -241,10 +241,10 @@ export function useAuditForm() {
 
   // Watch carrier changes to reload drivers
   watch(
-    () => auditFormAll.carrierId,
-    async (newCarrierId) => {
-      if (newCarrierId) {
-        await fetchDrivers(newCarrierId)
+    () => auditFormAll.companyId,
+    async (newCompanyId) => {
+      if (newCompanyId) {
+        await fetchDrivers(newCompanyId)
       } else {
         drivers.value = []
       }
@@ -253,11 +253,11 @@ export function useAuditForm() {
 
   // Initialize
   onMounted(async () => {
-    await fetchCarriers()
+    await fetchCompanies()
 
-    const currentCarrierId = getCarrierId()
-    if (currentCarrierId && !auditFormAll.carrierId) {
-      auditFormAll.carrierId = currentCarrierId
+    const currentCompanyId = getCompanyId()
+    if (currentCompanyId && !auditFormAll.companyId) {
+      auditFormAll.companyId = currentCompanyId
     }
   })
 
@@ -265,7 +265,7 @@ export function useAuditForm() {
     // State
     loading,
     tripsSaved,
-    carriers,
+    companies,
     drivers,
     auditFormAll,
     auditId,

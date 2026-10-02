@@ -18,7 +18,7 @@ const routes: Readonly<RouteRecordRaw[]> = [
     },
   },
   {
-    path: '/tools/monitoring/:carrierId',
+    path: '/tools/monitoring/:companyId',
     name: 'ToolsMonitoringDetail',
     component: () => import('@/modules/Tools/Monitoring/pages/PMonitoringDetail.vue'),
     meta: {

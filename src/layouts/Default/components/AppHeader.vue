@@ -23,7 +23,8 @@
           <template v-if="pageTitle.includes('/')">
             {{ pageTitle.substring(0, pageTitle.lastIndexOf('/')) }}
             <span class="text-[#090909] dark:text-gray-100 font-medium">
-              / {{ pageTitle.substring(pageTitle.lastIndexOf('/') + 1).trim() }}</span>
+              / {{ pageTitle.substring(pageTitle.lastIndexOf('/') + 1).trim() }}</span
+            >
           </template>
           <template v-else>
             <span class="text-[#090909] dark:text-gray-100 font-medium">{{ pageTitle }}</span>
@@ -55,10 +56,10 @@
               <div
                 class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm"
               >
-                T
+                {{ selectedCompanyName.charAt(0).toUpperCase() || 'C' }}
               </div>
               <span class="hidden sm:block text-sm font-medium text-gray-900 dark:text-gray-100">
-                The Walt Disney
+                {{ selectedCompanyName || 'Select company' }}
               </span>
               <ChevronsUpDown class="w-4 h-4 text-gray-500 dark:text-gray-400 hidden sm:block" />
             </Button>
@@ -95,65 +96,33 @@
               <!-- Companies List -->
               <div class="max-h-[320px] overflow-y-auto pr-1 flex flex-col gap-3">
                 <div
-                  v-for="provider in filteredCompanies"
-                  :key="provider.providerId"
-                  class="flex flex-col gap-2"
+                  v-for="company in filteredCompanies"
+                  :key="company.id"
+                  class="flex cursor-pointer items-center justify-between rounded border border-border p-3 transition-colors hover:bg-muted/50"
+                  :class="selectedCompanyId === company.id ? 'bg-muted' : ''"
+                  @click="handleCompanySelection(company)"
                 >
-                  <!-- Company Header Pill -->
-                  <div
-                    class="p-2 pr-4 border border-border rounded cursor-pointer flex items-center justify-between hover:bg-muted/50 dark:hover:bg-muted transition-colors group"
-                    @click="toggleCompany(provider.providerId)"
-                  >
-                    <div class="flex items-center gap-3">
-                      <div
-                        class="w-10 h-10 bg-[#F0F0F0] dark:bg-muted rounded flex items-center justify-center border border-border"
-                      >
-                        <Building class="w-5 h-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <div
-                          class="font-bold text-sm text-gray-900 dark:text-gray-100"
-                          v-html="highlightMatch(provider.providerName)"
-                        ></div>
-                        <div class="text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                          {{ provider.carriers.length }} carriers
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronDown
-                      :class="[
-                        'w-4 h-4 text-gray-400 transition-transform duration-300',
-                        expandedCompanies.includes(provider.providerId) ? 'rotate-180' : '',
-                      ]"
-                    />
-                  </div>
-
-                  <!-- Carriers List (Expanded) -->
-                  <div
-                    v-if="expandedCompanies.includes(provider.providerId)"
-                    class="flex flex-col gap-2 ml-px"
-                  >
+                  <div class="flex items-center gap-3">
                     <div
-                      v-for="(carrier, index) in provider.carriers"
-                      :key="carrier.carrierId"
-                      @click.stop="selectCarrier(carrier)"
-                      :class="[
-                        'px-4 py-2.5 rounded cursor-pointer transition-all border border-[#DBDBDB]',
-                        selectedCarrier?.carrierId === carrier.carrierId
-                          ? 'bg-[#F0F0F0] dark:bg-muted border-border'
-                          : 'bg-[#F0F0F0] dark:bg-muted/30 hover:bg-muted/80 dark:hover:bg-muted',
-                      ]"
+                      class="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted"
                     >
+                      <Building class="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
                       <div
-                        class="font-semibold text-xs text-[#090909] dark:text-gray-100 leading-tight"
-                        v-html="highlightMatch(carrier.name)"
+                        class="text-sm font-bold text-gray-900 dark:text-gray-100"
+                        v-html="highlightMatch(company.name)"
                       ></div>
                       <div
-                        class="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5"
-                        v-html="'USDOT: ' + highlightMatch(carrier.usdotNumber)"
+                        class="mt-0.5 text-xs font-medium text-gray-400 dark:text-gray-500"
+                        v-html="'USDOT: ' + highlightMatch(company.dotNumber || '—')"
                       ></div>
                     </div>
                   </div>
+                  <span
+                    class="h-2 w-2 rounded-full"
+                    :class="company.isActive ? 'bg-emerald-500' : 'bg-gray-300'"
+                  ></span>
                 </div>
 
                 <!-- Empty State -->
@@ -200,14 +169,12 @@
   </header>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Menu,
   Sun,
   Moon,
-  MessageSquare,
-  ChevronDown,
   ChevronsUpDown,
   User,
   Settings,
@@ -227,9 +194,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanies } from '@/layouts/Initial/composables/useCompanies'
-import type { Carrier } from '@/types/company'
+import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { setCarrierId } from '@/utils/carrier'
 
 const route = useRoute()
 const router = useRouter()
@@ -246,11 +212,10 @@ const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
 
 // Company dropdown state
-const { providers } = useCompanies({ autoFetch: true })
+const { companies, selectCompany } = useCompanies()
 const searchQuery = ref('')
-const expandedCompanies = ref<string[]>([])
-const selectedCarrier = ref<Carrier | null>(null)
 const isDropdownOpen = ref(false)
+const selectedCompanyId = ref(localStorage.getItem('companyId'))
 
 // Highlight search text
 const highlightMatch = (text: string | null | undefined): string => {
@@ -262,70 +227,27 @@ const highlightMatch = (text: string | null | undefined): string => {
 // Filter companies based on search
 const filteredCompanies = computed(() => {
   if (!searchQuery.value.trim()) {
-    return providers.value
+    return companies.value
   }
 
   const query = searchQuery.value.toLowerCase()
-  return providers.value.filter(
-    (provider) =>
-      provider.providerName.toLowerCase().includes(query) ||
-      provider.carriers.some(
-        (carrier) =>
-          carrier.name.toLowerCase().includes(query) || carrier.usdotNumber.includes(query)
-      )
+  return companies.value.filter(
+    (company) =>
+      company.name.toLowerCase().includes(query) || company.dotNumber.toLowerCase().includes(query)
   )
 })
 
-// Search qilganda barcha provider dropdown'larini ochish
-watch(searchQuery, (val) => {
-  if (!val || !val.trim()) {
-    // Search bo'sh bo'lsa - accordionlarni yopish
-    expandedCompanies.value = []
-  } else {
-    // Search qilishni boshlagandan barcha providerlarni ochish
-    expandedCompanies.value = providers.value.map((provider) => provider.providerId)
-  }
-})
+const selectedCompanyName = computed(
+  () => companies.value.find((company) => company.id === selectedCompanyId.value)?.name ?? ''
+)
 
-// Toggle company expansion
-const toggleCompany = (providerId: string) => {
-  const index = expandedCompanies.value.indexOf(providerId)
-  if (index > -1) {
-    expandedCompanies.value.splice(index, 1)
-  } else {
-    expandedCompanies.value.push(providerId)
-  }
-}
-
-// Handle carrier selection
-const handleCarrierSelection = async (carrier: Carrier) => {
-  console.log(carrier, 'selected carrier')
-
-  // Faqat carrierId ni localStorage'ga saqlash
-  // Qolgan ma'lumotlar current-user API'sidan keladi
-  setCarrierId(carrier.carrierId)
-
+const handleCompanySelection = async (company: RouteEldCompany) => {
+  if (!company.isActive) return
   isDropdownOpen.value = false
-  selectedCarrier.value = carrier
-
-  // Carrier o'zgarganda logs page'ga o'tib, page'ni reload qilish
-  const currentPath = route.path
-  if (currentPath === '/eld/logs') {
-    // Agar allaqachon logs page'da bo'lsa, faqat reload qilish
-    window.location.reload()
-  } else {
-    // Boshqa page'da bo'lsa, logs page'ga o'tib reload qilish
-    await router.push('/eld/logs')
-    // Router push to'liq yakunlanishi uchun kichik kutish
-    setTimeout(() => {
-      window.location.reload()
-    }, 100)
-  }
-}
-
-// Select carrier
-const selectCarrier = (carrier: Carrier) => {
-  handleCarrierSelection(carrier)
+  const selected = await selectCompany(company)
+  if (!selected) return
+  selectedCompanyId.value = company.id
+  window.location.reload()
 }
 
 // Page title based on route

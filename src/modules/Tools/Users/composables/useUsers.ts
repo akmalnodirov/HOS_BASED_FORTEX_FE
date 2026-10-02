@@ -23,7 +23,7 @@ export function useUsers() {
   const api = useApi()
   const authStore = useAuthStore()
 
-  const providerId = computed(() => authStore.providerId || '')
+  const clientId = computed(() => authStore.clientId || '')
 
   // State
   const users = ref<User[]>([])
@@ -73,8 +73,8 @@ export function useUsers() {
     itemsPerPage: 10,
   })
 
-  // Provider roles (type 3-5 only, matching old project)
-  const providerRoles = computed(() => roles.value.filter((r) => r.type >= 3 && r.type <= 5))
+  // Client roles (type 3-5 only, matching old project)
+  const clientRoles = computed(() => roles.value.filter((r) => r.type >= 3 && r.type <= 5))
 
   // Form validation
   const formErrors = ref<Record<string, string>>({})
@@ -113,7 +113,7 @@ export function useUsers() {
       const params: Record<string, any> = {
         PageNumber: pagination.currentPage.value,
         PageSize: pagination.itemsPerPage.value,
-        ProviderId: providerId.value,
+        ClientId: clientId.value,
         Search: debouncedSearchQuery.value || undefined,
         OrderBy: sorting.sortKey.value,
         OrderType: sorting.sortOrder.value === 'asc' ? 0 : 1,
@@ -123,7 +123,7 @@ export function useUsers() {
         params.IsActive = selectedStatus.value === 'online'
       }
 
-      const response = await api.get<UsersListResponse>(ApiEndpoints.PROVIDER_USERS_FILTER, {
+      const response = await api.get<UsersListResponse>(ApiEndpoints.CLIENT_USERS_FILTER, {
         params,
       })
 
@@ -148,7 +148,7 @@ export function useUsers() {
 
     try {
       const response = await api.get<RolesResponse>(ApiEndpoints.ROLES_URL, {
-        params: { providerId: providerId.value },
+        params: { clientId: clientId.value },
       })
 
       if (response.data?.successResult) {
@@ -187,7 +187,7 @@ export function useUsers() {
   // CRUD operations
   async function createUser(data: CreateUserRequest) {
     try {
-      await api.post(ApiEndpoints.PROVIDER_USERS, data)
+      await api.post(ApiEndpoints.CLIENT_USERS, data)
       toast.success('User created successfully')
       await fetchUsers()
       createModal.close()
@@ -199,7 +199,7 @@ export function useUsers() {
 
   async function updateUser(userId: string, data: UpdateUserRequest) {
     try {
-      await api.put(ApiEndpoints.PROVIDER_USERS_BY_ID(userId), data)
+      await api.put(ApiEndpoints.CLIENT_USERS_BY_ID(userId), data)
       toast.success('User updated successfully')
       await fetchUsers()
       editModal.close()
@@ -226,7 +226,7 @@ export function useUsers() {
     const user = statusModalUser.value
     if (!user) return
     try {
-      await api.put(ApiEndpoints.PROVIDER_USERS_STATE(user.id), {
+      await api.put(ApiEndpoints.CLIENT_USERS_STATE(user.id), {
         state: user.isActive ? 1 : 0,
       })
       toast.success(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`)
@@ -255,7 +255,7 @@ export function useUsers() {
     const user = deleteModalUser.value
     if (!user) return
     try {
-      await api.delete(ApiEndpoints.PROVIDER_USERS_BY_ID(user.id))
+      await api.delete(ApiEndpoints.CLIENT_USERS_BY_ID(user.id))
       toast.success('User deleted successfully')
       closeDeleteModal()
       await fetchUsers()
@@ -284,7 +284,7 @@ export function useUsers() {
     // State
     users,
     roles,
-    providerRoles,
+    clientRoles,
     isLoading,
     isLoadingRoles,
     error,
@@ -346,6 +346,6 @@ export function useUsers() {
     getStatusBadgeClass,
 
     // Auth
-    providerId,
+    clientId,
   }
 }

@@ -144,7 +144,7 @@ export interface DvirRequest {
   endDate: string
   vehicleId: string | null
   driverId: string | null
-  carrierId: string
+  companyId: string
 }
 
 export interface DvirStatus {

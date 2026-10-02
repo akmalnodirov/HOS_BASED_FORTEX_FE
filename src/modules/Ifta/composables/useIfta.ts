@@ -4,7 +4,7 @@ import { toast } from 'vue-sonner'
 import { usePagination } from '@/composables/usePagination'
 import { useModalState } from '@/composables/useModalState'
 import { ApiEndpoints } from '@/api/endpoints'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import dayjs from 'dayjs'
 import type {
@@ -29,12 +29,12 @@ interface VehiclesResponse {
 }
 
 export interface UseIftaOptions {
-  carrierId: string
+  companyId: string
   autoFetch?: boolean
 }
 
 export function useIfta(options: UseIftaOptions) {
-  const { carrierId, autoFetch = true } = options
+  const { companyId, autoFetch = true } = options
   const api = useApi()
   const { formatToUTC, getStartOf, getEndOf } = useTimeZoneHelper()
 
@@ -79,7 +79,7 @@ export function useIfta(options: UseIftaOptions) {
     try {
       const response = await api.get<IftaListResponse>(ApiEndpoints.IFTA_FILTER, {
         params: {
-          carrierId,
+          companyId,
           pageNumber: pagination.currentPage.value,
           pageSize: pagination.itemsPerPage.value,
         },
@@ -106,7 +106,7 @@ export function useIfta(options: UseIftaOptions) {
     isLoadingVehicles.value = true
     try {
       const response = await api.post<VehiclesResponse>(ApiEndpoints.VEHICLES_FILTER, {
-        carrierId,
+        companyId,
       })
       if (response.data?.successResult?.data) {
         vehicles.value = response.data.successResult.data
@@ -131,7 +131,7 @@ export function useIfta(options: UseIftaOptions) {
         vehicleIds: selectedVehicleIds.value,
         startDate: formatToUTC(getStartOf(dayjs(dateRange.value[0]))),
         endDate: formatToUTC(getEndOf(dayjs(dateRange.value[1]))),
-        carrierId,
+        companyId,
       }
 
       await api.post(ApiEndpoints.IFTA_GENERATE, request)

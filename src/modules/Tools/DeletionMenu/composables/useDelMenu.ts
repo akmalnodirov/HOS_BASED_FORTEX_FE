@@ -37,14 +37,14 @@ export function useDelMenu(options: UseDeletionMenuOptions = {}) {
     deletionMenuItems.value.map((item, index) => ({
       counter: pagination.itemsPerPage.value * (pagination.currentPage.value - 1) + index + 1,
       id: item.id,
-      system: item.providerName || 'N/A',
+      system: item.clientName || 'N/A',
       company: item.name || 'N/A',
       drivers: item.drivers,
       testDriverId: item.drivers.find((driver) => driver.isTestDriver)?.driverId || null,
     }))
   )
 
-  // Fetch deletion menu carriers
+  // Fetch deletion menu companies
   const fetchDeletionMenu = async () => {
     isLoading.value = true
     error.value = null
@@ -53,12 +53,12 @@ export function useDelMenu(options: UseDeletionMenuOptions = {}) {
       const params: Record<string, any> = {
         PageNumber: pagination.currentPage.value,
         PageSize: pagination.itemsPerPage.value,
-        ProviderId: authStore.providerId,
+        ClientId: authStore.clientId,
         Search: search.value || undefined,
       }
 
       const response = await api.get<DeletionMenuListResponse>(
-        ApiEndpoints.DELETION_MENU_CARRIERS,
+        ApiEndpoints.DELETION_MENU_COMPANIES,
         { params }
       )
 
@@ -75,11 +75,11 @@ export function useDelMenu(options: UseDeletionMenuOptions = {}) {
   }
 
   // Assign test driver
-  const assignDriver = async (driverId: string, carrierId: string) => {
+  const assignDriver = async (driverId: string, companyId: string) => {
     try {
       const payload: AssignTestDriverRequest = {
         driverId,
-        carrierId,
+        companyId,
         isTestDriver: true,
       }
 

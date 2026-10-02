@@ -1,10 +1,10 @@
 // src/types/dotInspection.ts
 export interface DotInspection {
   id: string
-  providerId: string
-  providerName: string
-  carrierId: string
-  carrierName: string
+  clientId: string
+  clientName: string
+  companyId: string
+  companyName: string
   driverId: string
   driverName: string
   startDate: string
@@ -22,7 +22,7 @@ export interface DotInspectionListResponse {
 }
 
 export interface CreateDotInspectionRequest {
-  carrierId: string
+  companyId: string
   driverId: string
   startDate: string
   endDate: string

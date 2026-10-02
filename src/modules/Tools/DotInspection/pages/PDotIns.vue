@@ -7,13 +7,13 @@
           <h2 class="text-2xl font-semibold text-foreground">DOT Inspection</h2>
 
           <div class="flex items-center gap-3">
-            <!-- Carrier Filter -->
-            <Select v-model="selectedCarrier">
+            <!-- Company Filter -->
+            <Select v-model="selectedCompany">
               <SelectTrigger class="w-48 dark:bg-card border-border">
                 <SelectValue placeholder="Company search" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="option in carrierOptions" :key="option.id" :value="option.id">
+                <SelectItem v-for="option in companyOptions" :key="option.id" :value="option.id">
                   {{ option.name }}
                 </SelectItem>
               </SelectContent>
@@ -156,7 +156,7 @@
     <!-- Create Dot Modal -->
     <CreateDotModal
       :open="isCreateModalOpen"
-      :carriers="carriers"
+      :companies="companies"
       @close="closeCreateModal"
       @submit="createDotInspection"
     />
@@ -192,13 +192,13 @@ const {
   // State
   isLoading,
   error,
-  carriers,
+  companies,
   drivers,
-  carrierOptions,
+  companyOptions,
   driverOptions,
 
   // Filters
-  selectedCarrier,
+  selectedCompany,
   selectedDriver,
   selectedTag,
 

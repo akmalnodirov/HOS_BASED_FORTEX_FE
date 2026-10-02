@@ -8,8 +8,8 @@ export interface Operator {
 export interface ActivityRecord {
   id: string
   type: number
-  carrierId: string
-  carrierName: string
+  companyId: string
+  companyName: string
   driverId: string
   driverName: string
   status: number
@@ -30,7 +30,7 @@ export interface ActivityListResponse {
 
 export interface ActivityRequest {
   OperatorId?: string
-  CarrierId?: string
+  CompanyId?: string
   DriverId?: string
   StartDate: string
   EndDate: string
@@ -46,7 +46,7 @@ export interface ActivityTableItem {
   tool: string
   toolType: number
   company: string
-  carrierId: string
+  companyId: string
   driver: string
   driverId: string
   period: string

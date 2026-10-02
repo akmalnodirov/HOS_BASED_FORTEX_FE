@@ -61,7 +61,7 @@ export interface VehicleRequest {
   vehicleFuelId: string | number
   eldVehicleConnectionId: string | number
   licensePlate?: LicensePlateRequest | null
-  carrierId: string
+  companyId: string
   isAllowedSleep: boolean
 }
 

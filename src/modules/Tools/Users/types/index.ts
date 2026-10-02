@@ -39,7 +39,7 @@ export interface CreateUserRequest {
   lastName: string
   password: string
   passwordConfirm: string
-  providerId: string
+  clientId: string
   roleId: string
   isActive?: boolean
 }

@@ -90,7 +90,7 @@ import { GoogleMap, Marker } from 'vue3-google-map'
 import { Search } from 'lucide-vue-next'
 import CMapControls from '@/components/custom/CMapControls.vue'
 import { Input } from '@/components/ui/input'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { mapStyles } from '@/utils/maps'
 import { useDriverLogs } from '../composables/useDriverLogs'
 import DriverCard from '../components/DriverCard.vue'
@@ -238,8 +238,8 @@ const handleDriverClick = (driver: MonitoringDriver) => {
 }
 
 onMounted(() => {
-  const carrierId = getCarrierId()
-  if (carrierId) {
+  const companyId = getCompanyId()
+  if (companyId) {
     fetchDriverLogs()
   }
 })

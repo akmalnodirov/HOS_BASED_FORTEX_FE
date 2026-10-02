@@ -2,8 +2,8 @@ export class ApiEndpoints {
   // Base URLs
   private static readonly BASE_URL = '/api'
   private static readonly MONITORING_URL = `${this.BASE_URL}/monitoring`
-  static readonly MONITORING_PROVIDER = `${this.MONITORING_URL}/provider`
-  static readonly MONITORING_CARRIER = `${this.MONITORING_URL}/carrier`
+  static readonly MONITORING_CLIENT = `${this.MONITORING_URL}/client`
+  static readonly MONITORING_COMPANY = `${this.MONITORING_URL}/company`
   private static readonly TRACKING_URL = `${this.BASE_URL}/tracking`
   private static readonly FUEL_URL = `${this.BASE_URL}/fuel`
   private static readonly GEO_URL = `${this.BASE_URL}/geo-locations`
@@ -13,7 +13,7 @@ export class ApiEndpoints {
   private static readonly SESSIONS_URL = `${this.BASE_URL}/sessions`
   private static readonly TABS_URL = `${this.BASE_URL}/tabs`
   private static readonly DRIVERS_URL = `${this.BASE_URL}/drivers`
-  private static readonly CARRIERS_URL = `${this.BASE_URL}/carriers`
+  private static readonly COMPANIES_URL = `${this.BASE_URL}/companies`
 
   // Tracking endpoints
   static readonly TRACKING_DRIVER_DAILY_EVENTS = `${this.TRACKING_URL}/driver-daily-events`
@@ -38,7 +38,8 @@ export class ApiEndpoints {
 
   // Driver Infos endpoints
   static readonly DRIVER_INFOS = `${this.BASE_URL}/driver-infos`
-  static readonly DRIVER_INFOS_TIME_ZONE = (driverId: string) => `${this.DRIVER_INFOS}/${driverId}/time-zone`
+  static readonly DRIVER_INFOS_TIME_ZONE = (driverId: string) =>
+    `${this.DRIVER_INFOS}/${driverId}/time-zone`
 
   // Sessions endpoints (used by Boost)
   static readonly SESSIONS = this.SESSIONS_URL
@@ -59,15 +60,18 @@ export class ApiEndpoints {
   static readonly BOOST_EVENTS_LATEST_RESET_PIN_TIMES = `${this.BOOST_EVENTS_URL}/latest-reset-pin-times`
   static readonly BOOST_EVENTS_HISTORY_RESET_PIN_TIMES = `${this.BOOST_EVENTS_URL}/history-reset-pin-times`
   static readonly BOOST_EVENTS_ADD = `${this.BOOST_EVENTS_URL}/add`
-  static readonly BOOST_EVENTS_UPDATE = (eventId: string) => `${this.BOOST_EVENTS_URL}/update/${eventId}`
+  static readonly BOOST_EVENTS_UPDATE = (eventId: string) =>
+    `${this.BOOST_EVENTS_URL}/update/${eventId}`
   static readonly BOOST_EVENTS_DELETE = `${this.BOOST_EVENTS_URL}/delete`
   static readonly BOOST_EVENTS_MULTI_DELETE = `${this.BOOST_EVENTS_URL}/multi-delete`
   static readonly BOOST_EVENTS_MULTI_UPDATE = `${this.BOOST_EVENTS_URL}/multi-update`
   static readonly BOOST_EVENTS_COPY = `${this.BOOST_EVENTS_URL}/copy`
   static readonly BOOST_EVENTS_REVERT = `${this.BOOST_EVENTS_URL}/revert`
   static readonly BOOST_EVENTS_MOVE_TIME = `${this.BOOST_EVENTS_URL}/move-time`
-  static readonly BOOST_EVENTS_SUBMIT = (sessionId: string) => `${this.BOOST_EVENTS_URL}/submit/${sessionId}`
-  static readonly BOOST_EVENTS_ROLLBACK = (sessionId: string) => `${this.BOOST_EVENTS_URL}/rollback/${sessionId}`
+  static readonly BOOST_EVENTS_SUBMIT = (sessionId: string) =>
+    `${this.BOOST_EVENTS_URL}/submit/${sessionId}`
+  static readonly BOOST_EVENTS_ROLLBACK = (sessionId: string) =>
+    `${this.BOOST_EVENTS_URL}/rollback/${sessionId}`
   static readonly BOOST_EVENTS_LOCATION_SEARCH = `${this.BOOST_EVENTS_URL}/location-search`
   static readonly BOOST_EVENTS_REASSIGN = `${this.BOOST_EVENTS_URL}/reassign`
   static readonly BOOST_EVENTS_REPLICATE = `${this.BOOST_EVENTS_URL}/replicate`
@@ -91,10 +95,10 @@ export class ApiEndpoints {
   // Drivers / Carriers (used by Reassign)
   static readonly DRIVERS = this.DRIVERS_URL
   static readonly DRIVERS_FILTER = `${this.DRIVERS_URL}/filter`
-  static readonly CARRIERS = this.CARRIERS_URL
-  static readonly CARRIERS_FILTER = `${this.CARRIERS_URL}/filter`
-  static readonly CARRIERS_BY_ID = (id: string) => `${ApiEndpoints.CARRIERS_URL}/${id}`
-  static readonly CARRIERS_TIME_ZONES = `${this.CARRIERS_URL}/time-zones`
+  static readonly COMPANIES = this.COMPANIES_URL
+  static readonly COMPANIES_FILTER = `${this.COMPANIES_URL}/filter`
+  static readonly COMPANIES_BY_ID = (id: string) => `${ApiEndpoints.COMPANIES_URL}/${id}`
+  static readonly COMPANIES_TIME_ZONES = `${this.COMPANIES_URL}/time-zones`
 
   // Driver Daily Forms endpoints
   private static readonly DRIVER_DAILY_FORMS_URL = `${this.BASE_URL}/driver-daily-forms`
@@ -106,7 +110,8 @@ export class ApiEndpoints {
   private static readonly EDIT_DRIVER_DAILY_FORMS_URL = `${this.BASE_URL}/edit-driver-daily-forms`
   static readonly EDIT_DRIVER_DAILY_FORMS = this.EDIT_DRIVER_DAILY_FORMS_URL
   static readonly EDIT_DRIVER_DAILY_FORMS_BY_DATE = `${this.EDIT_DRIVER_DAILY_FORMS_URL}/by-date`
-  static readonly EDIT_DRIVER_DAILY_FORMS_UPDATE = (id: string) => `${this.EDIT_DRIVER_DAILY_FORMS_URL}/${id}`
+  static readonly EDIT_DRIVER_DAILY_FORMS_UPDATE = (id: string) =>
+    `${this.EDIT_DRIVER_DAILY_FORMS_URL}/${id}`
   static readonly EDIT_DRIVER_DAILY_FORMS_REVERT = `${this.EDIT_DRIVER_DAILY_FORMS_URL}/revert`
   static readonly EDIT_DRIVER_DAILY_FORMS_SUBMIT = `${this.EDIT_DRIVER_DAILY_FORMS_URL}/submit`
 
@@ -132,12 +137,13 @@ export class ApiEndpoints {
   static readonly ROLES_URL = `${this.BASE_URL}/roles`
   static readonly PERMISSIONS_URL = `${this.BASE_URL}/permissions`
 
-  // Provider Users endpoints
-  private static readonly PROVIDER_USERS_URL = `${this.BASE_URL}/provider-users`
-  static readonly PROVIDER_USERS = this.PROVIDER_USERS_URL
-  static readonly PROVIDER_USERS_FILTER = `${this.PROVIDER_USERS_URL}/filter`
-  static readonly PROVIDER_USERS_BY_ID = (id: string) => `${ApiEndpoints.PROVIDER_USERS_URL}/${id}`
-  static readonly PROVIDER_USERS_STATE = (id: string) => `${ApiEndpoints.PROVIDER_USERS_URL}/${id}/state`
+  // Client Users endpoints
+  private static readonly CLIENT_USERS_URL = `${this.BASE_URL}/client-users`
+  static readonly CLIENT_USERS = this.CLIENT_USERS_URL
+  static readonly CLIENT_USERS_FILTER = `${this.CLIENT_USERS_URL}/filter`
+  static readonly CLIENT_USERS_BY_ID = (id: string) => `${ApiEndpoints.CLIENT_USERS_URL}/${id}`
+  static readonly CLIENT_USERS_STATE = (id: string) =>
+    `${ApiEndpoints.CLIENT_USERS_URL}/${id}/state`
 
   // DOT Inspection endpoints
   private static readonly DOT_INSPECTION_URL = `${this.BASE_URL}/dot-inspections`
@@ -147,16 +153,18 @@ export class ApiEndpoints {
 
   // Deletion Menu endpoints
   private static readonly DELETION_MENU_URL = `${this.BASE_URL}/deletion-menu`
-  static readonly DELETION_MENU_PROVIDERS = `${this.DELETION_MENU_URL}/providers`
-  static readonly DELETION_MENU_CARRIERS = `${this.DELETION_MENU_URL}/carriers`
+  static readonly DELETION_MENU_CLIENTS = `${this.DELETION_MENU_URL}/clients`
+  static readonly DELETION_MENU_COMPANIES = `${this.DELETION_MENU_URL}/companies`
   static readonly DELETION_MENU_ASSIGN_TEST_DRIVER = `${this.DELETION_MENU_URL}/assign-test-driver`
 
   // Event By Others endpoints (used for Edit/Add Status)
   private static readonly EVENT_BY_OTHERS_URL = `${this.BASE_URL}/eld-event-by-other-users`
   static readonly EVENT_BY_OTHERS = this.EVENT_BY_OTHERS_URL
-  static readonly EVENT_BY_OTHERS_GET = (eventId: string) => `${this.EVENT_BY_OTHERS_URL}/${eventId}`
+  static readonly EVENT_BY_OTHERS_GET = (eventId: string) =>
+    `${this.EVENT_BY_OTHERS_URL}/${eventId}`
   static readonly EVENT_BY_OTHERS_ADD = `${this.EVENT_BY_OTHERS_URL}/add`
-  static readonly EVENT_BY_OTHERS_UPDATE = (eventId: string) => `${this.EVENT_BY_OTHERS_URL}/update/${eventId}`
+  static readonly EVENT_BY_OTHERS_UPDATE = (eventId: string) =>
+    `${this.EVENT_BY_OTHERS_URL}/update/${eventId}`
 
   // Transfer Events endpoints (used by History)
   private static readonly TRANSFER_EVENTS_URL = `${this.BASE_URL}/transfer-events`
@@ -189,7 +197,8 @@ export class ApiEndpoints {
   static readonly PORTAL_USERS = this.PORTAL_USERS_URL
   static readonly PORTAL_USERS_FILTER = `${this.PORTAL_USERS_URL}/filter`
   static readonly PORTAL_USERS_BY_ID = (id: string) => `${ApiEndpoints.PORTAL_USERS_URL}/${id}`
-  static readonly PORTAL_USERS_STATE = (id: string) => `${ApiEndpoints.PORTAL_USERS_URL}/${id}/state`
+  static readonly PORTAL_USERS_STATE = (id: string) =>
+    `${ApiEndpoints.PORTAL_USERS_URL}/${id}/state`
 
   // Vehicles endpoints
   private static readonly VEHICLES_URL = `${this.BASE_URL}/vehicles`
@@ -197,7 +206,8 @@ export class ApiEndpoints {
   static readonly VEHICLES_FILTER = `${this.VEHICLES_URL}/filter`
   static readonly VEHICLES_BY_ID = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}`
   static readonly VEHICLES_STATE = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}/state`
-  static readonly VEHICLES_SLEEP_STATE = (id: string) => `${ApiEndpoints.VEHICLES_URL}/${id}/sleep-state`
+  static readonly VEHICLES_SLEEP_STATE = (id: string) =>
+    `${ApiEndpoints.VEHICLES_URL}/${id}/sleep-state`
   static readonly VEHICLES_DECODE_VIN = `${this.VEHICLES_URL}/decode-vin`
 
   // Drivers endpoints (CRUD)
@@ -205,6 +215,11 @@ export class ApiEndpoints {
   static readonly DRIVERS_STATE = (id: string) => `${ApiEndpoints.DRIVERS_URL}/${id}/state`
   static readonly DRIVERS_LOGOUT = `${this.DRIVERS_URL}/logout`
   static readonly DRIVERS_LOGOUT_BY_ID = (id: string) => `${ApiEndpoints.DRIVERS_URL}/logout/${id}`
+  static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
+  static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
+  static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
+  static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
+    `${ApiEndpoints.ROUTE_ELD_COMPANIES}/${id}/select`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`

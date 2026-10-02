@@ -1,175 +1,6 @@
-<template>
-  <div class="min-h-screen bg-white p-[16px_24px]">
-    <div>
-      <!-- Header -->
-      <div class="mb-5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Drivers</h2>
-            <!-- Search -->
-            <div class="relative">
-              <Search
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
-              />
-              <Input v-model="searchQuery" placeholder="Search" class="pl-9 w-64" />
-            </div>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <!-- Status Filter -->
-            <Select v-model="statusFilter">
-              <SelectTrigger class="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <!-- Add Driver Button -->
-            <Button
-              @click="openAddModal"
-              class="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900"
-            >
-              <span class="text-xl mr-1">+</span>
-              Add driver
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <DriversTable
-        :drivers="paginatedDrivers"
-        :sort-key="sortKey"
-        :sort-order="sortOrder"
-        @sort="handleSort"
-        @toggle-status="openStatusModal"
-        @edit="openEditModal"
-      />
-
-      <!-- Footer / Pagination -->
-      <div
-        class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between"
-      >
-        <!-- Items per page -->
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-600 dark:text-gray-400">Display on page</span>
-          <Select v-model="itemsPerPage">
-            <SelectTrigger class="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem :value="10">10</SelectItem>
-              <SelectItem :value="25">25</SelectItem>
-              <SelectItem :value="50">50</SelectItem>
-              <SelectItem :value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {{ totalEntries.toLocaleString() }} entries
-          </span>
-        </div>
-
-        <!-- Pagination -->
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1">
-            <button
-              v-for="page in pageNumbers"
-              :key="page"
-              @click="typeof page === 'number' && goToPage(page)"
-              :disabled="page === '...'"
-              :class="[
-                'min-w-[32px] h-8 px-2 text-sm font-medium rounded transition-colors',
-                page === currentPage
-                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                  : page === '...'
-                    ? 'text-gray-400 dark:text-gray-500 cursor-default'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
-              ]"
-            >
-              {{ page }}
-            </button>
-          </div>
-
-          <div class="flex items-center gap-2 ml-4">
-            <span class="text-sm text-gray-600 dark:text-gray-400">
-              {{ currentPage }} of {{ totalPages }} pages
-            </span>
-            <div class="flex gap-1">
-              <Button
-                @click="goToPage(currentPage - 1)"
-                :disabled="currentPage === 1"
-                variant="outline"
-                size="icon"
-                class="h-8 w-8"
-              >
-                <ChevronLeft class="w-4 h-4" />
-              </Button>
-              <Button
-                @click="goToPage(currentPage + 1)"
-                :disabled="currentPage === totalPages"
-                variant="outline"
-                size="icon"
-                class="h-8 w-8"
-              >
-                <ChevronRight class="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add/Edit Driver Modal -->
-    <AddDriverModal
-      :open="isModalOpen"
-      :driver="editingDriver"
-      :home-terminals="homeTerminals"
-      :vehicles="vehicles"
-      :issuer-state-parents="issuerStateParents"
-      :issuer-states="issuerStates"
-      :hos-roles="hosRoles"
-      :cargo-types="cargoTypes"
-      :restarts="restarts"
-      :rest-breaks="restBreaks"
-      @close="closeModal"
-      @save="handleSaveDriver"
-    />
-
-    <!-- Status Confirm Modal -->
-    <Dialog :open="isStatusModalOpen" @update:open="(v) => !v && closeStatusModal()">
-      <DialogContent class="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{{ statusModalDriver?.status ? 'Deactivate' : 'Activate' }} Driver</DialogTitle>
-          <DialogDescription>
-            Do you want to {{ statusModalDriver?.status ? 'deactivate' : 'activate' }}
-            <span class="font-medium">{{ statusModalDriver?.name }}</span>?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter class="gap-2">
-          <Button variant="outline" @click="closeStatusModal">Cancel</Button>
-          <Button :disabled="isStatusChanging" @click="submitToggleStatus">
-            <span v-if="isStatusChanging" class="flex items-center gap-2">
-              <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Saving...
-            </span>
-            <span v-else>{{ statusModalDriver?.status ? 'Deactivate' : 'Activate' }}</span>
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -179,18 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import DriversTable from '@/modules/Drivers/components/CDriverTable.vue'
-import AddDriverModal from '@/modules/Drivers/components/CDriversModal.vue'
+import DriverModal from '@/modules/Drivers/components/CDriversModal.vue'
 import { useDrivers } from '@/modules/Drivers/composables/useDrivers'
-import { Driver, DriverFormData } from '@/modules/Drivers/types'
+import type { Driver, RouteEldDriverUpdateFormData } from '@/modules/Drivers/types'
 
 const {
   searchQuery,
@@ -205,45 +28,20 @@ const {
   pageNumbers,
   handleSort,
   goToPage,
-  openStatusModal,
-  closeStatusModal,
-  submitToggleStatus,
-  isStatusModalOpen,
-  statusModalDriver,
-  isStatusChanging,
-  homeTerminals,
-  vehicles,
-  issuerStateParents,
-  issuerStates,
-  hosRoles,
-  cargoTypes,
-  restarts,
-  restBreaks,
-  addDriver,
   updateDriver,
 } = useDrivers()
 
-// Modal
 const isModalOpen = ref(false)
 const editingDriver = ref<Driver | null>(null)
-
-const openAddModal = () => {
-  editingDriver.value = null
-  isModalOpen.value = true
-}
 
 const openEditModal = (driver: Driver) => {
   editingDriver.value = { ...driver }
   isModalOpen.value = true
 }
 
-const handleSaveDriver = async (driverData: DriverFormData) => {
-  if (editingDriver.value) {
-    await updateDriver(editingDriver.value.id, driverData)
-  } else {
-    await addDriver(driverData)
-  }
-
+const handleSaveDriver = async (driverData: RouteEldDriverUpdateFormData) => {
+  if (!editingDriver.value) return
+  await updateDriver(editingDriver.value.id, driverData)
   isModalOpen.value = false
   editingDriver.value = null
 }
@@ -253,3 +51,105 @@ const closeModal = () => {
   editingDriver.value = null
 }
 </script>
+
+<template>
+  <div class="min-h-screen bg-white p-[16px_24px]">
+    <div class="mb-5 flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Drivers</h2>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Driver details and status are synchronized from Route ELD.
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <Search
+            class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          />
+          <Input v-model="searchQuery" placeholder="Search" class="w-64 pl-9" />
+        </div>
+        <Select v-model="statusFilter">
+          <SelectTrigger class="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <DriversTable
+      :drivers="paginatedDrivers"
+      :sort-key="sortKey"
+      :sort-order="sortOrder"
+      @sort="handleSort"
+      @edit="openEditModal"
+    />
+
+    <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-600">Display on page</span>
+        <Select v-model="itemsPerPage">
+          <SelectTrigger class="w-20"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="10">10</SelectItem>
+            <SelectItem :value="25">25</SelectItem>
+            <SelectItem :value="50">50</SelectItem>
+            <SelectItem :value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+        <span class="text-sm text-gray-600">{{ totalEntries.toLocaleString() }} entries</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1">
+          <button
+            v-for="page in pageNumbers"
+            :key="page"
+            :disabled="page === '...'"
+            :class="[
+              'h-8 min-w-[32px] rounded px-2 text-sm font-medium transition-colors',
+              page === currentPage
+                ? 'bg-gray-900 text-white'
+                : page === '...'
+                  ? 'cursor-default text-gray-400'
+                  : 'text-gray-700 hover:bg-gray-100',
+            ]"
+            @click="typeof page === 'number' && goToPage(page)"
+          >
+            {{ page }}
+          </button>
+        </div>
+        <span class="ml-4 text-sm text-gray-600">{{ currentPage }} of {{ totalPages }} pages</span>
+        <Button
+          variant="outline"
+          size="icon"
+          class="h-8 w-8"
+          :disabled="currentPage === 1"
+          @click="goToPage(currentPage - 1)"
+        >
+          <ChevronLeft class="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          class="h-8 w-8"
+          :disabled="currentPage === totalPages"
+          @click="goToPage(currentPage + 1)"
+        >
+          <ChevronRight class="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+
+    <DriverModal
+      :open="isModalOpen"
+      :driver="editingDriver"
+      @close="closeModal"
+      @save="handleSaveDriver"
+    />
+  </div>
+</template>

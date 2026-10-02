@@ -8,10 +8,10 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(duration);
 
-// let defaultTimezoneId = localStorage.getItem('carrier_timezoneid') || dayjs.tz.guess();
+// let defaultTimezoneId = localStorage.getItem('company_timezoneid') || dayjs.tz.guess();
 const getInitialTimeZone = () => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('carrier_timezoneid') || dayjs.tz.guess();
+    return localStorage.getItem('company_timezoneid') || dayjs.tz.guess();
   }
   return dayjs.tz.guess();
 };

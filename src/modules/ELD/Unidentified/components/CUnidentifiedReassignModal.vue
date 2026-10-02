@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import type { DriverItem } from '@/composables/useCarriersDrivers'
+import type { DriverItem } from '@/composables/useCompaniesDrivers'
 
 interface Props {
   open: boolean

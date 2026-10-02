@@ -38,7 +38,7 @@ export interface Trip {
 // ============================================
 
 export interface AuditRequest {
-  carrierId: string
+  companyId: string
   driverId: string
   trips: Trip[]
   startDate: Dayjs | string
@@ -58,7 +58,7 @@ export interface TimeValue {
 // ============================================
 
 export interface AuditTripForm {
-  carrier: string
+  company: string
   driver: string
   bolNumber: string
   trailerNumber: string
@@ -101,10 +101,10 @@ export interface FuelLocationItem {
 }
 
 // ============================================
-// Carrier / Driver for dropdowns
+// Company / Driver for dropdowns
 // ============================================
 
-export interface AuditCarrier {
+export interface AuditCompany {
   id: string
   name: string
   timeZoneInfo?: { ianaId: string }

@@ -19,7 +19,7 @@ export interface ActivityRecord {
   type: number
 
   // Used for UI columns
-  carrierName: string
+  companyName: string
   driverName: string
 
   // Used for name column

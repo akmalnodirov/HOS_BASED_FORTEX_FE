@@ -216,7 +216,7 @@ const profileFields = computed(() => {
         : '',
     },
     {
-      label: 'Carrier',
+      label: 'Company',
       value: form?.carrier?.name || '',
     },
     {

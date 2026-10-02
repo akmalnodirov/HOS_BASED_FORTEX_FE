@@ -7,14 +7,14 @@
           <h2 class="text-xl font-semibold text-foreground">Activity</h2>
 
           <div class="flex items-center gap-3">
-            <!-- Carrier Search -->
-            <Select v-model="carrierSearch">
+            <!-- Company Search -->
+            <Select v-model="companySearch">
               <SelectTrigger class="w-48 dark:bg-card border-border">
-                <SelectValue placeholder="Carrier search" />
+                <SelectValue placeholder="Company search" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="carrier in carriers" :key="carrier.id" :value="carrier.id">
-                  {{ carrier.name }}
+                <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
+                  {{ company.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -237,13 +237,13 @@ const {
   isLoading,
   hasLoaded,
   error,
-  carriers,
+  companies,
   drivers,
   rollbackLoading,
   selectedRollbackId,
 
   // Filters
-  carrierSearch,
+  companySearch,
   driverSearch,
   dateRange,
   selectedTag,

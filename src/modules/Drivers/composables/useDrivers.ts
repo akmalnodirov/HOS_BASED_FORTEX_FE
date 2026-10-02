@@ -6,7 +6,7 @@ import { sortArray, commonTransformers, type SortOrder } from '@/utils/sort'
 import { usePagination } from '@/composables/usePagination'
 import { useSorting } from '@/composables/useSorting'
 import { ApiEndpoints } from '@/api/endpoints'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import type {
   Driver,
   DriverFilter,
@@ -17,6 +17,9 @@ import type {
   NameWithId,
   IssuerStateOption,
   VehicleOption,
+  RouteEldDriverApiResponse,
+  RouteEldDriverUpdateFormData,
+  RouteEldDriverUpdateRequest,
 } from '@/modules/Drivers/types'
 import dayjs from 'dayjs'
 
@@ -31,6 +34,10 @@ interface SingleDriverResponse {
   successResult: DriverApiResponse
 }
 
+interface RouteEldDriversResponse {
+  successResult: RouteEldDriverApiResponse[]
+}
+
 interface ConfigResponse<T> {
   successResult: T[] | { data: T[] }
 }
@@ -41,7 +48,7 @@ interface ListConfigResponse<T> {
   }
 }
 
-interface CarrierDetailResponse {
+interface CompanyDetailResponse {
   successResult: {
     id: string
     carrierTerminals: Array<{
@@ -101,7 +108,11 @@ export function useDrivers() {
   }
 
   // Transform API response to UI Driver shape
-  const mapApiToDriver = (d: DriverApiResponse, index: number): Driver => ({
+  const mapApiToDriver = (
+    d: DriverApiResponse,
+    index: number,
+    routeEldDriver?: RouteEldDriverApiResponse
+  ): Driver => ({
     id: d.id,
     name: `${d.user?.firstName || ''} ${d.user?.lastName || ''}`.trim(),
     unit: d.currentVehicleUnit || 'N/A',
@@ -129,22 +140,37 @@ export function useDrivers() {
     cargoType: d.cargoType?.id,
     restart: d.restart?.id,
     restBreak: d.restBreak?.id,
+    isRouteEldDriver: !!routeEldDriver,
+    hasVan: routeEldDriver?.hasVan || false,
+    trailers: routeEldDriver?.trailers || '',
+    disableSleeperBerth: routeEldDriver?.disableSleeperBerth || false,
   })
 
   // Fetch drivers from API
   const fetchDrivers = async () => {
     isLoading.value = true
     try {
-      const response = await api.post<DriversListResponse>(ApiEndpoints.DRIVERS_FILTER, {
-        carrierId: getCarrierId(),
-        pageNumber: pagination.currentPage.value,
-        pageSize: pagination.itemsPerPage.value,
-      })
+      const [driversResult, routeEldResult] = await Promise.allSettled([
+        api.post<DriversListResponse>(ApiEndpoints.DRIVERS_FILTER, {
+          companyId: getCompanyId(),
+          pageNumber: pagination.currentPage.value,
+          pageSize: pagination.itemsPerPage.value,
+        }),
+        api.get<RouteEldDriversResponse>(ApiEndpoints.ROUTE_ELD_DRIVERS),
+      ])
+
+      if (driversResult.status === 'rejected') throw driversResult.reason
+      const response = driversResult.value
+      const routeEldDrivers =
+        routeEldResult.status === 'fulfilled' ? routeEldResult.value.data?.successResult || [] : []
+      const routeEldDriversById = new Map(
+        routeEldDrivers.map((driver) => [driver.driverId, driver])
+      )
 
       if (response.data?.successResult) {
         const apiData = response.data.successResult.data || []
         totalCount.value = response.data.successResult.totalCount || apiData.length
-        drivers.value = apiData.map((d, i) => mapApiToDriver(d, i))
+        drivers.value = apiData.map((d, i) => mapApiToDriver(d, i, routeEldDriversById.get(d.id)))
       } else {
         drivers.value = []
         totalCount.value = 0
@@ -167,20 +193,19 @@ export function useDrivers() {
         issuerParentRes,
         issuerRes,
         vehicleRes,
-        carrierRes,
-      ] =
-        await Promise.allSettled([
-          api.get<ConfigResponse<NameWithId>>(ApiEndpoints.HOS_RULE_URL),
-          api.get<ConfigResponse<NameWithId>>(ApiEndpoints.CARGO_TYPE_URL),
-          api.get<ConfigResponse<NameWithId>>(ApiEndpoints.RESTART_URL),
-          api.get<ConfigResponse<NameWithId>>(ApiEndpoints.REST_BREAK_URL),
-          api.get<ConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_PARENT_URL),
-          api.get<ListConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_URL),
-          api.post<{ successResult: { data: any[] } }>(ApiEndpoints.VEHICLES_FILTER, {
-            carrierId: getCarrierId(),
-          }),
-          api.get<CarrierDetailResponse>(`${ApiEndpoints.CARRIERS}/${getCarrierId()}`),
-        ])
+        companyRes,
+      ] = await Promise.allSettled([
+        api.get<ConfigResponse<NameWithId>>(ApiEndpoints.HOS_RULE_URL),
+        api.get<ConfigResponse<NameWithId>>(ApiEndpoints.CARGO_TYPE_URL),
+        api.get<ConfigResponse<NameWithId>>(ApiEndpoints.RESTART_URL),
+        api.get<ConfigResponse<NameWithId>>(ApiEndpoints.REST_BREAK_URL),
+        api.get<ConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_PARENT_URL),
+        api.get<ListConfigResponse<IssuerStateOption>>(ApiEndpoints.ISSUER_STATE_URL),
+        api.post<{ successResult: { data: any[] } }>(ApiEndpoints.VEHICLES_FILTER, {
+          companyId: getCompanyId(),
+        }),
+        api.get<CompanyDetailResponse>(`${ApiEndpoints.COMPANIES}/${getCompanyId()}`),
+      ])
 
       if (hosRes.status === 'fulfilled' && hosRes.value.data?.successResult) {
         hosRoles.value = unwrapOptions(hosRes.value.data.successResult)
@@ -203,10 +228,10 @@ export function useDrivers() {
       if (vehicleRes.status === 'fulfilled' && vehicleRes.value.data?.successResult?.data) {
         vehicles.value = vehicleRes.value.data.successResult.data
       }
-      if (carrierRes.status === 'fulfilled' && carrierRes.value.data?.successResult) {
-        const carrier = carrierRes.value.data.successResult
-        if (carrier.carrierTerminals) {
-          homeTerminals.value = carrier.carrierTerminals.map((t: any) => ({
+      if (companyRes.status === 'fulfilled' && companyRes.value.data?.successResult) {
+        const company = companyRes.value.data.successResult
+        if (company.carrierTerminals) {
+          homeTerminals.value = company.carrierTerminals.map((t: any) => ({
             id: t.id,
             name: `${t.street}, ${t.city}, ${t.issuerState?.stateCode || ''}, ${t.zipCode}`.trim(),
           }))
@@ -308,7 +333,10 @@ export function useDrivers() {
         cargoTypeId: driverData.cargoType,
         restartId: driverData.restart,
         restBreakId: driverData.restBreak,
-        carrierId: getCarrierId() || '',
+        companyId: getCompanyId() || '',
+        hasVan: driverData.hasVan,
+        trailers: driverData.hasVan ? driverData.trailers || null : null,
+        disableSleeperBerth: driverData.disableSleeperBerth,
       }
 
       const response = await api.post(ApiEndpoints.DRIVERS, request)
@@ -323,34 +351,17 @@ export function useDrivers() {
   }
 
   // Update driver
-  const updateDriver = async (id: number | string, driverData: Partial<DriverFormData>) => {
+  const updateDriver = async (id: number | string, driverData: RouteEldDriverUpdateFormData) => {
     try {
-      const request: DriverApiRequest = {
-        firstName: driverData.firstName || '',
-        lastName: driverData.lastName || '',
-        userName: driverData.username || '',
-        phoneNumber: driverData.phoneNumber || '',
-        email: driverData.email || '',
+      const request: RouteEldDriverUpdateRequest = {
         password: driverData.password || '',
         passwordConfirm: driverData.confirmPassword || '',
-        issuerStateId: driverData.issuerState || '',
-        licenseNumber: driverData.driverLicenseNumber || '',
-        homeTerminalId: driverData.homeTerminal || '',
-        assignedVehicleIds: driverData.vehicles || [],
-        exemptDriver: driverData.exemptDriver ?? false,
-        shortHaulException: driverData.shortHaulException ?? false,
-        allowPersonalUse: driverData.allowPersonalUse ?? false,
-        allowYardMoves: driverData.allowYardMove ?? false,
-        unlimitedTrailers: driverData.unlimitedTrailers ?? false,
-        unlimitedShippingDocuments: driverData.unlimitedShippingDocuments ?? false,
-        hosRuleId: driverData.hosRoles || '',
-        cargoTypeId: driverData.cargoType || '',
-        restartId: driverData.restart || '',
-        restBreakId: driverData.restBreak || '',
-        carrierId: getCarrierId() || '',
+        hasVan: driverData.hasVan ?? false,
+        trailers: driverData.hasVan ? driverData.trailers || null : null,
+        disableSleeperBerth: driverData.disableSleeperBerth ?? false,
       }
 
-      const response = await api.put(ApiEndpoints.DRIVERS_BY_ID(id as string), request)
+      const response = await api.put(ApiEndpoints.ROUTE_ELD_DRIVER(id as string), request)
       if (response.status === 200) {
         toast.success('Driver updated successfully')
         await fetchDrivers()
@@ -375,16 +386,13 @@ export function useDrivers() {
   }
 
   // Watch pagination changes
-  watch(
-    [() => pagination.currentPage.value, () => pagination.itemsPerPage.value],
-    async () => {
-      await fetchDrivers()
-    }
-  )
+  watch([() => pagination.currentPage.value, () => pagination.itemsPerPage.value], async () => {
+    await fetchDrivers()
+  })
 
   // Initial fetch
   onMounted(async () => {
-    await Promise.allSettled([fetchDrivers(), fetchConfigData()])
+    await fetchDrivers()
   })
 
   return {

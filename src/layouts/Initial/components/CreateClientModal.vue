@@ -190,7 +190,7 @@ const handleSubmit = async () => {
     }
 
     // Make API call
-    await api.post('/api/providers', payload, {
+    await api.post('/api/clients', payload, {
       _showSuccessToast: true,
       _successMessage: 'Client created successfully',
     })

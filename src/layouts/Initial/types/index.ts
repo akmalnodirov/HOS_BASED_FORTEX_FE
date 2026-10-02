@@ -8,8 +8,8 @@ export interface TimeZoneInfo {
   ianaId: string
 }
 
-export interface Carrier {
-  carrierId: string
+export interface Company {
+  companyId: string
   name: string
   usdotNumber: string
   phoneNumber: string
@@ -17,12 +17,12 @@ export interface Carrier {
   timeZoneInfo: TimeZoneInfo
 }
 
-export interface Provider {
-  providerId: string
-  providerName: string
-  carriers: Carrier[]
+export interface Client {
+  clientId: string
+  clientName: string
+  companies: Company[]
 }
 
-export interface ProvidersResponse {
-  successResult: Provider[]
+export interface ClientsResponse {
+  successResult: Client[]
 }

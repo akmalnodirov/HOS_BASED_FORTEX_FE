@@ -13,7 +13,7 @@
 import { useTrackingStore } from '@/modules/Overview/store/tracking.ts'
 import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { getCarrierId } from '@/utils/carrier.ts'
+import { getCompanyId } from '@/utils/company.ts'
 
 export function useOverviewList() {
   // search settings
@@ -30,7 +30,7 @@ export function useOverviewList() {
 
   // function to fetch trackings with search
   const fetchTrackings = async () => {
-    await trackingsStore.getDriverLastTrackings(getCarrierId() as string, search.value)
+    await trackingsStore.getDriverLastTrackings(getCompanyId() as string, search.value)
   }
 
   onMounted(async () => {

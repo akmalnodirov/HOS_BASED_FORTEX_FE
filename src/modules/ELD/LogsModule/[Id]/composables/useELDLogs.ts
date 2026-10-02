@@ -7,7 +7,7 @@ import { usePagination } from '@/composables/usePagination.ts'
 import { useSorting } from '@/composables/useSorting.ts'
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
-import { getCarrierId } from '@/utils/carrier.ts'
+import { getCompanyId } from '@/utils/company.ts'
 import { capitalizeKeys } from '@/utils/object.ts'
 import { formatTime, formatDuration } from '@/utils/time.ts'
 
@@ -89,9 +89,9 @@ export function useELDLogs() {
   const fetchLogs = async () => {
     try {
       loading.value = true
-      const carrierId = getCarrierId()
-      if (!carrierId) {
-        console.error('Carrier ID not found')
+      const companyId = getCompanyId()
+      if (!companyId) {
+        console.error('Company ID not found')
         return
       }
 
@@ -100,7 +100,7 @@ export function useELDLogs() {
       const pageSize = parseInt((route.query.pageSize as string) || '10')
       
       const model = {
-        carrierId,
+        companyId,
         startDate: null,
         endDate: null,
         hasViolation: violationFilter.value ? true : null,

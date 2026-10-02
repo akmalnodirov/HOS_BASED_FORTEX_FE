@@ -4,7 +4,7 @@ import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
-import { setCarrierId, setCarrierTimeZoneId } from '@/utils/carrier'
+import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 import { getEventLabel } from '@/utils/events'
 import { formatTime, formatDuration } from '@/utils/time'
 import { collectEventWarningAndErrors } from '@/services/normalize'
@@ -12,7 +12,7 @@ import type { MonitoringDriver, MonitoringDriverEvent } from '../types'
 import type { PinTime } from '@/types/events'
 import dayjs from 'dayjs'
 
-type CarrierMonitoringResponse = {
+type CompanyMonitoringResponse = {
   successResult: MonitoringDriver[] | { data: MonitoringDriver[]; totalCount: number }
 }
 
@@ -44,13 +44,13 @@ export function useMonitoringDetail() {
   const authStore = useAuthStore()
   const { getStartOf, getEndOf, convertToTimeZone } = useTimeZoneHelper()
 
-  const carrierId = computed(() => route.params.carrierId as string)
+  const companyId = computed(() => route.params.companyId as string)
 
   // State
   const monitoringDrivers = ref<MonitoringDriver[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const carrierTimeZone = ref('')
+  const companyTimeZone = ref('')
 
   // Drivers list derived from monitoring data
   const drivers = ref<{ id: string; name: string }[]>([])
@@ -290,14 +290,14 @@ export function useMonitoringDetail() {
   })
 
   // Fetch carrier monitoring data
-  async function fetchCarrierMonitoring() {
+  async function fetchCompanyMonitoring() {
     isLoading.value = true
     error.value = null
 
     try {
-      const response = await api.get<CarrierMonitoringResponse>(ApiEndpoints.MONITORING_CARRIER, {
+      const response = await api.get<CompanyMonitoringResponse>(ApiEndpoints.MONITORING_COMPANY, {
         params: {
-          CarrierId: carrierId.value,
+          CompanyId: companyId.value,
           PageNumber: 1,
           PageSize: 1000,
         },
@@ -325,11 +325,11 @@ export function useMonitoringDetail() {
         drivers.value = data.map((m) => ({ id: m.driverId, name: m.driverName }))
 
         if (data.length > 0 && data[0].timeZone) {
-          carrierTimeZone.value = data[0].timeZone
+          companyTimeZone.value = data[0].timeZone
         }
       }
     } catch (err: any) {
-      console.error('Error fetching carrier monitoring:', err)
+      console.error('Error fetching company monitoring:', err)
       error.value = err.response?.data?.message || 'Failed to load monitoring data'
     } finally {
       isLoading.value = false
@@ -338,9 +338,9 @@ export function useMonitoringDetail() {
 
   // Navigate to Boost page for a driver
   async function handleBoostClick(driverId: string) {
-    setCarrierId(carrierId.value)
-    if (carrierTimeZone.value) {
-      setCarrierTimeZoneId(carrierTimeZone.value)
+    setCompanyId(companyId.value)
+    if (companyTimeZone.value) {
+      setCompanyTimeZoneId(companyTimeZone.value)
     }
     await authStore.fetchCurrentUser()
 
@@ -360,7 +360,7 @@ export function useMonitoringDetail() {
   }
 
   onMounted(async () => {
-    await fetchCarrierMonitoring()
+    await fetchCompanyMonitoring()
   })
 
   return {

@@ -2,9 +2,9 @@
   <div>
     <Accordion type="multiple" class="w-full space-y-2">
       <AccordionItem
-        v-for="carrier in carriers"
-        :key="carrier.carrierId"
-        :value="`carrier-${carrier.carrierId}`"
+        v-for="company in companies"
+        :key="company.companyId"
+        :value="`company-${company.companyId}`"
         class=""
       >
         <AccordionTrigger class="group hover:no-underline px-6 py-4 hover:bg-accent cursor-pointer">
@@ -16,7 +16,7 @@
               <span
                 class="text-sm font-medium text-muted-foreground group-data-[state=open]:text-foreground"
               >
-                {{ carrier.carrierName }}
+                {{ company.companyName }}
               </span>
             </div>
 
@@ -24,21 +24,21 @@
               <Badge
                 variant="outline"
                 :class="
-                  carrier.hasProblem
+                  company.hasProblem
                     ? 'bg-[#F7EDED] text-[#AF4B4B] border-transparent'
                     : 'bg-[#EBF5EE] text-[#589E67] border-transparent'
                 "
               >
-                {{ carrier.hasProblem ? 'Problem' : 'Clear' }}
+                {{ company.hasProblem ? 'Problem' : 'Clear' }}
               </Badge>
               <Badge
                 variant="outline"
                 class="bg-blue-100/50 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 rounded-sm px-4 py-1"
               >
-                {{ carrier.timeZoneInfo.shortName }}
+                {{ company.timeZoneInfo.shortName }}
               </Badge>
               <Button
-                @click.stop="handleAnalyze(carrier.carrierId)"
+                @click.stop="handleAnalyze(company.companyId)"
                 size="sm"
                 class="bg-[#6082E0] text-primary-foreground cursor-pointer border-transparent"
               >
@@ -194,17 +194,17 @@
               </TableHeader>
               <TableBody>
                 <template
-                  v-for="driver in getSortedDrivers(carrier.monitoringDrivers)"
+                  v-for="driver in getSortedDrivers(company.monitoringDrivers)"
                   :key="driver.driverId"
                 >
                   <!-- Driver Row -->
                   <TableRow
-                    @click="toggleDriver(carrier.carrierId, driver.driverId)"
+                    @click="toggleDriver(company.companyId, driver.driverId)"
                     class="cursor-pointer bg-white dark:bg-card hover:bg-accent/50 transition-colors border-[#DBDBDB] dark:border-border"
                   >
                     <TableCell class="px-4 py-3">
                       <Plus
-                        v-if="!isDriverExpanded(carrier.carrierId, driver.driverId)"
+                        v-if="!isDriverExpanded(company.companyId, driver.driverId)"
                         class="w-4 h-4 text-muted-foreground"
                       />
                       <Minus v-else class="w-4 h-4 text-muted-foreground" />
@@ -284,7 +284,7 @@
                           <Tooltip>
                             <TooltipTrigger as-child>
                               <Button
-                                @click.stop="handleBoostClick(carrier, driver)"
+                                @click.stop="handleBoostClick(company, driver)"
                                 variant="ghost"
                                 size="icon"
                                 class="h-8 w-8"
@@ -302,7 +302,7 @@
                   </TableRow>
 
                   <!-- HOS Records Inner Table -->
-                  <TableRow v-if="isDriverExpanded(carrier.carrierId, driver.driverId)">
+                  <TableRow v-if="isDriverExpanded(company.companyId, driver.driverId)">
                     <TableCell colspan="12" class="p-0">
                       <div class="my-2">
                         <div
@@ -460,18 +460,18 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type {
-  MonitoringCarrier,
+  MonitoringCompany,
   MonitoringStats,
   MonitoringDriver,
 } from '@/modules/Tools/Monitoring/types'
-import { setCarrierId, setCarrierTimeZoneId } from '@/utils/carrier'
+import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import dayjs from 'dayjs'
 
 interface Props {
-  carriers: MonitoringCarrier[]
-  getCarrierStats: (carrier: MonitoringCarrier) => MonitoringStats
+  companies: MonitoringCompany[]
+  getCompanyStats: (company: MonitoringCompany) => MonitoringStats
   getEventName: (code: number) => string
   getEventBadgeClass: (code: number) => string
   formatDuration: (seconds: number) => string
@@ -561,38 +561,38 @@ const getSortedDrivers = (drivers: MonitoringDriver[]) => {
   })
 }
 
-// Track expanded drivers for each carrier
+// Track expanded drivers for each company
 const expandedDrivers = ref<Record<string, Set<string>>>({})
 
-const toggleDriver = (carrierId: string, driverId: string) => {
-  if (!expandedDrivers.value[carrierId]) {
-    expandedDrivers.value[carrierId] = new Set()
+const toggleDriver = (companyId: string, driverId: string) => {
+  if (!expandedDrivers.value[companyId]) {
+    expandedDrivers.value[companyId] = new Set()
   }
 
-  if (expandedDrivers.value[carrierId].has(driverId)) {
-    expandedDrivers.value[carrierId].delete(driverId)
+  if (expandedDrivers.value[companyId].has(driverId)) {
+    expandedDrivers.value[companyId].delete(driverId)
   } else {
-    expandedDrivers.value[carrierId].add(driverId)
+    expandedDrivers.value[companyId].add(driverId)
   }
 }
 
-const isDriverExpanded = (carrierId: string, driverId: string): boolean => {
-  return expandedDrivers.value[carrierId]?.has(driverId) || false
+const isDriverExpanded = (companyId: string, driverId: string): boolean => {
+  return expandedDrivers.value[companyId]?.has(driverId) || false
 }
 
-const handleAnalyze = (carrierId: string) => {
-  router.push({ name: 'ToolsMonitoringDetail', params: { carrierId } })
+const handleAnalyze = (companyId: string) => {
+  router.push({ name: 'ToolsMonitoringDetail', params: { companyId } })
 }
 
-// Handle boost click - navigate to boost page with carrier info
-const handleBoostClick = async (carrier: MonitoringCarrier, driver: MonitoringDriver) => {
-  // Set carrier info using utility functions
-  setCarrierId(carrier.carrierId)
-  if (carrier.timeZone) {
-    setCarrierTimeZoneId(carrier.timeZone)
+// Handle boost click - navigate to boost page with company info
+const handleBoostClick = async (company: MonitoringCompany, driver: MonitoringDriver) => {
+  // Set company info using utility functions
+  setCompanyId(company.companyId)
+  if (company.timeZone) {
+    setCompanyTimeZoneId(company.timeZone)
   }
 
-  // Fetch current user with new carrier to update authStore
+  // Fetch current user with new company to update authStore
   await authStore.fetchCurrentUser()
 
   // Calculate date range (2 weeks ago to now, like old project)

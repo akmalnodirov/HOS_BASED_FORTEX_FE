@@ -139,14 +139,14 @@ import {
 import IftaTable from '@/modules/Ifta/components/CIftaTable.vue'
 import IftaModal from '@/modules/Ifta/components/CIftaModal.vue'
 import { useIfta } from '@/modules/Ifta/composables/useIfta'
-import { getCarrierId } from '@/utils/carrier'
+import { getCompanyId } from '@/utils/company'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import dayjs from 'dayjs'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { toast } from 'vue-sonner'
 
-const carrierId = getCarrierId() || ''
+const companyId = getCompanyId() || ''
 
 const {
   iftaRecords,
@@ -164,7 +164,7 @@ const {
   goToPage,
   downloadReport,
   fetchIfta,
-} = useIfta({ carrierId, autoFetch: true })
+} = useIfta({ companyId, autoFetch: true })
 
 const api = useApi()
 const { formatToUTC, getStartOf, getEndOf } = useTimeZoneHelper()
@@ -190,7 +190,7 @@ const handleGenerate = async (data: {
       vehicleIds: data.vehicleIds,
       startDate: formatToUTC(getStartOf(dayjs(data.startDate))),
       endDate: formatToUTC(getEndOf(dayjs(data.endDate))),
-      carrierId,
+      companyId,
     })
     toast.success('IFTA report generated successfully')
     closeAddModal()

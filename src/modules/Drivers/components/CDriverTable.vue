@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import { Driver, SortKey, SortOrder } from '../types'
@@ -25,7 +24,6 @@ defineProps<Props>()
 
 const emit = defineEmits<{
   (e: 'sort', key: SortKey): void
-  (e: 'toggle-status', driver: Driver): void
   (e: 'edit', driver: Driver): void
 }>()
 </script>
@@ -116,7 +114,14 @@ const emit = defineEmits<{
           <TableCell class="p-2">{{ driver.appVersion }}</TableCell>
           <TableCell class="p-2">{{ driver.eventsTime }}</TableCell>
           <TableCell class="p-2">
-            <Switch :model-value="driver.status" @update:model-value="emit('toggle-status', driver)" />
+            <span
+              :class="[
+                'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                driver.status ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600',
+              ]"
+            >
+              {{ driver.status ? 'Active' : 'Inactive' }}
+            </span>
           </TableCell>
           <TableCell class="p-2">
             <Button @click="emit('edit', driver)" variant="ghost" size="icon" class="h-8 w-8">
