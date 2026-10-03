@@ -26,8 +26,12 @@ jobs:
             echo "::error::FRONTEND_ENV GitHub Secret is not configured"
             exit 1
           fi
-          printf '%s' "$FRONTEND_ENV" | base64 --decode > .env.production
+          printf '%s\n' "$FRONTEND_ENV" > .env.production
           trap 'rm -f .env.production' EXIT
+          if ! grep -q '^VITE_APP_BASE_URL=' .env.production; then
+            echo "::error::FRONTEND_ENV must contain VITE_APP_BASE_URL"
+            exit 1
+          fi
           npm install
           npm run build
           test -f dist/index.html
