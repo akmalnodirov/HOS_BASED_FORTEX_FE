@@ -3,7 +3,7 @@ name: Deploy HOS based FORTEX (Vue/Vite)
 on:
   push:
     branches:
-      - "main"
+      - 'main'
   workflow_dispatch:
 
 jobs:
@@ -16,10 +16,18 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
+          node-version: '20.x'
 
       - name: npm install and build
+        env:
+          FRONTEND_ENV_BASE64: ${{ secrets.FRONTEND_ENV }}
         run: |
+          if [ -z "$FRONTEND_ENV" ]; then
+            echo "::error::FRONTEND_ENV GitHub Secret is not configured"
+            exit 1
+          fi
+          printf '%s' "$FRONTEND_ENV" | base64 --decode > .env.production
+          trap 'rm -f .env.production' EXIT
           npm install
           npm run build
           test -f dist/index.html
