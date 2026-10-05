@@ -218,6 +218,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
+  static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
+  static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
   static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
     `${ApiEndpoints.ROUTE_ELD_COMPANIES}/${id}/select`
 
