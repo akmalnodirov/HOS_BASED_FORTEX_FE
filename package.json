@@ -31,6 +31,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
     "@tanstack/vue-table": "^8.21.3",
     "@vueuse/core": "^14.2.1",
     "apexcharts": "^5.3.6",
@@ -39,6 +40,8 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
     "echarts": "^6.0.0",
+    "html2pdf.js": "^0.14.0",
+    "jszip": "^3.10.2",
     "lucide-vue-next": "^0.561.0",
     "pinia": "^3.0.4",
     "radix-vue": "^1.9.17",

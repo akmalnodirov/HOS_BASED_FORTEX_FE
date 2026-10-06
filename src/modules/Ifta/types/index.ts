@@ -1,46 +1,52 @@
-// API response shape
-export interface IftaApiResponse {
+export interface IftaReport {
   id: string
-  startDate: string
-  endDate: string
-  pdfPath: string
-  csvPath: string
-  dateTime: string
-  vehicle: {
-    id: string
-    unit: string | null
-  }
-}
-
-// UI display shape
-export interface IftaRecord {
-  id: string
-  submitted: string
-  from: string
-  to: string
-  vehicleId: string
   status: string
-  pdfPath: string
-  csvPath: string
+  timeSubmitted: number
+  timeGenerated: number | null
+  fromDate: string
+  toDate: string
+  url: string | null
+  csvUrl: string | null
+  vehicleId: string
+  vehicleName: string | null
+  vehicleVin: string | null
+  vehicleMake: string | null
+  vehicleModel: string | null
+  vehicleYear: number | null
+  states: string[]
+  errors: string[]
 }
 
-// API request for generating IFTA report
-export interface IftaGenerateRequest {
-  vehicleIds: string[]
-  startDate: string
-  endDate: string
-  companyId: string
-}
-
-// API request for fetching IFTA list
-export interface IftaFilterRequest {
-  companyId: string
-  pageNumber?: number
-  pageSize?: number
-}
-
-// Vehicle option for select dropdown
-export interface VehicleOption {
+export interface IftaVehicle {
   id: string
-  unit: string | null
+  name: string | null
+  vin: string | null
+  make: string | null
+  model: string | null
+  year: number | null
 }
+
+export interface IftaGenerateForm {
+  vehicleIds: string[]
+  fromDate: string
+  toDate: string
+  states: string[]
+}
+
+export interface IftaGenerateRequest {
+  companyId: string
+  companyName: string
+  fromDate: string
+  toDate: string
+  timeZoneId: string
+  vehicles: IftaVehicle[]
+  states: string[]
+}
+
+export interface IftaSelectOption {
+  value: string
+  label: string
+}
+
+export type IftaSortKey = 'timeSubmitted' | 'fromDate' | 'toDate' | 'vehicleName' | 'status'
+export type IftaDownloadFormat = 'pdf' | 'csv' | 'all'

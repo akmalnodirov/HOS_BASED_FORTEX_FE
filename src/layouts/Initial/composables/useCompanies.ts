@@ -63,7 +63,12 @@ export function useCompanies() {
     if (!company.isActive || selectingCompanyId.value) return false
     selectingCompanyId.value = company.id
     try {
-      await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
+      const response = await api.post<{
+        successResult: { issues: { message: string }[] }
+      }>(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
+      for (const issue of response.data?.successResult?.issues ?? []) {
+        toast.warning(issue.message)
+      }
       setCompanyId(company.id)
       setCompanyTimeZoneId('UTC')
       await router.push('/eld/logs')

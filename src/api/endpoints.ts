@@ -223,6 +223,12 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
     `${ApiEndpoints.ROUTE_ELD_COMPANIES}/${id}/select`
 
+  // Route ELD IFTA reports use external company and vehicle IDs.
+  static readonly ROUTE_ELD_IFTA_REPORTS = `${this.BASE_URL}/route-eld/ifta-reports`
+  static readonly ROUTE_ELD_IFTA_VEHICLES = `${this.ROUTE_ELD_IFTA_REPORTS}/vehicles`
+  static readonly ROUTE_ELD_IFTA_GENERATE = `${this.ROUTE_ELD_IFTA_REPORTS}/generate`
+  static readonly ROUTE_ELD_IFTA_FILE = `${this.ROUTE_ELD_IFTA_REPORTS}/file`
+
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`
   static readonly IFTA_FILTER = `${this.IFTA_URL}/filter`
