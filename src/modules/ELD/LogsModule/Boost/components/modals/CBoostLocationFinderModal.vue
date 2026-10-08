@@ -160,7 +160,6 @@ const searchForm = reactive({
   longitude: 0,
 })
 
-// Reset form when modal closes
 watch(() => props.open, (val) => {
   if (!val) {
     searchForm.calculatedLocation = ''
@@ -215,7 +214,6 @@ async function pasteCoords() {
       searchForm.longitude = parseFloat(match[2])
     }
   } catch {
-    // clipboard access denied
   }
 }
 

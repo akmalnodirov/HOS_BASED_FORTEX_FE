@@ -13,9 +13,7 @@
       </TabsList>
     </Tabs>
 
-    <!-- Boost Page Toolbar -->
     <div v-if="isBoostPage" class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 mb-1">
-      <!-- Booster Toggle -->
       <div class="flex items-center bg-[#F0F0F0] dark:bg-muted rounded p-1 h-8 lg:h-9 2xl:h-10">
         <button
           v-for="b in ['booster 1', 'booster 2', 'booster 3']"
@@ -182,13 +180,11 @@ const props = defineProps<Props>()
 const router = useRouter()
 const route = useRoute()
 
-const tabs = ['ALL', 'AI', 'BOOST', 'HISTORY', 'OPTIMIZE', 'TRACKING', 'INSERT INFO LOG']
+const tabs = ['ALL', 'AI', 'BOOST', 'HISTORY', 'TRACKING']
 const activeTab = ref('ALL')
 
-// Check if we're on boost page
 const isBoostPage = computed(() => route.name === 'ELDBoost')
 
-// Get active tab based on current route
 const getActiveTabFromRoute = (): string => {
   if (route.query.tab === 'history') {
     return 'HISTORY'
@@ -196,8 +192,6 @@ const getActiveTabFromRoute = (): string => {
   switch (route.name) {
     case 'ELDBoost':
       return 'BOOST'
-    case 'ELDOptimise':
-      return 'OPTIMIZE'
     case 'ELDTracking':
       return 'TRACKING'
     case 'ELDInsertInfoLog':
@@ -208,7 +202,6 @@ const getActiveTabFromRoute = (): string => {
   }
 }
 
-// Initialize active tab from route
 watch(
   [() => route.name, () => route.query.tab],
   () => {
@@ -217,19 +210,15 @@ watch(
   { immediate: true }
 )
 
-// Emit for history tab changes and boost search
 const emit = defineEmits<{
   (e: 'history-toggle', isHistory: boolean): void
   (e: 'search-click'): void
   (e: 'boost-create-click', fromDate: Dayjs, toDate: Dayjs): void
 }>()
 
-// Watch for tab changes and navigate accordingly
 watch(activeTab, (newTab, oldTab) => {
-  // Skip if tab didn't actually change (prevents loops)
   if (newTab === oldTab) return
 
-  // Skip navigation if we're already on the correct route
   const currentTab = getActiveTabFromRoute()
   if (newTab === currentTab) return
 
@@ -247,20 +236,8 @@ watch(activeTab, (newTab, oldTab) => {
       }
       break
 
-    case 'OPTIMIZE':
-      if (driverId && route.name !== 'ELDOptimise') {
-        router.push({
-          name: 'ELDOptimise',
-          params: { id: driverId },
-          query: dateParam ? { date: dateParam } : undefined,
-        })
-      }
-      break
-
     case 'HISTORY':
-      // Toggle history mode via query parameter
       if (route.query.tab === 'history') {
-        // Exit history mode
         router.push({
           name: 'ELDLogDetail',
           params: { id: driverId },
@@ -268,7 +245,6 @@ watch(activeTab, (newTab, oldTab) => {
         })
         emit('history-toggle', false)
       } else {
-        // Enter history mode - stay on current page but add query param
         router.push({
           name: 'ELDLogDetail',
           params: { id: driverId },
@@ -299,7 +275,6 @@ watch(activeTab, (newTab, oldTab) => {
       break
 
     case 'ALL':
-      // Navigate to ELDLogDetail if not already there
       if (route.name !== 'ELDLogDetail' || route.query.tab === 'history') {
         router.push({
           name: 'ELDLogDetail',
@@ -312,10 +287,8 @@ watch(activeTab, (newTab, oldTab) => {
   }
 })
 
-// Calendar state
 const isCalendarOpen = ref(false)
 
-// Boost page specific state
 const selectedBooster = ref('booster 1')
 const isBoostCalendarOpen = ref(false)
 
@@ -338,7 +311,6 @@ const getInitialBoostRange = () => {
 
 const boostDateRange = ref<any>(getInitialBoostRange())
 
-// useBoost onMounted da URL ga initial dateni yozgandan keyin picker ni sync qilish
 watch([() => route.query.fromDate, () => route.query.toDate], ([fromDate, toDate]) => {
   if (!isBoostPage.value || !fromDate || !toDate) return
   const from = dayjs(String(fromDate))
@@ -351,7 +323,6 @@ watch([() => route.query.fromDate, () => route.query.toDate], ([fromDate, toDate
   }
 })
 
-// Handle boost create button click
 const handleBoostCreate = () => {
   if (!boostDateRange.value?.start || !boostDateRange.value?.end) return
   emit(
@@ -361,40 +332,33 @@ const handleBoostCreate = () => {
   )
 }
 
-// Auto-close boost calendar when both dates are selected
 watch(boostDateRange, (newRange) => {
   if (newRange?.start && newRange?.end) {
     isBoostCalendarOpen.value = false
   }
 })
 
-// Format boost date
 function formatBoostDate(date: any) {
   if (!date) return ''
   return `${String(date.day).padStart(2, '0')}.${String(date.month).padStart(2, '0')}.${date.year}`
 }
 
-// Convert Dayjs to CalendarDate
 const dayjsToCalendarDate = (date: Dayjs): CalendarDate => {
   return new CalendarDate(date.year(), date.month() + 1, date.date())
 }
 
-// Convert DateValue to Dayjs
 const calendarDateToDayjs = (date: DateValue | any): Dayjs => {
   return dayjs(new Date(date.year, date.month - 1, date.day))
 }
 
-// Function to disable future dates (dates after today)
 const isDateDisabled = (date: DateValue | any): boolean => {
   const today = dayjs().startOf('day')
   const dateToCheck = dayjs(new Date(date.year, date.month - 1, date.day)).startOf('day')
   return dateToCheck.isAfter(today)
 }
 
-// Selected date for Calendar component (DateValue type)
 const selectedDate = ref<any>(undefined)
 
-// Initialize selectedDate with headerDate when it changes
 watch(
   () => props.headerDate,
   (newDate) => {
@@ -405,32 +369,25 @@ watch(
   { immediate: true }
 )
 
-// Get button class based on violation status and selection
 const getButtonClass = (violation: WeeklyViolationResponse) => {
   const hasViolations = violation.violations && violation.violations.length > 0
   const isSelected = props.compareDates(violation.dateOfViolations, props.headerDate)
 
   if (isSelected) {
-    // Selected date theme-aware dark/light
     return 'bg-foreground text-background border-foreground shadow-sm'
   } else if (hasViolations) {
-    // Unselected with violations - red theme
     return 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20'
   } else {
-    // Default style - neutral
     return 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-foreground'
   }
 }
 
-// Handle date click from weekly violations buttons
 const handleDateClick = async (date: string | Dayjs) => {
   const selectedDate = props.acceptAsTimeZone(date)
   await props.updateHeaderDate(selectedDate)
 }
 
-// Handle calendar cancel
 const handleCancel = () => {
-  // Reset to headerDate
   if (props.headerDate) {
     selectedDate.value = dayjsToCalendarDate(props.headerDate)
   } else {
@@ -439,7 +396,6 @@ const handleCancel = () => {
   isCalendarOpen.value = false
 }
 
-// Check if next week button should be disabled (if headerDate is yesterday or later)
 const isNextWeekDisabled = computed(() => {
   if (!props.headerDate) return true
 
@@ -448,83 +404,58 @@ const isNextWeekDisabled = computed(() => {
   return headerDateDayjs.isSame(yesterday) || headerDateDayjs.isAfter(yesterday)
 })
 
-// Handle previous week navigation
 const handlePreviousWeek = async () => {
   if (!props.headerDate) return
 
-  // Subtract 1 day from headerDate
   const previousDay = props.subtract(props.headerDate, 1, 'day')
 
-  // Calculate endDate: previousDay + 2 days, capped at yesterday
   const rawEndDate = props.add(previousDay, 2, 'day')
   const yesterday = dayjs().subtract(1, 'day')
   const endDate = rawEndDate.isAfter(yesterday) ? yesterday : rawEndDate
 
-  // Calculate startDate: previousDay - 6 days (to make 8 days total)
   const startDate = props.subtract(previousDay, 6, 'day')
 
-  // Format dates to UTC
   const startDateUTC = props.formatToUTC(props.getStartOf(startDate))
   const endDateUTC = props.formatToUTC(props.getEndOf(endDate))
 
-  // Update headerDate to previous day
   await props.updateHeaderDate(previousDay)
 
-  // Fetch weekly violations with new date range
   await props.fetchWeeklyViolations(startDateUTC, endDateUTC)
 }
 
-// Handle next week navigation
 const handleNextWeek = async () => {
   if (!props.headerDate) return
   if (isNextWeekDisabled.value) return
 
-  // Add 1 day to headerDate
   const nextDay = props.add(props.headerDate, 1, 'day')
 
-  // Calculate endDate: nextDay + 2 days, capped at yesterday
   const rawEndDate = props.add(nextDay, 2, 'day')
   const yesterday = dayjs().subtract(1, 'day')
   const endDate = rawEndDate.isAfter(yesterday) ? yesterday : rawEndDate
 
-  // Calculate startDate: nextDay - 6 days (to make 8 days total)
   const startDate = props.subtract(nextDay, 6, 'day')
 
-  // Format dates to UTC
   const startDateUTC = props.formatToUTC(props.getStartOf(startDate))
   const endDateUTC = props.formatToUTC(props.getEndOf(endDate))
 
-  // Update headerDate to next day
   await props.updateHeaderDate(nextDay)
 
-  // Fetch weekly violations with new date range
   await props.fetchWeeklyViolations(startDateUTC, endDateUTC)
 }
 
-// Handle calendar apply
 const handleApply = async () => {
   if (!selectedDate.value) return
 
-  // Convert DateValue to Dayjs
   const selected = props.acceptAsTimeZone(calendarDateToDayjs(selectedDate.value))
-
-  // Calculate endDate: selected + 2 days
   const endDate = props.add(selected, 2, 'day')
-
-  // Calculate startDate: selected - 6 days (to make 8 days total: 12-20 inclusive)
   const startDate = props.subtract(selected, 6, 'day')
 
-  // Format dates to UTC
   const startDateUTC = props.formatToUTC(props.getStartOf(startDate))
   const endDateUTC = props.formatToUTC(props.getEndOf(endDate))
 
-  // Update headerDate to selected date
   await props.updateHeaderDate(selected)
-
-  // Fetch weekly violations with new date range
   await props.fetchWeeklyViolations(startDateUTC, endDateUTC)
 
-  // Close calendar
   isCalendarOpen.value = false
 }
 </script>

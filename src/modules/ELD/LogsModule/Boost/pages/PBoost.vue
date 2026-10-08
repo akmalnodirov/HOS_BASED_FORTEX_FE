@@ -1,6 +1,5 @@
 <template>
   <div class="pb-24">
-    <!-- Toolbar (Add Events & Status Filters) -->
     <CBoostToolbar
       :free-times="boostFreeTimes"
       :tabs="tabs"
@@ -18,8 +17,6 @@
       @remove-tab="removeTab"
       class="my-1"
     />
-
-    <!-- DOT Inspection Alert -->
     <div
       v-if="dotInspectionAlert && showDotInspectionBanner"
       class="px-6 py-4 bg-white dark:bg-card"
@@ -40,7 +37,6 @@
       </div>
     </div>
 
-    <!-- Main Chart -->
     <CBoostGraph
       ref="boostGraphRef"
       :chart-data="chartData"
@@ -56,7 +52,6 @@
       class="my-1"
     />
 
-    <!-- Events Table -->
     <CBoostEventsTable
       :events="dailyEvents"
       :loading="isDailyEventsLoading"
@@ -72,26 +67,17 @@
       @drop-property="dropProperty"
     />
 
-    <!-- Fixed Bottom Action Bar -->
     <CBoostActions
       :drag-drop-enabled="dragDropEnabled"
       :delete-disabled="!selectedRowIds.length"
       :reassign-disabled="!selectedRowIds.length"
       @dragdrop-change="setDragDropEnabled"
       @delete-click="deleteSelectedBoostEvents"
-      @optimize-click="showOptimizeModal = true"
       @boost-click="openBoostModal"
       @reassign-click="openReassignModal"
       @multi-update-click="multiUpdateModalOpen = true"
     />
 
-    <!-- Modals -->
-    <CBoostOptimizeModal
-      v-model:open="showOptimizeModal"
-      :categories="optimizeCategories"
-      :loading="isOptimizing"
-      @save="handleOptimizeSave"
-    />
     <CBoostErrorWarningModal
       v-model:open="showErrorWarningModal"
       :rows="errorWarningRows"
@@ -119,7 +105,6 @@
       @scroll-to-event="handleLocationScrollToEvent"
     />
 
-    <!-- Edit Event Modal -->
     <CBoostEditEventModal
       v-model:open="showEditEventModal"
       :form="editEventForm"
@@ -128,7 +113,6 @@
       @submit="submitEditEvent"
     />
 
-    <!-- Multi Update Modal -->
     <CBoostMultiUpdateModal
       v-model:open="multiUpdateModalOpen"
       :events="selectedEventsForUpdate"
@@ -137,13 +121,11 @@
       @submit="submitMultiUpdateEvents"
     />
 
-    <!-- DOT Inspection Details Modal -->
     <CBoostDotInspectionModal
       v-model:open="showDotInspectionDetails"
       :inspection="dotInspectionData"
     />
 
-    <!-- Edit Daily Form Modal -->
     <CBoostEditDailyFormModal
       v-model:open="showEditDailyFormModal"
       :form="editDailyForm"
@@ -163,7 +145,6 @@ import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts
 import CBoostGraph from '../components/CBoostGraph.vue'
 import CBoostEventsTable from '../components/CBoostEventsTable.vue'
 import CBoostActions from '../components/CBoostActions.vue'
-import CBoostOptimizeModal from '../components/modals/CBoostOptimizeModal.vue'
 import CBoostErrorWarningModal from '../components/modals/CBoostErrorWarningModal.vue'
 import CBoostViolationModal from '../components/modals/CBoostViolationModal.vue'
 import CBoostMoveTimeModal from '../components/modals/CBoostMoveTimeModal.vue'
@@ -175,7 +156,6 @@ import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.
 import CBoostDotInspectionModal from '../components/modals/CBoostDotInspectionModal.vue'
 import { useBoost } from '../composables/useBoost.ts'
 
-// Use composable
 const {
   dailySummary,
   dailyTimeRemainder,
@@ -221,8 +201,6 @@ const {
   deleteBoostEvent,
   deleteSelectedBoostEvents,
   dropProperty,
-  optimizeCategories,
-  optimizeSelectedCategories,
   submitMoveTimeBoost,
   submitReassignSelectedEvents,
   multiUpdateModalOpen,
@@ -243,13 +221,8 @@ const {
   driverId,
 } = useBoost()
 
-// Refs
 const boostGraphRef = ref<InstanceType<typeof CBoostGraph> | null>(null)
-
-// Inject from layout
 const showLocationFinderModal = inject<Ref<boolean>>('showBoostSearchModal', ref(false))
-
-// Inject boost trigger from layout (date range + create signal)
 const boostTrigger = inject<Ref<{ fromDate: Dayjs; toDate: Dayjs } | null>>(
   'boostTrigger',
   ref(null)
@@ -257,20 +230,14 @@ const boostTrigger = inject<Ref<{ fromDate: Dayjs; toDate: Dayjs } | null>>(
 
 watch(boostTrigger, (trigger) => {
   if (trigger) {
-    // headerDate ni o'zgartiramiz — useBoost ichidagi watch(headerDate) o'zi loadBoostEvents() ni chaqiradi
     headerDate.value = [trigger.fromDate, trigger.toDate]
   }
 })
 
-// DOT Inspection
 const showDotInspectionBanner = ref(true)
 
-// Modals State
-const showOptimizeModal = ref(false)
 const showErrorWarningModal = ref(false)
 const showViolationModal = ref(false)
-
-const isOptimizing = ref(false)
 
 const setDragDropEnabled = (v: boolean) => {
   dragDropEnabled.value = v
@@ -288,7 +255,6 @@ const onSelectedRowIdsUpdate = (ids: string[]) => {
   selectedRowIds.value = ids
 }
 
-// Graph event click: highlight + toggle checkbox
 const onGraphEventSelect = (event: any) => {
   getSelectedEvent(event)
   const id = typeof event === 'string' ? event : String(event?.id || event?.eventId || '')
@@ -301,21 +267,10 @@ const onGraphEventSelect = (event: any) => {
   }
 }
 
-// Table row click: set selected + scroll graph to that event
 const onTableEventSelect = (eventId: string) => {
   getSelectedEvent(eventId)
   if (boostGraphRef.value?.scrollToEventSegment) {
     boostGraphRef.value.scrollToEventSegment(eventId)
-  }
-}
-
-const handleOptimizeSave = async (selectedCategoryIds: string[]) => {
-  try {
-    isOptimizing.value = true
-    await optimizeSelectedCategories(selectedCategoryIds)
-    showOptimizeModal.value = false
-  } finally {
-    isOptimizing.value = false
   }
 }
 
@@ -332,7 +287,6 @@ const handleViolationSelect = (violationEventId: string) => {
   }
 }
 
-// Location finder - scroll to event in chart
 const handleLocationScrollToEvent = (eventId: string) => {
   getSelectedEvent(eventId)
   if (boostGraphRef.value?.scrollToEventSegment) {
@@ -340,7 +294,6 @@ const handleLocationScrollToEvent = (eventId: string) => {
   }
 }
 
-// Free time click handler - scroll chart to event segment
 const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   if (boostGraphRef.value?.scrollToEventSegment) {
     boostGraphRef.value.scrollToEventSegment(freeTime.eventId)

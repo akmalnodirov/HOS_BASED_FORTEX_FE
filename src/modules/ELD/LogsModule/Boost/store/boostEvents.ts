@@ -26,11 +26,10 @@ export const useBoostEventsStore = defineStore('boostEventsNewEld', () => {
   const boostEvent = ref<BoostEventResponse | null>(null)
   const boostGraph = ref<GraphResponse | null>(null)
   const reassignGraph = ref<GraphResponse | null>(null)
-  const pinTimes = shallowRef<any[]>([]) // backend type not defined in new-eld yet
+  const pinTimes = shallowRef<any[]>([])
 
   const boostLocationSearchEvents = ref<LocationSearchResponse[]>([])
 
-  // Move-time selection (used by Boost)
   const selectedMoveEvents = ref<Record<string, GraphDuties[]>>({})
   const selectedMoveEventsDurations = ref<number[]>([])
   const isMoveTimeEventsReversed = ref(false)

@@ -1,7 +1,3 @@
-/**
- * History Sessions Store - manages history session lifecycle
- */
-
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useApi } from '@/composables/useAxiosService.ts'
@@ -12,11 +8,9 @@ import type { HistorySessionRequest, HistorySessionResponse } from '../types/his
 export const useHistorySessionsStore = defineStore('historySessions', () => {
   const api = useApi()
 
-  // State
   const session = ref<HistorySessionResponse | null>(null)
   const sessionId = ref<string | null>(null)
 
-  // Actions
   async function getSession(id: string): Promise<boolean> {
     try {
       const response = await api.get<{ successResult: HistorySessionResponse }>(
@@ -66,11 +60,9 @@ export const useHistorySessionsStore = defineStore('historySessions', () => {
   }
 
   return {
-    // State
     session,
     sessionId,
 
-    // Actions
     getSession,
     addSession,
     deleteSession,

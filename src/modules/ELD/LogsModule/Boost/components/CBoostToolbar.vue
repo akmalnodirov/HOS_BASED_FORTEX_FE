@@ -1,20 +1,7 @@
 <template>
   <div class="flex items-center flex-col gap-1">
-    <!-- Top Row: Buttons & Submit -->
     <div class="flex items-center justify-between bg-white dark:bg-card w-full py-4 px-6">
-      <!-- Left: Action Buttons + Tabs -->
       <div class="flex items-center gap-2 flex-wrap">
-        <!-- Initial Button -->
-        <!--        <Button-->
-        <!--          variant="outline"-->
-        <!--          size="sm"-->
-        <!--          class="h-9 px-4 text-xs bg-background hover:bg-muted/50"-->
-        <!--          @click="$emit('initial-click')"-->
-        <!--        >-->
-        <!--          <span>Initial</span>-->
-        <!--        </Button>-->
-
-        <!-- Tabs -->
         <div v-if="tabs.length > 0" class="flex items-center gap-1 flex-wrap">
           <button
             v-for="(tab, i) in tabs"
@@ -37,7 +24,6 @@
             </span>
           </button>
 
-          <!-- Add Tab Button -->
           <button
             class="flex items-center justify-center w-7 h-7 rounded-md border border-border bg-background hover:bg-muted transition-colors"
             @click="$emit('new-click')"
@@ -47,7 +33,6 @@
         </div>
       </div>
 
-      <!-- Right: Submit / Rollback Button -->
       <div class="flex items-center gap-2">
         <Button
           variant="outline"
@@ -70,9 +55,7 @@
       </div>
     </div>
 
-    <!-- Bottom Row: Status Filter Buttons & Time Info -->
     <div class="flex items-center justify-between bg-white dark:bg-card w-full py-4 px-6">
-      <!-- Left: Error/Warning Button -->
       <Button
         variant="outline"
         size="sm"
@@ -83,7 +66,6 @@
         <span>Error/Warning</span>
       </Button>
 
-      <!-- Center: Free Times with Navigation Buttons -->
       <div v-if="freeTimes.length" class="flex items-center gap-1">
         <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="scrollLeft">
           <ChevronLeft class="w-4 h-4" />
@@ -111,7 +93,6 @@
         </Button>
       </div>
 
-      <!-- Right: Violation Button -->
       <Button
         variant="outline"
         size="sm"
@@ -122,7 +103,6 @@
       </Button>
     </div>
 
-    <!-- Delete Tab Confirmation Dialog -->
     <Dialog v-model:open="showDeleteConfirm">
       <DialogContent class="sm:max-w-[360px]">
         <DialogHeader>
@@ -191,7 +171,6 @@ const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   emit('free-time-click', freeTime)
 }
 
-// ─── Delete Tab Confirmation ──────────────────────────────────────────────────
 const showDeleteConfirm = ref(false)
 const pendingRemoveTabId = ref<string | null>(null)
 
@@ -208,7 +187,6 @@ const confirmRemoveTab = () => {
   pendingRemoveTabId.value = null
 }
 
-// ─── Free Times Scroll ────────────────────────────────────────────────────────
 const freeTimesContainer = ref<HTMLDivElement | null>(null)
 const freeTimesContent = ref<HTMLDivElement | null>(null)
 const scrollOffset = ref(0)

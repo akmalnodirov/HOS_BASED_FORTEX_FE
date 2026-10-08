@@ -1,11 +1,11 @@
 <template>
-  <div class="space-y-4">
+  <div class="h-[calc(100dvh-65px)] min-h-[520px]">
     <!-- Tracking Content -->
-    <div v-show="trackingCollapse" class="grid grid-cols-12 gap-x-1">
+    <div v-show="trackingCollapse" class="grid h-full grid-cols-12 gap-x-1">
       <!-- Left Sidebar: History -->
       <div
         v-if="!isFullscreen"
-        class="col-span-3 bg-white dark:bg-gray-900 overflow-hidden p-[16px]"
+        class="col-span-3 flex min-h-0 flex-col overflow-hidden bg-white p-[16px] dark:bg-gray-900"
       >
         <div class="flex items-center justify-between mb-4 mx-1">
           <h2 class="text-xl font-semibold text-foreground">Tracking</h2>
@@ -16,7 +16,7 @@
           <!--      </Button>-->
         </div>
         <!-- History Events List -->
-        <div class="max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div class="min-h-0 flex-1 overflow-y-auto">
           <template v-for="(tracking, ind) in filteredTrackingEvents" :key="tracking.eventId">
             <!-- Drive Event -->
             <div
@@ -73,8 +73,8 @@
                     </span>
                     {{
                       tracking.calculatedLocation ||
-                        tracking.manualLocation ||
-                        'Location not available'
+                      tracking.manualLocation ||
+                      'Location not available'
                     }}
                   </div>
                   <div class="flex items-center justify-between">
@@ -112,7 +112,7 @@
       <div
         class="bg-white dark:bg-card p-1"
         :class="[
-          'overflow-hidden relative transition-all duration-300 bg-white dark:bg-card',
+          'h-full overflow-hidden relative transition-all duration-300 bg-white dark:bg-card',
           isFullscreen ? 'col-span-12' : 'col-span-9',
         ]"
       >
@@ -130,7 +130,7 @@
 
         <!-- Google Map -->
         <GoogleMap
-          v-if="dailyTrackings?.trackingEventResponse?.length"
+          v-if="apiKey && dailyTrackings?.trackingEventResponse?.length"
           :api-key="apiKey"
           :center="{
             lat: (selectedEvent && selectedEvent.latitude) || mapCenter.lat,
@@ -141,10 +141,19 @@
           :styles="mapStyles"
           :disable-default-ui="true"
           style="width: 100%; height: 100%"
-          :style="{ height: isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)' }"
           ref="mapInstance"
           @ready="onMapReady"
         >
+          <Polyline
+            v-if="routePath.length > 1"
+            :options="{
+              path: routePath,
+              geodesic: true,
+              strokeColor: '#4f46e5',
+              strokeOpacity: 0.9,
+              strokeWeight: 4,
+            }"
+          />
           <!-- Every tracking points (for drive events) -->
           <CustomMarker
             v-for="(tracking, ind) in selectedTrackingEvents"
@@ -157,8 +166,8 @@
             <Navigation
               v-if="
                 ind + 1 === selectedTrackingEvents.length &&
-                  dailyTrackings?.trackingEventResponse.at(-1)?.eventCode === 3 &&
-                  dailyTrackings?.trackingEventResponse.at(-1)?.eventType === 1
+                dailyTrackings?.trackingEventResponse.at(-1)?.eventCode === 3 &&
+                dailyTrackings?.trackingEventResponse.at(-1)?.eventType === 1
               "
               class="w-8 text-purple-600"
               :style="{
@@ -224,10 +233,15 @@
           </CustomMarker>
         </GoogleMap>
 
-        <!-- Empty State -->
+        <div
+          v-else-if="!apiKey"
+          class="flex h-full w-full items-center justify-center rounded-lg border border-border bg-muted/30"
+        >
+          <p class="text-muted-foreground">Google Maps API key is not configured</p>
+        </div>
         <div
           v-else
-          class="w-full h-[calc(100vh-280px)] flex items-center justify-center bg-muted/30 rounded-lg border border-border"
+          class="flex h-full w-full items-center justify-center rounded-lg border border-border bg-muted/30"
         >
           <p class="text-muted-foreground">No tracking data available</p>
         </div>
@@ -238,16 +252,9 @@
 
 <script setup lang="ts">
 import { computed, watch, ref, onUnmounted, nextTick } from 'vue'
-import {
-  ChevronsUpDown,
-  Navigation,
-  MapPin,
-  Clock,
-  Calendar,
-  FileText,
-} from 'lucide-vue-next'
+import { ChevronsUpDown, Navigation, MapPin, Clock, Calendar, FileText } from 'lucide-vue-next'
 import CMapControls from '@/components/custom/CMapControls.vue'
-import { GoogleMap, CustomMarker } from 'vue3-google-map'
+import { GoogleMap, CustomMarker, Polyline } from 'vue3-google-map'
 import { mapStyles } from '@/utils/maps'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -275,17 +282,15 @@ const emit = defineEmits<{
 
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const mapInstance = ref<any>(null)
-const rawMapInstance = ref<any>(null) // Store raw Google Map from @ready event
+const rawMapInstance = ref<any>(null)
 const trafficLayer = ref<any>(null)
 const isMapReady = ref(false)
 
-// Map controls state
 const mapType = ref<'roadmap' | 'terrain' | 'satellite'>('roadmap')
 const isTrafficActive = ref(false)
 const isFullscreen = ref(false)
 const currentStatusFilter = ref('all')
 
-// Computed: Event status counts
 const eventStatuses = computed(() => {
   const events = props.dailyTrackings?.trackingEventResponse || []
 
@@ -306,7 +311,6 @@ const eventStatuses = computed(() => {
   ]
 })
 
-// Computed: Filtered tracking events based on status filter
 const filteredTrackingEvents = computed(() => {
   const events = props.dailyTrackings?.trackingEventResponse || []
 
@@ -327,7 +331,21 @@ const filteredTrackingEvents = computed(() => {
   return events.filter((e) => e.eventType === filter.eventType && e.eventCode === filter.eventCode)
 })
 
-// Computed: Selected tracking events for drive events
+const routePath = computed(() =>
+  props.everyTrackings
+    .map((tracking) => ({
+      lat: Number(tracking.latitude),
+      lng: Number(tracking.longitude),
+    }))
+    .filter(
+      (tracking) =>
+        Number.isFinite(tracking.lat) &&
+        Number.isFinite(tracking.lng) &&
+        Math.abs(tracking.lat) <= 90 &&
+        Math.abs(tracking.lng) <= 180
+    )
+)
+
 const selectedTrackingEvents = computed(() => {
   if (
     !props.selectedEvent ||
@@ -356,7 +374,6 @@ const selectedTrackingEvents = computed(() => {
   })
 })
 
-// Methods
 const selectEvent = (event: TrackingResponse) => {
   emit('select-event', event)
 }
@@ -365,7 +382,6 @@ const toggleTrackingCollapse = () => {
   emit('toggle-collapse')
 }
 
-// Helper to get a valid map wrapper
 const getMapWrapper = () => {
   if (mapInstance.value?.map) {
     return mapInstance.value
@@ -376,17 +392,14 @@ const getMapWrapper = () => {
   return null
 }
 
-// Map ready handler
 const onMapReady = async (instance: any) => {
-  // Store the raw map instance from the event
   rawMapInstance.value = instance
 
-  // Wait for Vue to populate the template ref
   await nextTick()
 
   isMapReady.value = true
+  fitRouteToMap()
 
-  // Render route when map is ready
   if (props.renderRouteOnMap && props.directionsSegments && props.directionsSegments.length > 0) {
     const mapWrapper = getMapWrapper()
     if (mapWrapper) {
@@ -395,7 +408,15 @@ const onMapReady = async (instance: any) => {
   }
 }
 
-// Toggle traffic layer
+const fitRouteToMap = () => {
+  const mapWrapper = getMapWrapper()
+  if (!mapWrapper?.map || routePath.value.length === 0 || !window.google?.maps) return
+  const bounds = new window.google.maps.LatLngBounds()
+  routePath.value.forEach((point) => bounds.extend(point))
+  mapWrapper.map.fitBounds(bounds)
+  if (routePath.value.length === 1) mapWrapper.map.setZoom(14)
+}
+
 const toggleTraffic = () => {
   isTrafficActive.value = !isTrafficActive.value
 
@@ -412,12 +433,10 @@ const toggleTraffic = () => {
   }
 }
 
-// Toggle fullscreen
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
 }
 
-// Get marker color based on event type
 const getMarkerColor = (tracking: TrackingResponse): string => {
   if (tracking.eventType === 1) {
     switch (tracking.eventCode) {
@@ -434,7 +453,6 @@ const getMarkerColor = (tracking: TrackingResponse): string => {
   return 'bg-purple-600' // Default
 }
 
-// Calculate bearing for rotation
 const calculateBearing = (
   lat1: number | null,
   lng1: number | null,
@@ -455,7 +473,6 @@ const calculateBearing = (
   return (bearing + 360) % 360
 }
 
-// Watch for map center changes to update map
 watch(
   () => props.mapCenter,
   (newCenter) => {
@@ -467,7 +484,8 @@ watch(
   { deep: true }
 )
 
-// Watch for direction segments changes to render route
+watch(routePath, fitRouteToMap, { deep: true })
+
 watch(
   () => props.directionsSegments,
   (newSegments) => {
@@ -479,7 +497,6 @@ watch(
   { deep: true }
 )
 
-// Watch for map becoming ready - render if segments are already loaded
 watch(
   () => isMapReady.value,
   (ready) => {

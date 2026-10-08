@@ -1,14 +1,12 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-[800px] p-0 gap-0 overflow-hidden">
-      <!-- Header -->
       <DialogHeader class="px-6 py-4 border-b">
         <DialogTitle class="text-xl font-bold uppercase tracking-wide">
           ERRORS & WARNINGS
         </DialogTitle>
       </DialogHeader>
 
-      <!-- Content (Table) -->
       <div class="p-6 max-h-[60vh] overflow-y-auto">
         <Table>
           <TableHeader class="bg-[#f8f9fd] dark:bg-muted/50 sticky top-0 z-10">
@@ -48,7 +46,6 @@
         </Table>
       </div>
 
-      <!-- Footer -->
       <div class="px-6 py-4 border-t flex items-center justify-between bg-white dark:bg-card">
         <div class="text-sm font-medium">All errors: {{ rows.length }}</div>
         <Button variant="outline" @click="$emit('update:open', false)">Cancel</Button>

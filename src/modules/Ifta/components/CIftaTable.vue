@@ -45,8 +45,14 @@ const handleSort = (key: SortKey) => {
 const sortedRecords = computed(() => {
   if (!sortKey.value) return props.records
   return [...props.records].sort((a, b) => {
-    const aVal = a[sortKey.value!]
-    const bVal = b[sortKey.value!]
+    const aVal =
+      sortKey.value === 'submitted'
+        ? Date.parse(a.submitted) || 0
+        : a[sortKey.value!]
+    const bVal =
+      sortKey.value === 'submitted'
+        ? Date.parse(b.submitted) || 0
+        : b[sortKey.value!]
     if (aVal < bVal) return sortOrder.value === 'asc' ? -1 : 1
     if (aVal > bVal) return sortOrder.value === 'asc' ? 1 : -1
     return 0
@@ -65,12 +71,27 @@ const toggleRow = (id: string) => {
 }
 
 const isSelected = (id: string) => selectedIds.value.has(id)
+
+const statusLabel = (status: string) => {
+  if (status === 'READY') return 'Ready'
+  if (status === 'ERROR' || status === 'FAILED') return 'Failed'
+  if (status === 'WAITING') return 'Waiting'
+  return 'Processing'
+}
+
+const statusClass = (status: string) => {
+  if (status === 'READY')
+    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+  if (status === 'ERROR' || status === 'FAILED')
+    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+  return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'
+}
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-lg">
-    <Table>
-      <TableHeader>
+  <div class="ifta-table min-w-[980px]">
+    <Table class="min-w-full">
+      <TableHeader class="sticky top-0 z-10">
         <TableRow class="bg-[#f0f0f0] dark:bg-muted/50 border-0">
           <TableHead class="w-10 px-4 py-3" />
           <TableHead class="w-16 px-4 py-3">
@@ -168,16 +189,15 @@ const isSelected = (id: string) => selectedIds.value.has(id)
             <span
               :class="[
                 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                record.status === 'ready'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                  : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+                statusClass(record.status),
               ]"
+              :title="record.errors.join(', ')"
             >
-              {{ record.status === 'ready' ? 'Ready' : 'Processing' }}
+              {{ statusLabel(record.status) }}
             </span>
           </TableCell>
           <TableCell class="px-4 py-3">
-            <div class="flex items-center gap-2" v-if="record.status === 'ready'">
+            <div class="flex items-center gap-2" v-if="record.status === 'READY'">
               <Button
                 v-if="record.pdfPath"
                 variant="ghost"
@@ -199,7 +219,9 @@ const isSelected = (id: string) => selectedIds.value.has(id)
                 CSV
               </Button>
             </div>
-            <span v-else class="text-gray-400 dark:text-gray-500 text-sm">Processing...</span>
+            <span v-else class="text-gray-400 dark:text-gray-500 text-sm">
+              {{ statusLabel(record.status) }}
+            </span>
           </TableCell>
         </TableRow>
 
@@ -213,3 +235,9 @@ const isSelected = (id: string) => selectedIds.value.has(id)
     </Table>
   </div>
 </template>
+
+<style scoped>
+.ifta-table :deep(.relative.w-full.overflow-auto) {
+  overflow: visible;
+}
+</style>

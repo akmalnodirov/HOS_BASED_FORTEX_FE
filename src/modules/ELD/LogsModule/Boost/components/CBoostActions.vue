@@ -5,15 +5,11 @@
   >
     <div class="px-6 py-4">
       <div class="flex items-center justify-between gap-4">
-        <!-- Left Side: Empty (status buttons moved to toolbar) -->
         <div class="flex items-center gap-2"></div>
 
-        <!-- Center: Empty (add buttons moved to toolbar) -->
         <div class="flex items-center gap-2"></div>
 
-        <!-- Action Buttons (centered) -->
         <div class="flex items-center justify-end gap-2 flex-1">
-          <!-- Delete Button -->
           <Button
             variant="outline"
             size="sm"
@@ -41,7 +37,6 @@
             <span>Delete</span>
           </Button>
 
-          <!-- Multi Update Button -->
           <Button
             variant="outline"
             size="sm"
@@ -52,7 +47,6 @@
             <span>Multi Update</span>
           </Button>
 
-          <!-- Drag & Drop Button -->
           <Label
             class="hover:bg-accent/50 flex items-start gap-3 rounded border py-2.5 px-3 has-aria-checked:border-[#666666] has-aria-checked:bg-white dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
           >
@@ -67,7 +61,6 @@
             </div>
           </Label>
 
-          <!-- Fullscreen Button -->
           <Button
             variant="outline"
             size="icon"
@@ -99,17 +92,6 @@
             </svg>
           </Button>
 
-          <!-- Optimize Button -->
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-9.5 px-4 text-sm"
-            @click="$emit('optimize-click')"
-          >
-            <span>Optimize</span>
-          </Button>
-
-          <!-- Reset Button -->
           <Button
             variant="outline"
             size="sm"
@@ -120,7 +102,6 @@
             <span>Boost</span>
           </Button>
 
-          <!-- Escalate Button -->
           <Button
             variant="outline"
             size="sm"
@@ -135,7 +116,6 @@
     </div>
   </div>
 
-  <!-- Delete Confirmation Dialog -->
   <Dialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
     <DialogContent class="sm:max-w-[400px]">
       <DialogHeader>
@@ -195,7 +175,6 @@ const emit = defineEmits<{
   (e: 'delete-click'): void
   (e: 'dragdrop-change', enabled: boolean): void
   (e: 'fullscreen-click'): void
-  (e: 'optimize-click'): void
   (e: 'boost-click'): void
   (e: 'reassign-click'): void
   (e: 'multi-update-click'): void

@@ -1,7 +1,3 @@
-/**
- * Transfer Events Store - manages history/transfer event operations
- */
-
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useApi } from '@/composables/useAxiosService.ts'
@@ -18,11 +14,9 @@ import type {
 export const useTransferEventsStore = defineStore('transferEvents', () => {
   const api = useApi()
 
-  // State
   const originalDailyEvents = ref<any[]>([])
   const loading = ref(false)
 
-  // Actions
   async function getOriginalTransferEvents(params: TransferEventParams): Promise<void> {
     loading.value = true
     try {
@@ -111,11 +105,9 @@ export const useTransferEventsStore = defineStore('transferEvents', () => {
   }
 
   return {
-    // State
     originalDailyEvents,
     loading,
 
-    // Actions
     getOriginalTransferEvents,
     getGraphTransferEvents,
     getDailySummaryTransferEvents,

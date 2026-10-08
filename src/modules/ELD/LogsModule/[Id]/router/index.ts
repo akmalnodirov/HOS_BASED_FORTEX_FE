@@ -27,11 +27,6 @@ const routes: Readonly<RouteRecordRaw[]> = [
         component: () => import('@/modules/ELD/LogsModule/Boost/pages/PBoost.vue'),
       },
       {
-        path: 'optimise',
-        name: 'ELDOptimise',
-        component: () => import('@/modules/ELD/LogsModule/Optimize/pages/POptimise.vue'),
-      },
-      {
         path: 'tracking',
         name: 'ELDTracking',
         component: () => import('@/modules/ELD/LogsModule/Tracking/pages/PTracking.vue'),

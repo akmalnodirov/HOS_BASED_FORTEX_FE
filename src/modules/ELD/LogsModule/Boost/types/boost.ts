@@ -3,8 +3,8 @@ import type { Dayjs } from 'dayjs'
 export interface SessionRequest {
   driverId: string
   type: number
-  startDate: string // UTC string
-  endDate: string // UTC string
+  startDate: string
+  endDate: string
   status: number
 }
 
@@ -43,8 +43,8 @@ export interface TabResponse {
 
 export interface BoostEventRequest {
   driverId: string
-  startDate: string // UTC
-  endDate: string // UTC
+  startDate: string
+  endDate: string
 }
 
 export interface BoostHistoryRequest {
@@ -116,7 +116,7 @@ export interface BoostEventAddUpdateRequest {
   recordOrigin: number
   eventType: number
   eventCode: number
-  dateTime: string // UTC
+  dateTime: string
   totalVehicleMiles: number
   totalEngineHours: number
   annotation: string | null
@@ -201,12 +201,6 @@ export interface BoostViolationRequest {
   screenResolution: number
 }
 
-export interface OptimizeCategory {
-  id: string
-  name: string
-  description?: string
-}
-
 export interface BoostEventStatusForm {
   id: number
   eventId: string
@@ -247,7 +241,6 @@ export interface BoostEventsMultiUpdateRequest {
   tabId: string
 }
 
-// ─── Daily Form list (for accordion header) ───────────────────────────────────
 export interface DailyFormListResponse {
   id: string
   formDate: string
@@ -258,7 +251,6 @@ export interface DailyFormListResponse {
   isEdited: boolean
 }
 
-// ─── Daily Form types ─────────────────────────────────────────────────────────
 export interface DriverInfoResponse {
   driverId: string
   firstName: string

@@ -6,7 +6,6 @@
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
-        <!-- Row 1: Sequence ID + Event -->
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-3 space-y-1">
             <label class="text-sm font-medium">Id</label>
@@ -41,7 +40,6 @@
           </div>
         </div>
 
-        <!-- Certified date (visible only for eventType === 4) -->
         <template v-if="isCertifiedVisible">
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
@@ -85,7 +83,6 @@
           </div>
         </template>
 
-        <!-- Row: Date + Time + Origin -->
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-4 space-y-1">
             <label class="text-sm font-medium">Date</label>
@@ -140,7 +137,6 @@
           </div>
         </div>
 
-        <!-- Row: Vehicle + Odometer + Engine Hours -->
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-6 space-y-1">
             <label class="text-sm font-medium">Vehicle</label>
@@ -171,7 +167,6 @@
           </div>
         </div>
 
-        <!-- Row: Trailer + Shipping Document -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1">
             <label class="text-sm font-medium">Trailer</label>
@@ -193,7 +188,6 @@
           </div>
         </div>
 
-        <!-- Row: Location Origin -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Location origin</label>
           <Select
@@ -210,7 +204,6 @@
           </Select>
         </div>
 
-        <!-- Row: Latitude + Longitude -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1">
             <label class="text-sm font-medium">Latitude</label>
@@ -236,7 +229,6 @@
           </div>
         </div>
 
-        <!-- Calculated Location (readonly) -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Location</label>
           <Input
@@ -247,7 +239,6 @@
           />
         </div>
 
-        <!-- Copy / Paste / Map buttons -->
         <div class="grid grid-cols-3 gap-2">
           <Button type="button" variant="outline" class="gap-2" @click="copyCoords">
             <Copy class="w-4 h-4" /> Copy
@@ -260,7 +251,6 @@
           </Button>
         </div>
 
-        <!-- Location Note -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Location note</label>
           <Input
@@ -272,7 +262,6 @@
           />
         </div>
 
-        <!-- Notes + quick-add shortcuts -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Notes</label>
           <Input
@@ -354,12 +343,10 @@ const emit = defineEmits<{
 
 const geoStore = useGeoLocationsStore()
 
-// ─── Helpers to emit partial updates ─────────────────────────────────────────
 function patch(partial: Partial<BoostEventStatusForm>) {
   emit('update:form', { ...props.form, ...partial })
 }
 
-// ─── Auto-populate location when lat/lng changes ──────────────────────────────
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   () => [props.form.latitude, props.form.longitude],
@@ -376,10 +363,8 @@ watch(
   }
 )
 
-// ─── Certified date visibility ────────────────────────────────────────────────
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
 
-// ─── Event selector ──────────────────────────────────────────────────────────
 const selectedEventKey = computed(
   () =>
     allEvents.find(
@@ -396,7 +381,6 @@ function onEventChange(key: unknown) {
   patch({ event: { eventType: ev.eventType, eventCode: ev.eventCode } })
 }
 
-// ─── Date / time inputs ───────────────────────────────────────────────────────
 const certifiedDateStr = computed(() =>
   props.form.certifiedDate ? dayjs(props.form.certifiedDate).format('YYYY-MM-DD') : ''
 )
@@ -416,7 +400,6 @@ function onCertifiedTimeInput(field: 'hours' | 'minutes' | 'seconds', e: Event) 
   patch({ certifiedTime: { ...props.form.certifiedTime, [field]: val } })
 }
 
-// ─── Select bridges ──────────────────────────────────────────────────────────
 function onOriginChange(v: unknown) {
   patch({ origin: Number(v) })
 }
@@ -424,7 +407,6 @@ function onLocationOriginChange(v: unknown) {
   patch({ locationOrigin: Number(v) })
 }
 
-// ─── Generic input helpers ────────────────────────────────────────────────────
 function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
   const raw = (e.target as HTMLInputElement).value
   patch({ [field]: raw === '' ? null : parseFloat(raw) } as Partial<BoostEventStatusForm>)
@@ -433,14 +415,12 @@ function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
   patch({ [field]: (e.target as HTMLInputElement).value || null } as Partial<BoostEventStatusForm>)
 }
 
-// ─── Validation ───────────────────────────────────────────────────────────────
 const isSubmitDisabled = computed(() => {
   const { locationOrigin, latitude, longitude, locationNote } = props.form
   if (locationOrigin === 1 && (!latitude || !longitude)) return true
   return locationOrigin === 2 && !locationNote
 })
 
-// ─── Clipboard ────────────────────────────────────────────────────────────────
 async function copyCoords() {
   const { latitude, longitude } = props.form
   if (latitude != null && longitude != null) {
@@ -456,7 +436,6 @@ async function pasteCoords() {
       patch({ latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) })
     }
   } catch {
-    // clipboard access denied — silently ignore
   }
 }
 
@@ -467,7 +446,6 @@ function openMap() {
   }
 }
 
-// ─── Note shortcuts ───────────────────────────────────────────────────────────
 function appendNote(note: string) {
   const parts = (props.form.notes ?? '')
     .split(',')
@@ -478,7 +456,6 @@ function appendNote(note: string) {
   if (joined.length <= 100) patch({ notes: joined })
 }
 
-// ─── Submit ────────────────────────────────────────────────────────────────────
 function handleSubmit() {
   emit('submit', props.form)
 }

@@ -1,8 +1,5 @@
 import type { Dayjs } from 'dayjs'
 
-/**
- * Driver Daily Form Response from API
- */
 export interface DriverDailyFormResponse {
   id: string
   driverId: string
@@ -14,6 +11,7 @@ export interface DriverDailyFormResponse {
       firstName: string
       lastName: string
     }
+    mainOffice?: string
     homeTerminal?: {
       street: string
     }
@@ -39,9 +37,7 @@ export interface DriverDailyFormResponse {
   }>
 }
 
-/**
- * Edit Driver Daily Form Request
- */
+
 export interface EditDriverDailyFormRequest {
   driverId: string
   formDate: Dayjs | string
@@ -52,9 +48,7 @@ export interface EditDriverDailyFormRequest {
   signaturePath: string
 }
 
-/**
- * Edit Driver Daily Form (for form state)
- */
+
 export interface EditDriverDailyForm {
   coDrivers: string | null
   shippingDocs: string
@@ -63,9 +57,6 @@ export interface EditDriverDailyForm {
   signaturePaths: string[]
 }
 
-/**
- * Driver option for select dropdown
- */
 export interface DriverOption {
   id: string
   fullname: string

@@ -4,7 +4,6 @@ import { ref, onMounted, onUnmounted } from 'vue'
 const SIDEBAR_STORAGE_KEY = 'sidebar-open'
 
 export const useSidebarStore = defineStore('sidebar', () => {
-  // Read initial state from localStorage (synced with global sidebar)
   const getInitialState = (): 'open' | 'closed' => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY)
@@ -21,7 +20,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
     sidebar.value = state
   }
 
-  // Sync with localStorage changes (from global sidebar toggle)
   const syncFromStorage = () => {
     const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY)
     if (saved !== null) {
@@ -29,19 +27,16 @@ export const useSidebarStore = defineStore('sidebar', () => {
     }
   }
 
-  // Listen for storage changes (when global sidebar toggles)
   const handleStorageChange = (event: StorageEvent) => {
     if (event.key === SIDEBAR_STORAGE_KEY) {
       syncFromStorage()
     }
   }
 
-  // Setup storage listener
   const setupStorageListener = () => {
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', handleStorageChange)
 
-      // Also poll for changes (storage event doesn't fire in same tab)
       const interval = setInterval(syncFromStorage, 100)
 
       return () => {

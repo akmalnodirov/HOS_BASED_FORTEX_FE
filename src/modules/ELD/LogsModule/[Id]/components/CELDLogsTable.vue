@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +15,7 @@ import { formatTime } from '@/utils/time'
 import { useELDLogs, type RouteEldClock } from '../composables/useELDLogs'
 
 const logsInstance = inject<ReturnType<typeof useELDLogs>>('eldLogs') ?? useELDLogs()
+const router = useRouter()
 
 const {
   loading,
@@ -72,6 +74,19 @@ const formatConnection = (value: string) =>
     .toLowerCase()
     .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+
+const localDate = () => {
+  const value = new Date()
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+}
+
+const openDriver = (driverId: string, date = localDate()) => {
+  void router.push({
+    name: 'ELDLogDetail',
+    params: { id: driverId },
+    query: { date: date.replaceAll('/', '-').slice(0, 10) },
+  })
+}
 </script>
 
 <template>
@@ -99,18 +114,6 @@ const formatConnection = (value: string) =>
                 <component :is="getSortIcon('displayName')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <!-- <th class="min-w-48 px-3 py-3">
-              <button class="flex items-center gap-1" @click="handleSort('companyName')">
-                Company
-                <component :is="getSortIcon('companyName')" class="h-3.5 w-3.5" />
-              </button>
-            </th>
-            <th class="min-w-36 px-3 py-3">
-              <button class="flex items-center gap-1" @click="handleSort('externalDriverId')">
-                Route ELD ID
-                <component :is="getSortIcon('externalDriverId')" class="h-3.5 w-3.5" />
-              </button>
-            </th> -->
             <th class="min-w-10 px-3 py-3">
               <button class="flex items-center gap-1" @click="handleSort('vehicleUnitName')">
                 Unit
@@ -124,7 +127,6 @@ const formatConnection = (value: string) =>
               </button>
             </th>
             <th class="w-15 px-3 py-3">VAN</th>
-            <th class="min-w-15 px-3 py-3">Trailers</th>
             <th class="min-w-50 px-3 py-3">
               <button class="flex items-center gap-1" @click="handleSort('location')">
                 Latest location
@@ -169,13 +171,15 @@ const formatConnection = (value: string) =>
             <tr
               class="cursor-pointer border-t border-border transition-colors hover:bg-muted/40"
               :class="isRowExpanded(log.driverId) && 'bg-muted/30'"
-              @click="toggleRow(log.driverId)"
+              @click="openDriver(log.driverId)"
             >
-              <td class="px-3 py-4">
-                <ChevronDown
-                  class="h-4 w-4 text-muted-foreground transition-transform"
-                  :class="!isRowExpanded(log.driverId) && '-rotate-90'"
-                />
+              <td class="px-3 py-4" @click.stop="toggleRow(log.driverId)">
+                <button type="button" class="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                  <ChevronDown
+                    class="h-4 w-4 text-muted-foreground transition-transform"
+                    :class="!isRowExpanded(log.driverId) && '-rotate-90'"
+                  />
+                </button>
               </td>
               <td class="px-3 py-4 text-muted-foreground">
                 {{ (currentPage - 1) * itemsPerPage + index + 1 }}
@@ -186,10 +190,6 @@ const formatConnection = (value: string) =>
                   {{ log.email || log.phoneNumber || 'No contact information' }}
                 </div>
               </td>
-              <!-- <td class="max-w-52 truncate px-3 py-4" :title="log.companyName">
-                {{ log.companyName }}
-              </td>
-              <td class="px-3 py-4 font-mono text-xs">{{ log.externalDriverId }}</td> -->
               <td class="px-3 py-4">{{ log.vehicleUnitName || '—' }}</td>
               <td class="px-3 py-4">
                 <span
@@ -200,9 +200,6 @@ const formatConnection = (value: string) =>
                 </span>
               </td>
               <td class="px-3 py-4">{{ log.hasVan ? 'Yes' : 'No' }}</td>
-              <td class="max-w-36 truncate px-3 py-4" :title="formatTrailers(log.trailers)">
-                {{ formatTrailers(log.trailers) }}
-              </td>
               <td class="max-w-50 px-3 py-4">
                 <div class="truncate" :title="log.location || ''">
                   {{ log.location || 'No location yet' }}
@@ -311,7 +308,8 @@ const formatConnection = (value: string) =>
                       <tr
                         v-for="dailyLog in getDailyLogs(log.driverId)"
                         :key="dailyLog.id"
-                        class="border-t border-border"
+                        class="cursor-pointer border-t border-border transition-colors hover:bg-muted/40"
+                        @click.stop="openDriver(log.driverId, dailyLog.logDate)"
                       >
                         <td class="px-4 py-3 font-medium">
                           {{ formatLogDate(dailyLog.logDate) }}

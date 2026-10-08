@@ -17,7 +17,6 @@
     </DialogContent>
   </Dialog>
 
-  <!-- Transfer by Date Range Modal -->
   <Dialog v-model:open="transferByPeriodOpen">
     <DialogContent class="sm:max-w-180">
       <DialogHeader>
@@ -31,7 +30,6 @@
         </DialogDescription>
       </DialogHeader>
 
-      <!-- Date Selection Step -->
       <div v-if="!showConfirmation" class="flex flex-col items-center justify-center py-4">
         <RangeCalendar v-model="rangeValue" :number-of-months="2" class="rounded-md border" />
       </div>
@@ -84,7 +82,6 @@ const emit = defineEmits<{
   'cancel-period': []
 }>()
 
-// Two-way binding for modals
 const transferEventsOpen = computed({
   get: () => props.transferEventsOpen,
   set: (value) => emit('update:transferEventsOpen', value),
@@ -95,12 +92,10 @@ const transferByPeriodOpen = computed({
   set: (value) => emit('update:transferByPeriodOpen', value),
 })
 
-// Validation
 const isValidRange = computed(() => {
   return props.dateRange[0] !== null && props.dateRange[1] !== null
 })
 
-// Formatted date range for display
 const formattedDateRange = computed(() => {
   if (!isValidRange.value) return ''
   return `${props.formatDate(props.dateRange[0])} - ${props.formatDate(props.dateRange[1])}`
@@ -138,7 +133,6 @@ const rangeValue = computed({
   },
 })
 
-// Update date handlers (kept for compatibility if needed, but rangeValue handles it now)
 function updateStartDate(dateField: Dayjs): void {
   emit('update:dateRange', [dateField, props.dateRange[1]])
 }

@@ -9,7 +9,6 @@ export class ApiEndpoints {
   private static readonly GEO_URL = `${this.BASE_URL}/geo-locations`
   private static readonly BOOST_EVENTS_URL = `${this.BASE_URL}/boost-events`
   private static readonly BOOST_URL = `${this.BASE_URL}/boost`
-  private static readonly OPTIMIZE_URL = `${this.BASE_URL}/optimize`
   private static readonly SESSIONS_URL = `${this.BASE_URL}/sessions`
   private static readonly TABS_URL = `${this.BASE_URL}/tabs`
   private static readonly DRIVERS_URL = `${this.BASE_URL}/drivers`
@@ -87,10 +86,6 @@ export class ApiEndpoints {
   static readonly BOOST_LATEST_FREE_TIMES = `${this.BOOST_URL}/latest-free-times`
   static readonly BOOST_HISTORY_FREE_TIMES = `${this.BOOST_URL}/history-free-times`
   static readonly BOOST_PIXEL_VIOLATIONS = `${this.BOOST_URL}/pixel-violations`
-
-  // Optimize endpoints (used by Boost)
-  static readonly OPTIMIZE = this.OPTIMIZE_URL
-  static readonly OPTIMIZE_CATEGORIES = `${this.OPTIMIZE_URL}/categories`
 
   // Drivers / Carriers (used by Reassign)
   static readonly DRIVERS = this.DRIVERS_URL
@@ -185,13 +180,6 @@ export class ApiEndpoints {
   static readonly AUDIT_WEIGHT_STATIONS = `${this.AUDIT_URL}/weight-stations`
   static readonly AUDIT_TRACKING = `${this.AUDIT_URL}/tracking`
 
-  // Unidentified Events endpoints
-  private static readonly UNIDENTIFIED_EVENTS_URL = `${this.BASE_URL}/unidentified-events`
-  static readonly UNIDENTIFIED_EVENTS_FILTER = `${this.UNIDENTIFIED_EVENTS_URL}/filter`
-  static readonly UNIDENTIFIED_EVENTS_SELECT = `${this.UNIDENTIFIED_EVENTS_URL}/select`
-  static readonly UNIDENTIFIED_EVENTS_REASSIGN = `${this.UNIDENTIFIED_EVENTS_URL}/reassign`
-  static readonly UNIDENTIFIED_EVENTS_DELETE = `${this.UNIDENTIFIED_EVENTS_URL}/delete`
-
   // Portal Users endpoints
   private static readonly PORTAL_USERS_URL = `${this.BASE_URL}/portal-users`
   static readonly PORTAL_USERS = this.PORTAL_USERS_URL
@@ -220,13 +208,25 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
   static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
+  static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
+  static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
+  static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_START_ROLLBACK = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
+  static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
+  static readonly ROUTE_ELD_DRIVER_SIGNATURE = (id: string, file: string) =>
+    `${this.BASE_URL}/route-eld/drivers/${id}/signature?file=${encodeURIComponent(file)}`
   static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
     `${ApiEndpoints.ROUTE_ELD_COMPANIES}/${id}/select`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`
   static readonly IFTA_FILTER = `${this.IFTA_URL}/filter`
+  static readonly IFTA_VEHICLES = `${this.IFTA_URL}/vehicles`
   static readonly IFTA_GENERATE = `${this.IFTA_URL}/generate`
+  static readonly IFTA_FILE = `${this.IFTA_URL}/file`
 
   // DVIR endpoints
   private static readonly DVIRS_URL = `${this.BASE_URL}/edit-dvirs`

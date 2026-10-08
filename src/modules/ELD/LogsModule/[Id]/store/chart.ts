@@ -8,20 +8,16 @@ import type { GraphResponse } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts
 export const useChartStore = defineStore('chart', () => {
   const api = useApi()
 
-  // default chart settings
   const topOffset = ref(20)
 
-  // Loading states
   const isGraphDataLoading = ref(false)
   const isPixelDataLoading = ref(false)
 
-  // readonly chart
   const chartData = ref<GraphResponse | null>(null)
   const heightInPixel = ref(40)
   const dutyTimes = computed(() => chartData.value)
   const chart = ref()
 
-  // edit chart
   const editChartData = ref<GraphResponse | null>(null)
   const editHeightInPixel = ref(28)
   const editDutyTimes = computed(() => editChartData.value)
@@ -29,7 +25,6 @@ export const useChartStore = defineStore('chart', () => {
     typeof window !== 'undefined' ? Math.max(320, document.documentElement.clientWidth) : 1200
   )
 
-  // Computed loading state
   const isGraphLoading = computed(() => isGraphDataLoading.value || isPixelDataLoading.value)
 
   async function getChart(model: any, edit: boolean = false, signal?: AbortSignal) {
@@ -56,7 +51,6 @@ export const useChartStore = defineStore('chart', () => {
         console.log('Backend returned svgWidth:', graphData.svgWidth)
         console.log('Backend returned svgViewBox:', graphData.svgViewBox)
 
-        // Count actual duty events
         let totalDutyEvents = 0
         Object.keys(graphData.duties || {}).forEach((key) => {
           const dutyArray = graphData.duties[key as keyof typeof graphData.duties]
@@ -87,7 +81,6 @@ export const useChartStore = defineStore('chart', () => {
   }
 
   return {
-    // State
     topOffset,
     chartData,
     chart,
@@ -101,7 +94,6 @@ export const useChartStore = defineStore('chart', () => {
     isGraphDataLoading,
     isPixelDataLoading,
 
-    // Functions
     getChart,
   }
 })

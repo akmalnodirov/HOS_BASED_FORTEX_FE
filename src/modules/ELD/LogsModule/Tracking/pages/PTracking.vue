@@ -1,6 +1,5 @@
 <template>
   <div>
-    <!-- Tracking Section -->
     <CLogTracking
       :daily-trackings="dailyTrackings"
       :every-trackings="everyTrackings"
@@ -20,14 +19,11 @@
 <script setup lang="ts">
 import { inject } from 'vue'
 
-// Page Components
 import CLogTracking from '@/modules/ELD/LogsModule/[Id]/components/detail/CLogTracking.vue'
 
-// Inject shared data from layout
 const logDetail = inject('logDetail') as ReturnType<typeof import('@/modules/ELD/LogsModule/[Id]/composables/useELDLogDetail.ts').useELDLogDetail>
 
 const {
-  // Tracking
   dailyTrackings,
   everyTrackings,
   selectedEvent,

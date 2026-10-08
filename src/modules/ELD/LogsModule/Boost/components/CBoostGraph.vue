@@ -1,6 +1,5 @@
 <template>
   <div>
-    <!-- Chart Section -->
     <div class="bg-white dark:bg-card">
       <div v-if="isGraphLoading" class="flex items-center justify-center p-8">
         <div class="text-muted-foreground">Loading chart...</div>
@@ -38,7 +37,6 @@ import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts
 import type { GraphDuties } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 import { useTimeZoneHelper } from '@/composables/useTimezone.ts'
 
-// Chart ref
 const mainChartRef = ref<InstanceType<typeof MainChart> | null>(null)
 
 interface Props {
@@ -63,7 +61,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { getStartOf, getEndOf } = useTimeZoneHelper()
 
-// Violation description → reset type mapping (ported from RouteAppFE)
 const VIOLATION_RESET_TYPE: Record<string, string> = {
   '14 - Hour on duty limit': '10h',
   '11 - Hour on driving limit': '10h',
@@ -71,11 +68,6 @@ const VIOLATION_RESET_TYPE: Record<string, string> = {
   'USA 70/8 - cycle limit': '34h',
 }
 
-/**
- * Port of getEventViolationsBlock from RouteAppFE/utils/violation.ts.
- * Given flat pixel violations and reset pin-times, computes [start, width]
- * blocks for a specific violation description / reset type pair.
- */
 function computeViolationBlocks(
   allViolations: any[],
   stringType: string,
@@ -84,18 +76,15 @@ function computeViolationBlocks(
   headerDateStr: string,
   endTimeStr: string,
 ): [number, number][] {
-  // Filter violations of the requested type
   const curr = allViolations.filter((v: any) => v?.description === stringType)
   if (!curr.length) return []
 
-  // Sort violations chronologically
   curr.sort((a: any, b: any) => {
     const ta = String(a.startedAt)
     const tb = String(b.startedAt)
     return ta < tb ? -1 : ta > tb ? 1 : 0
   })
 
-  // For cycle violations, only use 34h pin times; otherwise use all
   const pins =
     resetType === '34h'
       ? pinTimesRaw.filter((p: any) => p?.type === resetType)
@@ -116,7 +105,6 @@ function computeViolationBlocks(
   while (i < n && j < m) {
     const startPixel: number = curr[i].position
 
-    // Advance to the next pin time that is AFTER this violation
     while (j < m && String(pins[j]?.time) < String(curr[i].startedAt)) {
       j++
     }
@@ -125,17 +113,14 @@ function computeViolationBlocks(
     const endPixel: number = pins[j]?.prevPosition ?? startPixel
     result.push([startPixel, Math.max(endPixel - startPixel, 4)])
 
-    // Skip all violations that are resolved by this same pin time
     while (i < n && String(curr[i].startedAt) <= String(pins[j]?.time)) {
       i++
     }
     j++
   }
 
-  // Any remaining violations have no subsequent pin time – extend to chart end
   if (i < n) {
     const startPixel: number = curr[i].position
-    // Approximate end: (endTime - resetType hours) proportional to violation position
     try {
       const headerSec = new Date(headerDateStr).getTime() / 1000
       const endSec = new Date(endTimeStr).getTime() / 1000
@@ -149,7 +134,6 @@ function computeViolationBlocks(
           : startPixel + 50
       result.push([startPixel, Math.max(endPixel - startPixel, 4)])
     } catch {
-      // Fallback: extend to SVG end
       const svgWidth = props.chartData?.svgWidth ?? 99999
       result.push([startPixel, Math.max(svgWidth - startPixel, 4)])
     }
@@ -158,12 +142,10 @@ function computeViolationBlocks(
   return result
 }
 
-// Compute allViolations blocks for red background highlighting
 const allViolations = computed(() => {
   const violations = props.dailyPixelViolations || []
   if (!violations.length) return []
 
-  // ── Nested format (legacy ELD log view): each item is ViolationPixelResponse[]
   if (Array.isArray(violations[0])) {
     const blocks: [number, number][] = (violations as any[][]).map((v) => {
       const start = v[0].position
@@ -173,7 +155,6 @@ const allViolations = computed(() => {
     return [{ stringType: 'violations', violationBlocks: blocks }]
   }
 
-  // ── Flat format (boost): use pinTimes to compute proper block widths
   const pinTimesRaw = props.pinTimes || []
   const headerDateStr = props.headerDate
     ? getStartOf(props.headerDate[0]).format('YYYY-MM-DDTHH:mm:ss')
@@ -183,7 +164,6 @@ const allViolations = computed(() => {
     : ''
 
   if (pinTimesRaw.length && headerDateStr && endTimeStr) {
-    // Compute blocks for every known violation type
     const groups: { stringType: string; violationBlocks: [number, number][] }[] = []
     for (const [desc, resetType] of Object.entries(VIOLATION_RESET_TYPE)) {
       const blocks = computeViolationBlocks(
@@ -201,7 +181,6 @@ const allViolations = computed(() => {
     return groups
   }
 
-  // ── Fallback: no pinTimes available – extend each violation to SVG end
   const svgWidth = props.chartData?.svgWidth ?? 99999
   const sorted = [...violations].sort((a: any, b: any) => a.position - b.position)
   const blocks: [number, number][] = sorted.map((v: any, i: number) => {
@@ -218,7 +197,6 @@ const emit = defineEmits<{
   (e: 'selected-events', events: GraphDuties[], durations: number[]): void
 }>()
 
-// Inject date labels (DD.MM) into chartData.dayNames so LabelsForDays renders them
 const chartDataWithDates = computed(() => {
   if (!props.chartData) return props.chartData
   if (!props.headerDate) return props.chartData
@@ -240,7 +218,6 @@ const handleSelectedEvents = (events: GraphDuties[], durations: number[]) => {
   emit('selected-events', events, durations)
 }
 
-// Scroll to event segment on chart
 const scrollToEventSegment = (eventId: string) => {
   if (mainChartRef.value?.handleSelectedLineId) {
     mainChartRef.value.handleSelectedLineId(eventId as unknown as number)

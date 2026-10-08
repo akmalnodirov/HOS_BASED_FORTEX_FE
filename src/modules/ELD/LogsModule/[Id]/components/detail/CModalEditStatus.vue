@@ -8,14 +8,10 @@
           <DialogTitle class="text-2xl font-semibold">
             {{ action === 'edit' ? 'Edit' : 'Add' }} Status
           </DialogTitle>
-          <!--          <Button variant="ghost" size="icon" @click="handleClose">-->
-          <!--            <X class="h-5 w-5" />-->
-          <!--          </Button>-->
         </div>
       </DialogHeader>
 
       <div class="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto">
-        <!-- Chart Component -->
         <div>
           <MainChart
             ref="editChartRef"
@@ -39,7 +35,6 @@
           </p>
         </div>
 
-        <!-- Status Buttons -->
         <div class="flex gap-2 w-full">
           <button
             v-for="eventItem in eventTypes"
@@ -56,12 +51,8 @@
             {{ eventItem.label }}
           </button>
         </div>
-
         <Separator />
-
-        <!-- Form Fields -->
         <form @submit.prevent="handleSubmit" class="space-y-4">
-          <!-- Time Pickers -->
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label>Start Time</Label>
@@ -81,7 +72,6 @@
             </div>
           </div>
 
-          <!-- Coordinates -->
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label>Latitude</Label>
@@ -103,13 +93,11 @@
             </div>
           </div>
 
-          <!-- Location -->
           <div class="space-y-2">
             <Label>Location</Label>
             <Input v-model="statusForm.calculatedLocation" placeholder="Enter Location" />
           </div>
 
-          <!-- Copy/Paste Actions -->
           <div class="flex justify-end gap-2">
             <Button type="button" variant="outline" @click="handleCopy">
               <Copy class="mr-2 h-4 w-4" />
@@ -121,7 +109,6 @@
             </Button>
           </div>
 
-          <!-- Engine Hours / Odometer -->
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label>Engine Hours</Label>
@@ -143,7 +130,6 @@
             </div>
           </div>
 
-          <!-- Vehicle -->
           <div class="space-y-2">
             <Label>Vehicle</Label>
             <Select v-model="statusForm.vehicleId">
@@ -158,7 +144,6 @@
             </Select>
           </div>
 
-          <!-- Notes -->
           <div class="space-y-2">
             <Label>Notes</Label>
             <Input v-model="statusForm.annotation" placeholder="Enter Notes" />
@@ -184,7 +169,6 @@ import type { Dayjs } from 'dayjs'
 import { Copy, ClipboardPaste, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
-// UI Components
 import {
   Dialog,
   DialogContent,
@@ -205,13 +189,10 @@ import {
 } from '@/components/ui/select'
 import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
 
-// Chart Component
 import MainChart from '../chart/MainChart.vue'
 
-// Types
 import type { GraphResponse, DailySummaryResponse } from '../../types/chart'
 
-// Event types definition
 const eventTypes = [
   { key: 'offduty', label: 'Off duty', eventCode: 1, eventType: 1 },
   { key: 'onduty', label: 'On duty', eventCode: 4, eventType: 1 },
@@ -221,25 +202,21 @@ const eventTypes = [
   { key: 'pc', label: 'PC', eventCode: 1, eventType: 3 },
 ]
 
-// Time object interface
 interface TimeObject {
   hours: number
   minutes: number
   seconds: number
 }
 
-// Convert TimeObject to string "HH:mm"
 function timeObjectToString(time: TimeObject): string {
   return `${time.hours.toString().padStart(2, '0')}:${time.minutes.toString().padStart(2, '0')}`
 }
 
-// Convert string "HH:mm" to TimeObject
 function stringToTimeObject(str: string): TimeObject {
   const [hours, minutes] = str.split(':').map(Number)
   return { hours: hours || 0, minutes: minutes || 0, seconds: 0 }
 }
 
-// Props
 interface Props {
   open: boolean
   action?: 'edit' | 'add'
@@ -259,7 +236,6 @@ const props = withDefaults(defineProps<Props>(), {
   chartError: '',
 })
 
-// Emits
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'update:editOnceSetPrev': [value: boolean]
@@ -269,16 +245,13 @@ const emit = defineEmits<{
   'dutyEvent:update': [data: any]
 }>()
 
-// Refs
 const editChartRef = ref<InstanceType<typeof MainChart> | null>(null)
 
-// Modal open state
 const isOpen = computed({
   get: () => props.open,
   set: (val) => emit('update:open', val),
 })
 
-// Event state
 const eventState = reactive({
   editEventId: '',
   editEventType: 1,
@@ -290,7 +263,6 @@ const eventState = reactive({
   blockEventTimeEdit: false,
 })
 
-// Form state
 const statusForm = reactive({
   driverId: '',
   eventType: 1,
@@ -305,7 +277,6 @@ const statusForm = reactive({
   vehicleId: '',
 })
 
-// Computed for time picker strings
 const startTimeString = computed({
   get: () => timeObjectToString(eventState.editEventStart),
   set: (val: string) => {
@@ -320,7 +291,6 @@ const endTimeString = computed({
   },
 })
 
-// Computed
 const disabledSubmit = computed(() => {
   if (props.loading || !props.open) return true
 
@@ -340,7 +310,6 @@ const disabledSubmit = computed(() => {
   return !!props.chartError
 })
 
-// Watch for event changes
 watch(
   () => props.event,
   (newEvent) => {
@@ -351,9 +320,7 @@ watch(
   { immediate: true }
 )
 
-// Initialize form from event data
 function initializeFromEvent(event: any) {
-  // Event state
   eventState.editEventId = event.eventId || event.id || ''
   eventState.editEventType = event.eventType || 1
   eventState.editEventCode = event.eventCode || 1
@@ -361,7 +328,6 @@ function initializeFromEvent(event: any) {
   eventState.editOnceSetPrev = false
   eventState.blockEventTimeEdit = false
 
-  // Parse time from event
   if (event.dateTime) {
     const date = new Date(event.dateTime)
     eventState.editEventStart = {
@@ -371,7 +337,6 @@ function initializeFromEvent(event: any) {
     }
   }
 
-  // Form state
   statusForm.driverId = event.driverId || ''
   statusForm.eventType = event.eventType || 1
   statusForm.eventCode = event.eventCode || 1
@@ -385,13 +350,11 @@ function initializeFromEvent(event: any) {
   statusForm.vehicleId = event.vehicleId || ''
 }
 
-// Get event key from type and code
 function getEventKey(eventType: number, eventCode: number): string {
   const event = eventTypes.find((e) => e.eventType === eventType && e.eventCode === eventCode)
   return event?.key || ''
 }
 
-// Handle event type change
 function handleEventTypeChange(eventItem: (typeof eventTypes)[0]) {
   eventState.editEventStatus = eventItem.key
   eventState.editEventType = eventItem.eventType
@@ -400,7 +363,6 @@ function handleEventTypeChange(eventItem: (typeof eventTypes)[0]) {
   statusForm.eventCode = eventItem.eventCode
 }
 
-// Handle time changes
 function handleStartTimeChange(timeStr: string) {
   const time = stringToTimeObject(timeStr)
   eventState.editEventStart = time
@@ -419,14 +381,12 @@ function handleEndTimeChange(timeStr: string) {
   }
 }
 
-// Chart event handlers
 function handleContainerUpdate(width: number) {
   emit('container:update', width)
 }
 
 function handleDutyEventUpdate(data: any) {
   emit('dutyEvent:update', data)
-  // Update event state from chart
   if (data.eventStart) {
     eventState.editEventStart = data.eventStart
   }
@@ -445,7 +405,6 @@ function handleBlockEventTimeEdit(value: boolean) {
   emit('update:blockEventTimeEdit', value)
 }
 
-// Copy/Paste handlers
 async function handleCopy() {
   try {
     if (!statusForm.latitude || !statusForm.longitude) {
@@ -498,13 +457,11 @@ async function handlePaste() {
   }
 }
 
-// Close handler
 function handleClose() {
   isOpen.value = false
   emit('update:editOnceSetPrev', false)
 }
 
-// Submit handler
 function handleSubmit() {
   const submitData = {
     ...statusForm,

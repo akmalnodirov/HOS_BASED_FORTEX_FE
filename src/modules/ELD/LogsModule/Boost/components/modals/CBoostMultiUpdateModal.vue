@@ -10,7 +10,6 @@
           Selected events: <span class="font-medium text-foreground">{{ events.length }}</span>
         </div>
 
-        <!-- Trailer + Doc + Co-Driver -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1">
             <label class="text-sm font-medium">Trailer</label>
@@ -42,7 +41,6 @@
           </Select>
         </div>
 
-        <!-- Shift Timeline -->
         <div class="rounded-xl border bg-muted/30 p-4 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-sm font-semibold">Shift Timeline</span>
@@ -56,7 +54,6 @@
             <span v-else class="text-xs text-muted-foreground italic">No shift applied</span>
           </div>
 
-          <!-- Direction toggle -->
           <div class="flex gap-2">
             <button
               type="button"
@@ -80,7 +77,6 @@
             </button>
           </div>
 
-          <!-- Time inputs -->
           <div class="flex items-center gap-3 justify-center">
             <div v-for="field in SHIFT_FIELDS" :key="field.key" class="flex flex-col items-center gap-1">
               <Input
@@ -99,7 +95,6 @@
           </div>
         </div>
 
-        <!-- Selected events preview -->
         <div v-if="events.length" class="border rounded-lg overflow-hidden max-h-44 overflow-y-auto">
           <div class="bg-muted/50 grid grid-cols-[40px_1fr_1fr_1fr] gap-2 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase sticky top-0">
             <span>#</span>

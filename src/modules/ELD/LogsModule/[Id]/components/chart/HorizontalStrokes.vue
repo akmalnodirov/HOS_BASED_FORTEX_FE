@@ -34,12 +34,9 @@ const props = defineProps({
   },
 })
 
-// dark
 const { isDarkMode } = useDarkMode()
 
-// Computed property for lineLength calculation
 const lineLength = computed(() => {
-  // Sum of distances for each hour, based on count and distance
   return props.count * props.distance
 })
 </script>

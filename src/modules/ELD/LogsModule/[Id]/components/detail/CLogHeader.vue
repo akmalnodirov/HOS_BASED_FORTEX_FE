@@ -11,52 +11,19 @@
             :event-code="driverInfo.lastEventCode ?? 0"
             :event-type="driverInfo.lastEventType"
           />
-        </div>
-        <div class="flex items-center gap-2 text-sm">
           <span
-            v-if="driverInfo?.isConnected !== undefined"
-            class="flex items-center gap-1"
-            :class="driverInfo.isConnected ? 'text-[#589E67]' : 'text-muted-foreground'"
+            v-if="driverInfo?.connectionStatus"
+            class="flex items-center gap-1 text-xs font-medium"
+            :class="connectionStatusClass"
           >
-            <svg
-              v-if="driverInfo.isConnected"
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M8.00033 13H8.00699M15.2046 5.80051C13.3067 4.06133 10.7774 3 8.00025 3C5.22309 3 2.69381 4.06133 0.795898 5.80051M3.15495 8.16198C4.44703 7.02377 6.14304 6.33333 8.00031 6.33333C9.85758 6.33333 11.5536 7.02377 12.8457 8.16198M10.4659 10.5167C9.78647 9.98418 8.93044 9.66667 8.00025 9.66667C7.05599 9.66667 6.18814 9.99386 5.50391 10.5411"
-                stroke="#589E67"
-                stroke-width="1.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <svg
-              v-else
-              width="16"
-              height="16"
-              viewBox="0 0 26 26"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M15.3119 10C16.6802 10.4263 17.9624 11.1191 19.08 12.05M22.5799 8.49997C19.6575 5.92394 15.8956 4.50262 11.9999 4.50262C11.3949 4.50262 10.7931 4.5369 10.1972 4.60447M8.52979 15.61C9.54499 14.8888 10.7595 14.5013 12.0048 14.5013C13.2501 14.5013 14.4646 14.8888 15.4798 15.61M12 19.5H12.01M1.19336 8.70076C2.52697 7.47869 4.06839 6.47975 5.75851 5.76306M4.73193 12.243C6.12934 11.012 7.84172 10.1302 9.73265 9.73393M15.6983 15.7751C14.6792 14.9763 13.3952 14.5 11.9999 14.5C10.5835 14.5 9.28172 14.9908 8.25537 15.8116M3 3L21 21"
-                stroke="black"
-                stroke-width="1.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            {{ driverInfo.isConnected ? 'Online' : 'Offline' }}
+            <Wifi v-if="driverInfo.connectionStatus === 'CONNECTED'" class="h-3.5 w-3.5" />
+            <WifiOff v-else class="h-3.5 w-3.5" />
+            {{ connectionStatusLabel }}
           </span>
         </div>
       </div>
 
       <div class="flex gap-x-8 font-normal text-sm">
-        <!-- Left column -->
         <div class="space-y-2">
           <div class="flex items-center gap-2 text-muted-foreground">
             <Mail class="w-4 h-4" />
@@ -86,10 +53,8 @@
           </div>
         </div>
 
-        <!-- Vertical divider -->
         <div class="w-px bg-border self-stretch"></div>
 
-        <!-- Right column -->
         <div class="space-y-2">
           <div class="flex items-center gap-2 text-muted-foreground">
             <Clock class="w-4 h-4 text-[#6082E0]" />
@@ -167,7 +132,6 @@
       class="flex items-center gap-5 2xl:gap-6"
     >
       <div v-for="stat in stats" :key="stat.label" class="flex flex-col items-center">
-        <!-- Outer ring with progress -->
         <span
           class="progress-ring relative w-19.25 h-19.25 2xl:w-20.5 2xl:h-20.5 rounded-full flex items-center justify-center"
           :style="{
@@ -175,18 +139,13 @@
             '--progress-color': stat.color,
           }"
         >
-          <!-- White gap ring -->
           <span
             class="absolute w-[67px] h-[67px] 2xl:w-[72px] 2xl:h-[72px] rounded-full bg-white dark:bg-background"
           ></span>
-
-          <!-- Inner colored circle -->
           <span
             class="absolute w-[63px] h-[63px] 2xl:w-[68px] 2xl:h-[68px] rounded-full transition-colors"
             :style="{ backgroundColor: stat.innerBg }"
           ></span>
-
-          <!-- Text Content -->
           <span class="relative flex flex-col items-center justify-center leading-tight">
             <span class="text-base font-bold text-foreground">{{ stat.value }}</span>
             <span class="text-[11px] font-semibold" :style="{ color: stat.color }">{{
@@ -201,21 +160,20 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Mail, Phone, Clock, AlertCircle, FileText } from 'lucide-vue-next'
+import { Mail, Phone, Clock, AlertCircle, Wifi, WifiOff } from 'lucide-vue-next'
 import { formatDuration } from '@/utils/time.ts'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 import type { DailySummaryResponse } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 import { useRoute } from 'vue-router'
-import CEventBadge from '@/modules/ELD/LogsModule/Optimize/components/CEventBadge.vue'
+import CEventBadge from './CEventBadge.vue'
 
-// Props
 interface DriverInfo {
   name?: string
   email?: string
   phone?: string
   vehicleUnit?: string
   hasViolation?: boolean
-  isConnected?: boolean
+  connectionStatus?: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONNECTED' | string
   signaturePath?: string
   workedDurationInSeconds?: number
   lastEventCode?: number | null
@@ -244,21 +202,29 @@ const props = defineProps<{
 const { isDarkMode } = useDarkMode()
 const route = useRoute()
 
-// Calculate total worked hours from daily summary or driver info
+const connectionStatusLabel = computed(() => {
+  if (props.driverInfo?.connectionStatus === 'CONNECTED') return 'Connected'
+  if (props.driverInfo?.connectionStatus === 'DISCONNECTED') return 'Disconnected'
+  return 'Not Connected'
+})
+
+const connectionStatusClass = computed(() => {
+  if (props.driverInfo?.connectionStatus === 'CONNECTED') return 'text-[#589E67]'
+  if (props.driverInfo?.connectionStatus === 'DISCONNECTED') return 'text-[#AF4B4B]'
+  return 'text-muted-foreground'
+})
+
 const totalWorkedHours = computed(() => {
-  // First try to get from daily summary
   if (props.dailySummary) {
     const total = (props.dailySummary.dailyOnDuty || 0) + (props.dailySummary.dailyDriving || 0)
     return formatDuration(total)
   }
-  // Fallback to driver info workedDurationInSeconds
   if (props.driverInfo?.workedDurationInSeconds) {
     return formatDuration(props.driverInfo.workedDurationInSeconds)
   }
   return '0h 0m'
 })
 
-// Calculate max durations for progress
 const maxDurations = {
   break: 8 * 3600, // 8 hours
   drive: 11 * 3600, // 11 hours
@@ -266,7 +232,6 @@ const maxDurations = {
   cycle: 70 * 3600, // 70 hours
 }
 
-// Format duration as hh:mm
 const formatHoursMinutes = (seconds: number): string => {
   const totalMinutes = Math.floor(seconds / 60)
   const hours = Math.floor(totalMinutes / 60)
@@ -275,9 +240,7 @@ const formatHoursMinutes = (seconds: number): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
 }
 
-// Stats with real data
 const stats = computed(() => {
-  // Use dailyTimeRemainder prop if available, otherwise fallback to driverInfo.timeRemainder
   const timeRemainder = props.dailyTimeRemainder || props.driverInfo?.timeRemainder
 
   if (!timeRemainder) {

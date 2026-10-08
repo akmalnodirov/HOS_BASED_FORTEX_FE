@@ -183,7 +183,12 @@ const menuItems: MenuItem[] = [
             path: '/eld/logs',
             relatedPaths: ['/logs/'],
           },
-          { id: 'eld-reports', label: 'Unidentified', icon: null, path: '/eld/unidentified' },
+          {
+            id: 'eld-event-sessions',
+            label: 'Event Sessions',
+            icon: null,
+            path: '/eld/event-sessions',
+          },
         ],
       },
       {

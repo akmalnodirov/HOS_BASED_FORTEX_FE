@@ -9,9 +9,7 @@
       class="object-contain h-full w-full rounded-lg duration-200 select-none pointer-events-none"
       :style="{ filter: isDarkMode ? 'invert(0.8358)' : '' }"
     />
-    <h2 v-else class="font-semibold tracking-wide text-muted-foreground">
-      NO SIGNATURE PATH
-    </h2>
+    <h2 v-else class="font-semibold tracking-wide text-muted-foreground">NO SIGNATURE PATH</h2>
   </div>
 </template>
 
@@ -31,11 +29,15 @@ const baseUrl = import.meta.env.VITE_APP_BASE_URL || ''
 
 const signatureImageUrl = computed(() => {
   if (!props.signaturePath) return ''
-  // If signaturePath already includes http, return as is
+  if (props.signaturePath.startsWith('data:')) {
+    return props.signaturePath
+  }
+  if (props.signaturePath.startsWith('blob:')) {
+    return props.signaturePath
+  }
   if (props.signaturePath.startsWith('http')) {
     return props.signaturePath
   }
-  // Otherwise, prepend base URL
   return `${baseUrl}/${props.signaturePath}`
 })
 </script>

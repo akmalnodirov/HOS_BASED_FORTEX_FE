@@ -256,10 +256,9 @@ const pageTitle = computed(() => {
 
   // Dynamic /logs/:id/* routes
   if (path.startsWith('/logs/')) {
-    const subPage = path.split('/')[3] // undefined | 'boost' | 'optimise' | 'tracking' | 'insert-info' | ...
+    const subPage = path.split('/')[3] // undefined | 'boost' | 'tracking' | 'insert-info' | ...
     const subPageMap: Record<string, string> = {
       boost: 'Boost',
-      optimise: 'Optimise',
       tracking: 'Tracking',
       'insert-info': 'Insert Info',
       history: 'History',
@@ -282,7 +281,8 @@ const pageTitle = computed(() => {
 
     // ELD routes
     '/eld/logs': 'ELD / Logs',
-    '/eld/unidentified': 'ELD / Unidentified',
+    '/eld/event-sessions': 'ELD / Event Sessions',
+    '/eld/unidentified': 'ELD / Event Sessions',
 
     // Tools routes
     '/tools/activity': 'Tools / Activity',

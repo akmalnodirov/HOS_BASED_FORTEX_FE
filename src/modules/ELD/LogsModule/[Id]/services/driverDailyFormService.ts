@@ -1,8 +1,3 @@
-/**
- * Service for Driver Daily Form operations
- * Follows Single Responsibility Principle - handles only driver daily form business logic
- */
-
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
 import type {
@@ -13,16 +8,9 @@ import type {
 import type { Dayjs } from 'dayjs'
 import { capitalizeKeys } from '@/utils/object.ts'
 
-/**
- * Service class for driver daily form operations
- * Implements Single Responsibility Principle
- */
 export class DriverDailyFormService {
   private api = useApi()
 
-  /**
-   * Get driver daily form by date
-   */
   async getDriverDailyFormByDate(
     driverId: string,
     dateTime: Dayjs | string,
@@ -49,9 +37,6 @@ export class DriverDailyFormService {
     }
   }
 
-  /**
-   * Update driver daily form
-   */
   async updateDriverDailyForm(
     model: EditDriverDailyFormRequest
   ): Promise<DriverDailyFormResponse | null> {
@@ -68,10 +53,6 @@ export class DriverDailyFormService {
     }
   }
 
-  /**
-   * Validate edit driver daily form
-   * Returns array of validation errors
-   */
   validateEditDriverDailyForm(form: EditDriverDailyForm): Array<{ path: string; message: string }> {
     const errors: Array<{ path: string; message: string }> = []
 
@@ -96,9 +77,6 @@ export class DriverDailyFormService {
     return errors
   }
 
-  /**
-   * Prepare edit form from driver daily form response
-   */
   prepareEditForm(
     driverDailyForm: DriverDailyFormResponse | null
   ): EditDriverDailyForm {
@@ -111,9 +89,6 @@ export class DriverDailyFormService {
     }
   }
 
-  /**
-   * Prepare request model from edit form
-   */
   prepareRequestModel(
     form: EditDriverDailyForm,
     driverId: string,
@@ -136,5 +111,4 @@ export class DriverDailyFormService {
   }
 }
 
-// Export singleton instance
 export const driverDailyFormService = new DriverDailyFormService()

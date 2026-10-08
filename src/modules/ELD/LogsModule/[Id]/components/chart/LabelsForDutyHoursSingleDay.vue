@@ -46,7 +46,6 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-// Props
 const props = defineProps<{
   dayName: string
   dailySummary: any

@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Status Buttons -->
     <div class="flex justify-between items-center lg:gap-3">
       <button
         v-for="status in eventTypes"
@@ -17,9 +16,7 @@
       </button>
     </div>
 
-    <!-- Form -->
     <form @submit.prevent="handleSave" class="space-y-4">
-      <!-- Time Pickers -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-2">
           <Label>Start Time</Label>
@@ -31,7 +28,6 @@
         </div>
       </div>
 
-      <!-- Coordinates -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-2">
           <Label>Latitude</Label>
@@ -55,7 +51,6 @@
         </div>
       </div>
 
-      <!-- Location -->
       <div class="space-y-2">
         <Label>Location</Label>
         <Input
@@ -65,7 +60,6 @@
         />
       </div>
 
-      <!-- Copy/Paste Buttons -->
       <div class="flex gap-3">
         <Button
           type="button"
@@ -89,7 +83,6 @@
         </Button>
       </div>
 
-      <!-- Odometer and Engine Hours -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-2">
           <Label>Odometer</Label>
@@ -113,7 +106,6 @@
         </div>
       </div>
 
-      <!-- Vehicle -->
       <div class="space-y-2">
         <Label>Vehicle</Label>
         <Select v-model="form.vehicleId">
@@ -128,7 +120,6 @@
         </Select>
       </div>
 
-      <!-- Notes -->
       <div class="space-y-2">
         <Label>Notes</Label>
         <Textarea
@@ -138,7 +129,6 @@
         />
       </div>
 
-      <!-- Action Buttons -->
       <div class="flex items-center justify-between pt-4">
         <Button
           type="button"
@@ -170,7 +160,6 @@ import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
 import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations.ts'
 
-// UI Components
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -184,14 +173,12 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
 
-// Time object interface
 interface TimeObject {
   hours: number
   minutes: number
   seconds: number
 }
 
-// Props from parent (synced with chart)
 const props = defineProps<{
   eventStart: TimeObject
   eventEnd: TimeObject
@@ -199,14 +186,12 @@ const props = defineProps<{
   eventCode: number
 }>()
 
-// Emits for updating parent state
 const emit = defineEmits<{
   'update:event-start': [time: TimeObject]
   'update:event-end': [time: TimeObject]
   'update:event-type': [data: { eventType: number; eventCode: number }]
 }>()
 
-// Inject shared data from layout
 const logDetail = inject('logDetail') as ReturnType<
   typeof import('@/modules/ELD/LogsModule/[Id]/composables/useELDLogDetail.ts').useELDLogDetail
 >
@@ -214,14 +199,11 @@ const logDetail = inject('logDetail') as ReturnType<
 const route = useRoute()
 const driverId = route.params.id as string
 
-// Get required data and functions from composable
 const { driverVehicles, editLoading, submitEventStatus } = logDetail
 const geoStore = useGeoLocationsStore()
 
-// Loading state
 const loading = computed(() => editLoading.value)
 
-// Event types definition
 const eventTypes = [
   { key: 'offduty', label: 'Off duty', eventCode: 1, eventType: 1 },
   { key: 'sleeper', label: 'Sleeper', eventCode: 2, eventType: 1 },
@@ -231,7 +213,6 @@ const eventTypes = [
   { key: 'pc', label: 'PC', eventCode: 1, eventType: 3 },
 ]
 
-// Get event key from type and code
 function getEventKey(eventType: number, eventCode: number): string {
   const event = eventTypes.find((e) => e.eventType === eventType && e.eventCode === eventCode)
   return event?.key || 'offduty'
@@ -239,11 +220,9 @@ function getEventKey(eventType: number, eventCode: number): string {
 
 const selectedStatus = ref(getEventKey(props.eventType, props.eventCode))
 
-// Local time state (synced with props)
 const eventStart = reactive<TimeObject>({ ...props.eventStart })
 const eventEnd = reactive<TimeObject>({ ...props.eventEnd })
 
-// Watch props for changes from chart (when user drags catchers)
 watch(
   () => props.eventStart,
   (newVal) => {
@@ -264,7 +243,6 @@ watch(
   { deep: true }
 )
 
-// Watch props for event type changes
 watch(
   () => [props.eventType, props.eventCode],
   ([newType, newCode]) => {
@@ -274,18 +252,15 @@ watch(
   }
 )
 
-// Convert TimeObject to string "HH:mm"
 function timeObjectToString(time: TimeObject): string {
   return `${time.hours.toString().padStart(2, '0')}:${time.minutes.toString().padStart(2, '0')}`
 }
 
-// Convert string "HH:mm" to TimeObject
 function stringToTimeObject(str: string): TimeObject {
   const [hours, minutes] = str.split(':').map(Number)
   return { hours: hours || 0, minutes: minutes || 0, seconds: 0 }
 }
 
-// Computed for time picker strings
 const startTimeString = computed({
   get: () => timeObjectToString(eventStart),
   set: (val: string) => {
@@ -306,7 +281,6 @@ const endTimeString = computed({
   },
 })
 
-// Form state
 const form = reactive({
   driverId: driverId,
   eventType: props.eventType,
@@ -321,7 +295,6 @@ const form = reactive({
   vehicleId: '',
 })
 
-// Watch lat/lng changes to auto-populate location
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   () => [form.latitude, form.longitude],
@@ -338,12 +311,10 @@ watch(
   }
 )
 
-// Handlers
 function handleEventTypeChange(eventItem: (typeof eventTypes)[0]) {
   selectedStatus.value = eventItem.key
   form.eventType = eventItem.eventType
   form.eventCode = eventItem.eventCode
-  // Emit to parent so chart can update
   emit('update:event-type', { eventType: eventItem.eventType, eventCode: eventItem.eventCode })
 }
 
@@ -352,7 +323,6 @@ function handleStartTimeChange(timeStr: string) {
   eventStart.hours = time.hours
   eventStart.minutes = time.minutes
   eventStart.seconds = time.seconds
-  // Emit to parent so chart can update
   emit('update:event-start', { ...time })
 }
 
@@ -361,7 +331,6 @@ function handleEndTimeChange(timeStr: string) {
   eventEnd.hours = time.hours
   eventEnd.minutes = time.minutes
   eventEnd.seconds = time.seconds
-  // Emit to parent so chart can update
   emit('update:event-end', { ...time })
 }
 
@@ -418,7 +387,6 @@ async function handlePaste() {
 }
 
 function handleClear() {
-  // Reset form
   form.eventType = 1
   form.eventCode = 1
   form.latitude = undefined
@@ -430,7 +398,6 @@ function handleClear() {
   form.totalEngineHours = undefined
   form.vehicleId = ''
 
-  // Reset time
   eventStart.hours = 0
   eventStart.minutes = 0
   eventStart.seconds = 0
@@ -438,17 +405,14 @@ function handleClear() {
   eventEnd.minutes = 0
   eventEnd.seconds = 0
 
-  // Reset status
   selectedStatus.value = 'offduty'
 
-  // Emit reset events to parent so chart can update
   emit('update:event-start', { hours: 0, minutes: 0, seconds: 0 })
   emit('update:event-end', { hours: 0, minutes: 0, seconds: 0 })
   emit('update:event-type', { eventType: 1, eventCode: 1 })
 }
 
 async function handleSave() {
-  // Validate times
   const startTotalSeconds = eventStart.hours * 3600 + eventStart.minutes * 60 + eventStart.seconds
   const endTotalSeconds = eventEnd.hours * 3600 + eventEnd.minutes * 60 + eventEnd.seconds
 
@@ -457,12 +421,11 @@ async function handleSave() {
     return
   }
 
-  // Prepare submit data
   const submitData = {
     ...form,
     eventStart: { ...eventStart },
     eventEnd: { ...eventEnd },
-    eventId: null, // null means add new event
+    eventId: null,
   }
 
   const success = await submitEventStatus(submitData)

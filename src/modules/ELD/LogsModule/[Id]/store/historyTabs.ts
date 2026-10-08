@@ -1,7 +1,3 @@
-/**
- * History Tabs Store - manages tabs within a history session
- */
-
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useApi } from '@/composables/useAxiosService.ts'
@@ -12,11 +8,9 @@ import type { HistoryTabRequest, HistoryTabResponse } from '../types/history.ts'
 export const useHistoryTabsStore = defineStore('historyTabs', () => {
   const api = useApi()
 
-  // State
   const tabs = ref<HistoryTabResponse[]>([])
   const selectedTab = ref<HistoryTabResponse | null>(null)
 
-  // Actions
   async function getTabs(sessionId: string): Promise<HistoryTabResponse[]> {
     try {
       const response = await api.get<{ successResult: HistoryTabResponse[] }>(
@@ -74,11 +68,9 @@ export const useHistoryTabsStore = defineStore('historyTabs', () => {
   }
 
   return {
-    // State
     tabs,
     selectedTab,
 
-    // Actions
     getTabs,
     addTab,
     updateTab,

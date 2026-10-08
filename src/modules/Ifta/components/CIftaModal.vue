@@ -24,7 +24,7 @@
                 :key="vehicle.id"
                 :value="vehicle.id"
               >
-                {{ vehicle.unit || vehicle.id }}
+                {{ vehicle.name || vehicle.vin || vehicle.id }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -72,6 +72,22 @@
               />
             </PopoverContent>
           </Popover>
+        </div>
+
+        <div class="space-y-2">
+          <Label>States (optional)</Label>
+          <CIftaMultiSelect
+            v-model="selectedStates"
+            :options="stateOptions"
+            placeholder="All states"
+            searchable
+            show-chips
+            search-placeholder="Search states"
+          />
+          <p class="text-xs text-muted-foreground">
+            Leave empty to include every state. Selected states are applied when files are
+            downloaded.
+          </p>
         </div>
 
         <!-- Actions -->
@@ -131,6 +147,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/custom/modal'
 import type { VehicleOption } from '@/modules/Ifta/types'
+import CIftaMultiSelect from '@/modules/Ifta/components/CIftaMultiSelect.vue'
+import { IFTA_STATE_OPTIONS } from '@/modules/Ifta/utils/iftaDownload'
 import type { DateRange } from 'reka-ui'
 import { CalendarDate } from '@internationalized/date'
 import dayjs from 'dayjs'
@@ -144,11 +162,21 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'generate', data: { vehicleIds: string[]; startDate: string; endDate: string }): void
+  (
+    e: 'generate',
+    data: {
+      vehicleIds: string[]
+      startDate: string
+      endDate: string
+      states: string[]
+    }
+  ): void
 }>()
 
 const selectedVehicle = ref<string>('')
 const localSelectedIds = ref<string[]>([])
+const selectedStates = ref<string[]>([])
+const stateOptions = IFTA_STATE_OPTIONS
 
 // Initial: start = yesterday, end = today
 const localStartDate = ref(dayjs().subtract(1, 'day').format('YYYY-MM-DD'))
@@ -204,7 +232,7 @@ const availableVehicles = computed(() =>
 
 const getVehicleName = (id: string) => {
   const vehicle = props.vehicles.find((v) => v.id === id)
-  return vehicle?.unit || id
+  return vehicle?.name || vehicle?.vin || id
 }
 
 const addVehicle = (vehicleId: string) => {
@@ -228,6 +256,7 @@ const handleSubmit = () => {
     vehicleIds: localSelectedIds.value,
     startDate: localStartDate.value,
     endDate: localEndDate.value,
+    states: selectedStates.value,
   })
 }
 
@@ -243,6 +272,7 @@ watch(
   (isOpen) => {
     if (!isOpen) {
       localSelectedIds.value = []
+      selectedStates.value = []
       selectedVehicle.value = ''
       localStartDate.value = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
       localEndDate.value = dayjs().format('YYYY-MM-DD')

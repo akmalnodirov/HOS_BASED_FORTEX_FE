@@ -72,7 +72,7 @@ export function useActivity(options: UseActivityOptions = {}) {
     getStartOf(dayjs().subtract(7, 'days')),
     getEndOf(dayjs()),
   ])
-  const selectedTag = ref<'all' | 'ai' | 'booster' | 'optimize' | 'audit'>('all')
+  const selectedTag = ref<'all' | 'ai' | 'booster' | 'audit'>('all')
 
   // Sorting using composable
   const sorting = useSorting<SortKey>({
@@ -156,8 +156,6 @@ export function useActivity(options: UseActivityOptions = {}) {
         params.type = 3
       } else if (selectedTag.value === 'booster') {
         params.type = 1
-      } else if (selectedTag.value === 'optimize') {
-        params.type = 2
       } else if (selectedTag.value === 'audit') {
         params.type = 4
       }
@@ -236,8 +234,6 @@ export function useActivity(options: UseActivityOptions = {}) {
     let toolPath = ''
     if (item.toolType === 1) {
       toolPath = '/boost'
-    } else if (item.toolType === 2) {
-      toolPath = '/optimize'
     } else if (item.toolType === 3) {
       toolPath = '/ai'
     }

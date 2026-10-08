@@ -85,7 +85,6 @@
               :count="actualHours * 2"
             />
 
-            <!-- DUTY EVENTS -->
             <g v-for="(dutyGroup, dutyIndex) in dutyTimesCopy?.duties" :key="dutyIndex">
               <template v-for="(item, key) in dutyGroup" :key="key">
                 <text
@@ -213,7 +212,6 @@
               </template>
             </g>
 
-            <!-- VERTICAL LINES -->
             <line
               v-for="(item, key) in dutyTimesCopy?.verticalLines"
               :key="key"
@@ -239,7 +237,6 @@
               :stroke="inactiveColor"
             ></line>
 
-            <!-- VIOLATIONS -->
             <line
               v-for="(violation, ind) in props?.violations"
               :key="ind"
@@ -251,8 +248,6 @@
               :stroke="errorColor"
             ></line>
 
-            <!-- EDIT EVENT LINES and RECTS -->
-            <!-- top border -->
             <line
               v-if="props.edit || props.add"
               :x1="editEvent.x1"
@@ -265,7 +260,6 @@
               stroke-linecap="round"
             ></line>
 
-            <!-- two borders -->
             <line
               v-if="props.edit || props.add"
               :x1="editEvent.x1"
@@ -296,7 +290,6 @@
               :height="height * 4"
             ></rect>
 
-            <!-- HORIZONTAL 2 RECTS -->
             <rect
               :stroke="mainColor"
               :x="0"
@@ -316,7 +309,6 @@
               :height="height"
             ></rect>
 
-            <!--MOVING VERTICAL LINE AND CIRCLE-->
             <line
               :x1="dynamicLine.x1"
               :y1="topOffset"
@@ -408,7 +400,6 @@
           </g>
         </svg>
 
-        <!-- VIOLATIONS -->
         <template v-if="!props.edit && !props.add">
           <div
             v-for="(violation, ind) in props.violations"
@@ -479,8 +470,6 @@
       </div>
     </div>
 
-    <!-- EDIT EVENT -->
-    <!-- edit event controller -->
     <div
       v-if="props.edit || props.add"
       :style="{ left: `${editEvent.x1 + 47}px`, width: `${2 + (editEvent.x2 - editEvent.x1)}px` }"
@@ -495,9 +484,6 @@
         :class="{ 'opacity-50 cursor-not-allowed!': blockEventTimeEdit }"
         :disabled="blockEventTimeEdit"
       >
-        <!--        <ArrowLeft-->
-        <!--          class="w-4 h-4 text-primary-foreground !cursor-grab group-active:!cursor-grabbing"-->
-        <!--        />-->
         <svg
           width="20"
           height="20"
@@ -523,9 +509,6 @@
         :class="{ 'opacity-50 cursor-not-allowed!': blockEventTimeEdit }"
         :disabled="blockEventTimeEdit"
       >
-        <!--        <ArrowRight-->
-        <!--          class="w-4 h-4 text-primary-foreground !cursor-grab group-active:!cursor-grabbing"-->
-        <!--        />-->
         <svg
           width="20"
           height="20"
@@ -544,7 +527,6 @@
       </Button>
     </div>
 
-    <!-- edit event top tooltip -->
     <div
       v-if="props.edit || props.add"
       :style="{ left: `${editEvent.x1 + (editEvent.x2 - editEvent.x1) / 2 + 47}px` }"
@@ -560,19 +542,15 @@
 <script setup lang="ts">
 import { ref, computed, reactive, watch, nextTick } from 'vue'
 
-// ICONS
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-vue-next'
 
-// DAYJS
 import dayjs, { Dayjs } from 'dayjs'
 
-// STORES
 import { storeToRefs } from 'pinia'
 import { useTimeZoneHelper } from '@/composables/useTimezone.ts'
 import { useSidebarStore } from '@/modules/ELD/LogsModule/[Id]/store/sidebar.ts'
 import { useChartStore } from '@/modules/ELD/LogsModule/[Id]/store/chart.ts'
 
-// COMPONENTS
 import LabelsForDutiesSingleDay from './LabelsForDutiesSingleDay.vue'
 import LabelsForDays from './LabelsForDays.vue'
 import LabelsForDutyHoursSingleDay from './LabelsForDutyHoursSingleDay.vue'
@@ -584,7 +562,6 @@ import TwoShorterVerticalStrokes from './TwoShorterVerticalStrokes.vue'
 import TwoShortestVerticalStrokes from './TwoShortestVerticalStrokes.vue'
 import { Button } from '@/components/ui/button'
 
-// UTILITIES
 import { deepClone } from '@/utils/object.ts'
 import { formatTime, formatDuration, convertPixelstoSeconds } from '@/utils/time.ts'
 import {
@@ -596,12 +573,10 @@ import {
 } from '@/utils/hos.ts'
 import { getDutyOrder, getEventCodeText, isDrivingEvent, events } from '@/utils/events.ts'
 
-// COMPOSABLES
 import { useCurrentTime } from '@/composables/useCurrentTime.ts'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 import { useRoute } from 'vue-router'
 
-// TYPES
 import type {
   GraphResponse,
   DailySummaryResponse,
@@ -612,7 +587,6 @@ import type {
   DaySeparatorComponent,
 } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 
-// EMITS
 const emits = defineEmits([
   'container:update',
   'dutyEvent:update',
@@ -623,7 +597,6 @@ const emits = defineEmits([
   'updateReverseEvents',
 ])
 
-// PROPS
 const props = defineProps({
   edit: {
     type: Boolean,
@@ -724,9 +697,7 @@ const editOnceSetPrev = computed({
   },
 })
 
-// dark
 const { isDarkMode } = useDarkMode()
-// route
 const route = useRoute()
 
 function lightenColor(hex: string, percent: number): string {
@@ -738,85 +709,62 @@ function lightenColor(hex: string, percent: number): string {
   return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`
 }
 
-// CONSTANTAS
 const secondInPixel = ref<number>(0)
 const mainColor = computed(() => (isDarkMode.value ? '#7588BF' : '#465a95'))
-const inactiveColor = computed(() => lightenColor(mainColor.value, 0.3)) // 30% lighter
+const inactiveColor = computed(() => lightenColor(mainColor.value, 0.3))
 const errorColor = '#AD1F38'
 const editColor = '#56463D'
 
-// chart
 const chartStore = useChartStore()
 const sidebarStore = useSidebarStore()
 
-// store to refs
 const { sidebar } = storeToRefs(sidebarStore)
 const { heightInPixel, topOffset, editHeightInPixel, screenResolution } = storeToRefs(chartStore)
 
-// properties of chart
 const height = computed(() =>
   props.edit || props.add ? editHeightInPixel.value : heightInPixel.value
 )
 const distance = computed(() => secondInPixel.value * 3600)
-
-// Calculate actual hours based on backend data (svgWidth) instead of days * 24
-// This ensures the chart only shows up to where the backend endDate is
-// Backend calculates svgWidth based on actual data range and screenResolution
 const actualHours = computed(() => {
   if (!dutyTimesCopy.value) {
     return 0
   }
 
-  // If svgWidth is available, calculate hours based on it
-  // Backend sends svgWidth which represents the actual width of data
-  // Backend calculates: svgWidth = (actualHours / 24) * screenResolution
-  // So: actualHours = (svgWidth * 24) / screenResolution
   if (dutyTimesCopy.value.svgWidth && screenResolution.value && screenResolution.value > 0) {
     const hours = (dutyTimesCopy.value.svgWidth * 24) / screenResolution.value
-    return Math.ceil(hours) // Round up to ensure we show all data
+    return Math.ceil(hours)
   }
 
-  // Fallback: use distance if screenResolution is not available
   if (dutyTimesCopy.value.svgWidth && distance.value && distance.value > 0) {
     const hours = dutyTimesCopy.value.svgWidth / distance.value
     return Math.ceil(hours)
   }
 
-  // Final fallback to days * 24 if svgWidth is not available
   return dutyTimesCopy.value.days ? dutyTimesCopy.value.days * 24 : 0
 })
 
-// Use backend's svgWidth directly to limit chart display to actual data range
-// This ensures the chart only shows up to where the backend endDate is
 const actualSvgWidth = computed(() => {
-  // Use backend's svgWidth if available, as it's already calculated based on actual data
   if (dutyTimesCopy.value?.svgWidth) {
     return dutyTimesCopy.value.svgWidth
   }
-  // Fallback to calculated width based on days
   if (distance.value && dutyTimesCopy.value?.days) {
     return distance.value * dutyTimesCopy.value.days * 24
   }
   return 1438
 })
 
-// Use backend's svgViewBox directly to limit chart display to actual data range
 const actualSvgViewBox = computed(() => {
-  // Use backend's svgViewBox if available, as it's already calculated based on actual data
   if (dutyTimesCopy.value?.svgViewBox) {
     return dutyTimesCopy.value.svgViewBox
   }
-  // Fallback to calculated viewBox based on days
   if (distance.value && dutyTimesCopy.value?.days) {
     return distance.value * dutyTimesCopy.value.days * 24
   }
   return 1738
 })
 
-// free times
 const freeTimes = computed(() => props.freeTimes)
 
-// time zone
 const { convertToTimeZone, getStartOf, acceptAsTimeZone } = useTimeZoneHelper()
 
 const iterateAndRoundMiles = (chartData?: GraphResponse) => {
@@ -831,7 +779,6 @@ const iterateAndRoundMiles = (chartData?: GraphResponse) => {
   return newChartData
 }
 
-// duty times
 const dutyTimes = computed(() => iterateAndRoundMiles(props.chartData) ?? ({} as GraphResponse))
 const dutyTimesCopy = ref<GraphResponse>(dutyTimes.value)
 const dutyTimesCopyPrev = ref<GraphResponse>(dutyTimes.value)
@@ -840,10 +787,8 @@ const reassignDutyTimesCopy = computed(
   () => iterateAndRoundMiles(props.reassignsData) ?? ({} as GraphResponse)
 )
 
-// current time composable
 const timeCompose = useCurrentTime()
 
-// current time
 const currentTime = ref<Dayjs>(convertToTimeZone(timeCompose.currentTime.value))
 watch(
   () => timeCompose.currentTime.value,
@@ -852,19 +797,14 @@ watch(
   }
 )
 
-// edit event time
 const editEventTime = ref<Dayjs>(props.eventTime!)
 
-// if edit is true, search for eventId
-// For add mode, initialize with small range (both at same position) to avoid affecting existing duties
 const getInitialX1 = () => {
   if (props.x1) return parseInt(props.x1 as string)
-  // For add mode, start at a small offset instead of 0 to avoid covering all duties from start
   return props.add ? 50 : 0
 }
 const getInitialX2 = () => {
   if (props.x2) return parseInt(props.x2 as string)
-  // For add mode, start with same position as x1 (will expand when user drags)
   return props.add ? 52 : 100
 }
 
@@ -883,7 +823,6 @@ const editEvent = reactive({
   recordStatus: 1,
 })
 
-// block editing event, if the first event after the editing event is auto driving
 const blockEventTimeEdit = computed({
   get() {
     return props.blockEventTimeEdit
@@ -894,14 +833,12 @@ const blockEventTimeEdit = computed({
   },
 })
 
-// parentDiv
 const parentDiv = ref<HTMLElement | undefined>()
 
 const labelsForDutyHours = ref<HTMLElement | null>(null)
 const separatorDayOrder = ref<number>(0)
 const separatorDate = ref<Dayjs>(dayjs())
 
-// daily summaries
 const dailySummary = ref<DailySummaryResponse>(
   (props.dailySummary as DailySummaryResponse) ||
     (props.dailySummaries?.[
@@ -955,7 +892,6 @@ const lineToolTip = ref({
   speedMph: 0,
 })
 
-// dynamic moving lines
 const isMovingDetailsVisible = ref<boolean>(false)
 const editMovingController = ref<boolean>(false)
 const editControllerStart = ref<boolean>(false)
@@ -966,7 +902,6 @@ const svgContainer = ref<HTMLElement | any>(null)
 const previousScrollLeft = ref<number>(0)
 const mySvg = ref<any>(null)
 
-// Vertical Position Based on Event Code
 function verticalEventPosition(code: number) {
   switch (code) {
     case 0:
@@ -985,7 +920,6 @@ function verticalEventPosition(code: number) {
   }
 }
 
-// tooltip
 const lineToolTipDuration = computed(() => {
   const duration: number = lineToolTip.value.duration
   const h: number = Math.floor(duration / 3600)
@@ -1049,20 +983,17 @@ const lineToolTipCurrentTime = computed(() => {
 })
 
 function changeBlockBackground() {
-  // Circle x coordinate handling
   circleObj.value.x = dynamicLine.value.x1
 
   let l: number = 0,
     r: number = dutyTimesXCoordinatesSorted.value.length - 1,
     mid: number
 
-  // Binary search to find the segment containing the dynamicLine
   while (l <= r) {
     mid = Math.floor((l + r) / 2)
     const segment = dutyTimesXCoordinatesSorted.value[mid]
 
     if (dynamicLine.value.x1 >= segment.x1 && dynamicLine.value.x1 <= segment.x2) {
-      // We've found the correct segment
       rectObj.value.x = segment.x1
       rectObj.value.width = segment.x2 - segment.x1
       rectObj.value.y1 = segment.y1
@@ -1185,7 +1116,6 @@ const drivingMouse = (event: MouseEvent) => {
   console.log('im here baby')
 }
 
-// selected events
 const selectedEvents = ref<GraphDuties[]>([])
 const selectedEvent = ref<GraphDuties | null>(null)
 
@@ -1292,17 +1222,13 @@ const clearSelectedEvent = () => {
   selectedEvent.value = null
 }
 
-// handle chart click to move buttons
 const handleChartClick = (event: MouseEvent) => {
-  // Only handle clicks in edit or add mode
   if (!props.edit && !props.add) return
 
-  // Ignore if event time editing is blocked
   if (blockEventTimeEdit.value) return
 
   if (!mySvg.value || !svgContainer.value) return
 
-  // Get SVG coordinates for comparison
   const svg: any = mySvg.value
   const point = svg?.createSVGPoint()
   point.x = event?.clientX
@@ -1313,9 +1239,7 @@ const handleChartClick = (event: MouseEvent) => {
   const leftButtonX = editEvent.x1
   const rightButtonX = editEvent.x2
 
-  // Check if click is to the right of both buttons
   if (clickX > rightButtonX) {
-    // Move right button to click position
     editMovingController.value = true
     editControllerEnd.value = true
 
@@ -1331,9 +1255,7 @@ const handleChartClick = (event: MouseEvent) => {
     editMovingController.value = false
     editControllerEnd.value = false
   }
-  // Check if click is to the left of both buttons
   else if (clickX < leftButtonX) {
-    // Move left button to click position
     editMovingController.value = true
     editControllerStart.value = true
 
@@ -1349,12 +1271,10 @@ const handleChartClick = (event: MouseEvent) => {
     editMovingController.value = false
     editControllerStart.value = false
   }
-  // Click is between buttons - use midpoint logic
   else {
     const midpoint = (leftButtonX + rightButtonX) / 2
     const containerRect = svgContainer.value.getBoundingClientRect()
 
-    // If click is to the right of midpoint, move right button
     if (clickX >= midpoint) {
       editMovingController.value = true
       editControllerEnd.value = true
@@ -1370,7 +1290,6 @@ const handleChartClick = (event: MouseEvent) => {
       editMovingController.value = false
       editControllerEnd.value = false
     }
-    // If click is to the left of midpoint, move left button
     else {
       editMovingController.value = true
       editControllerStart.value = true
@@ -1389,7 +1308,6 @@ const handleChartClick = (event: MouseEvent) => {
   }
 }
 
-// dynamic moving lines handle func
 const onMouseMove = (event: MouseEvent) => {
   if (!mySvg.value) return
   const svg: any = mySvg.value
@@ -1443,7 +1361,6 @@ const onEditMouseMove = (event: MouseEvent | string | number, isLeft: boolean = 
         if (editEvent.x1 > editEvent.x2) editEvent.x1 = Math.max(editEvent.x2 - 2, 0)
       }
     } else {
-      // In this case we are passing event as date, so we need to convert it to pixel via screenResolution
       event = convertDateToPixel(svgContainer.value.clientWidth, event as string) as number
 
       if (
@@ -1462,7 +1379,6 @@ const onEditMouseMove = (event: MouseEvent | string | number, isLeft: boolean = 
 
     changeEditHos()
   } else if (typeof event === 'number' || typeof event === 'string') {
-    // In this case we are passing event as date, so we need to convert it to pixel via screenResolution
     event = convertDateToPixel(svgContainer.value.clientWidth, event as string) as number
 
     if (isLeft) {
@@ -1476,7 +1392,6 @@ const onEditMouseMove = (event: MouseEvent | string | number, isLeft: boolean = 
   }
 }
 
-// checking converted event time by endX pixels to date does exceed over given 'time' dayjs
 const doesExceed = (endX: number, time: Dayjs) => {
   const seconds = convertPixelstoSeconds(svgContainer.value.clientWidth, endX)
   const convertedTime = getStartOf(editEventTime.value).add(seconds, 'seconds')
@@ -1490,7 +1405,6 @@ const doesExceed = (endX: number, time: Dayjs) => {
 }
 
 const changeEditHos = () => {
-  // Not found compatible event with given id
   if (
     props.edit &&
     ((editEvent.x1 === 1 && editEvent.x2 === 3) ||
@@ -1511,7 +1425,6 @@ const changeEditHos = () => {
             .find((duty: any) => duty.eventId === props.eventId)
         )
 
-  // previous origin duty event before compatible event
   let prevOriginDutyEvent: any = Object.values(dutyTimes.value.duties)
     .flat()
     .filter((duty: any) => duty.x2 >= originDutyEvent.x1)
@@ -1521,7 +1434,6 @@ const changeEditHos = () => {
     prevOriginDutyEvent = deepClone(prevOriginDutyEvent)
   }
 
-  // next origin duty event before compatible event
   let nextOriginDutyEvent: any = Object.values(dutyTimes.value.duties)
     .flat()
     .filter((duty: any) => duty.x1 <= originDutyEvent.x2)
@@ -1531,15 +1443,10 @@ const changeEditHos = () => {
     nextOriginDutyEvent = deepClone(nextOriginDutyEvent)
   }
 
-  // edit ending range cannot be higher than driving bound because in case
-  // when this is high than driving range it can affect driving range
   const drivingDuty = '3'
   let drivingMinBoundX = firstFoundEventAfterPos(originDutyEvent.x2, dutyTimes.value, drivingDuty)
   let drivingMaxBoundX = lastFoundEventBeforePos(originDutyEvent.x1, dutyTimes.value, drivingDuty)
 
-  // edit event should be intersecting with editing origin event
-  // should not affect driving events also
-  // should not exceed over current time
   if (
     (drivingMinBoundX && editEvent.x2 > drivingMinBoundX) ||
     (drivingMaxBoundX && editEvent.x1 < drivingMaxBoundX) ||
@@ -1575,7 +1482,6 @@ const changeEditHos = () => {
     )
   }
 
-  // freeing up dutyTimeCopy because after processing all events we push all of them to this object arrays
   dutyTimesCopy.value = deepClone(dutyTimes.value)
   for (let i = 1; i <= 6; i++) {
     dutyTimesCopy.value.duties[String(i) as keyof typeof dutyTimesCopy.value.duties] = []
@@ -1586,7 +1492,6 @@ const changeEditHos = () => {
     for (const duty of dutyTimes.value.duties[i as keyof typeof dutyTimes.value.duties]) {
       const dutyEvent = deepClone(duty)
 
-      // iterating event range is covering editing event range
       let covering: boolean = contains(dutyEvent.x1, dutyEvent.x2, editEvent.x1, editEvent.x2)
       if (covering) {
         const newDutyEvent = deepClone(dutyEvent)
@@ -1606,7 +1511,6 @@ const changeEditHos = () => {
         continue
       }
 
-      // previous event
       if (
         prevOriginDutyEvent &&
         dutyEvent.eventId === prevOriginDutyEvent.eventId &&
@@ -1617,7 +1521,6 @@ const changeEditHos = () => {
         continue
       }
 
-      // next event
       if (
         nextOriginDutyEvent &&
         dutyEvent.eventId === nextOriginDutyEvent.eventId &&
@@ -1628,13 +1531,11 @@ const changeEditHos = () => {
         continue
       }
 
-      // iterating event range is between editing event range
       let doesContain: boolean = contains(editEvent.x1, editEvent.x2, dutyEvent.x1, dutyEvent.x2)
       if (doesContain) {
         continue
       }
 
-      // intersecting position between edit event and iterating event
       let intersectPos: number = intersectsPos(
         editEvent.x1,
         editEvent.x2,
@@ -1651,7 +1552,6 @@ const changeEditHos = () => {
     }
   }
 
-  // Vertical lines should not been inside edit event block
   for (const verticalItem of dutyTimes.value.verticalLines) {
     const verticalLine = deepClone(verticalItem)
     if (
@@ -1663,7 +1563,6 @@ const changeEditHos = () => {
     dutyTimesCopy.value.verticalLines.push(verticalLine)
   }
 
-  // add new event to duty times because this graph segment does not exists till now
   if (props.add || props.edit) {
     const mappedDuty = getDutyOrder(editEvent.eventType, editEvent.eventCode)
     dutyTimesCopy.value.duties[`${mappedDuty}` as keyof typeof dutyTimesCopy.value.duties].push(
@@ -1675,7 +1574,6 @@ const changeEditHos = () => {
   updateDailySummary()
 }
 
-// Helper function to emit dutyEvent:update with eventStart and eventEnd TimeObjects
 const emitDutyEventUpdate = () => {
   const svgWidth = svgContainer.value?.clientWidth || 1440
   const startSeconds = convertPixelstoSeconds(svgWidth, editEvent.x1)
@@ -1697,7 +1595,6 @@ const emitDutyEventUpdate = () => {
   emits('dutyEvent:update', { ...editEvent, eventStart, eventEnd })
 }
 
-// Update daily summary when edit graph changed
 type NumericDailySummaryKeys = 'dailyOffDuty' | 'dailySleeperBerth' | 'dailyDriving' | 'dailyOnDuty'
 
 const updateDailySummary = () => {

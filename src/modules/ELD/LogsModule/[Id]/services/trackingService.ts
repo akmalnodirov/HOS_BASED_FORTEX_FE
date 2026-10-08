@@ -1,8 +1,3 @@
-/**
- * Service for Tracking operations
- * Follows Single Responsibility Principle - handles only tracking business logic
- */
-
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
 import type {
@@ -12,16 +7,9 @@ import type {
 } from '@/types/tracking'
 import { capitalizeKeys } from '@/utils/object.ts'
 
-/**
- * Service class for tracking operations
- * Implements Single Responsibility Principle
- */
 export class TrackingService {
   private api = useApi()
 
-  /**
-   * Get driver daily trackings
-   */
   async getDriverDailyTrackings(
     model: DriverLogsDailyEventsRequest,
     signal?: AbortSignal
@@ -37,10 +25,8 @@ export class TrackingService {
 
       const result = response.data?.successResult
       if (result && result.trackingEventResponse && Array.isArray(result.trackingEventResponse)) {
-        // Reverse to show chronological order
         result.trackingEventResponse.reverse()
       } else if (result) {
-        // Ensure it's at least an empty array if missing or invalid
         result.trackingEventResponse = []
       }
 
@@ -51,9 +37,6 @@ export class TrackingService {
     }
   }
 
-  /**
-   * Get driver every trackings (detailed points)
-   */
   async getDriverEveryTrackings(
     model: DriverLogsDailyEventsRequest,
     signal?: AbortSignal
@@ -75,7 +58,6 @@ export class TrackingService {
         signal,
       })
 
-      // Extract trackingEvents from the response (matches old project structure)
       const trackingEvents = response.data?.successResult?.trackingEvents
       return Array.isArray(trackingEvents) ? trackingEvents : []
     } catch (error) {
@@ -84,9 +66,6 @@ export class TrackingService {
     }
   }
 
-  /**
-   * Filter valid coordinates
-   */
   isValidCoordinates(latitude: number | null, longitude: number | null): boolean {
     if (latitude === null || longitude === null) return false
     if (isNaN(latitude) || isNaN(longitude)) return false
@@ -96,9 +75,6 @@ export class TrackingService {
     return true
   }
 
-  /**
-   * Filter tracking events with valid coordinates
-   */
   filterValidCoordinates<T extends { latitude: number | null; longitude: number | null }>(
     trackings: T[]
   ): T[] {
@@ -112,5 +88,4 @@ export class TrackingService {
   }
 }
 
-// Export singleton instance
 export const trackingService = new TrackingService()

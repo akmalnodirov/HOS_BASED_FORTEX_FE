@@ -1,7 +1,5 @@
 import { ref } from 'vue'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface LocationTransfer {
   locationOrigin?: number | null
   calculatedLocation?: string | null
@@ -18,23 +16,18 @@ export interface DragPayload {
   data: LocationTransfer | number | string | null
 }
 
-// ─── Composable ───────────────────────────────────────────────────────────────
-
 export function useDragDrop(
   onDropCallback: (column: DragColumnType, targetEventId: string, data: DragPayload['data']) => void
 ) {
   const isDragging = ref(false)
   let activeDrag: DragPayload | null = null
 
-  // Find the nearest draggable cell from the event target
-  // event.target can be a text node (no .closest), so we guard with instanceof
   function getCell(event: DragEvent): HTMLElement | null {
     const el = event.target
     if (!(el instanceof Element)) return null
     return el.closest<HTMLElement>('[data-draggable="true"]')
   }
 
-  // Get the event row's ID by traversing up from the draggable cell
   function getEventId(cell: HTMLElement) {
     return cell.closest<HTMLElement>('[data-event-id]')?.dataset.eventId ?? null
   }

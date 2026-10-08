@@ -37,21 +37,17 @@ const emit = defineEmits<{
   'update:date': [date: Dayjs]
 }>()
 
-// Convert Dayjs to CalendarDate
 function toCalendarDate(date: Dayjs | null): CalendarDate | undefined {
   if (!date) return undefined
   return new CalendarDate(date.year(), date.month() + 1, date.date())
 }
 
-// Convert CalendarDate to Dayjs
 function toDayjs(date: any): Dayjs {
   return dayjs(new Date(date.year, date.month - 1, date.day))
 }
 
-// Local calendar state
 const calendarDate = ref<CalendarDate | undefined>(toCalendarDate(props.date))
 
-// Sync with prop changes
 watch(
   () => props.date,
   (newDate) => {
@@ -59,12 +55,10 @@ watch(
   }
 )
 
-// Display text
 const displayDate = computed(() => {
   return props.date ? props.formatFn(props.date) : props.placeholder
 })
 
-// Handle date selection
 function handleDateChange(date: any): void {
   if (date) {
     emit('update:date', toDayjs(date))

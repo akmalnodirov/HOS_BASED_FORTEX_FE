@@ -6,13 +6,11 @@
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
-        <!-- Date display -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Date</label>
           <Input :value="form.date" disabled class="bg-muted" />
         </div>
 
-        <!-- Co-Driver -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Co-Driver</label>
           <div class="relative">
@@ -46,7 +44,6 @@
           </div>
         </div>
 
-        <!-- Trailer -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Trailer</label>
           <Input
@@ -57,7 +54,6 @@
           />
         </div>
 
-        <!-- Shipping Docs -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Shipping docs</label>
           <Input
@@ -68,7 +64,6 @@
           />
         </div>
 
-        <!-- Signature Path -->
         <div class="space-y-1">
           <label class="text-sm font-medium">Signature Path</label>
           <div class="relative">
@@ -89,7 +84,6 @@
               <X class="h-3.5 w-3.5" />
             </Button>
           </div>
-          <!-- Signature dropdown -->
           <div v-if="form.signaturePaths.length" class="flex flex-wrap gap-1 mt-1">
             <Button
               v-for="path in form.signaturePaths"

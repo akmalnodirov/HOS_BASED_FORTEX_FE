@@ -10,7 +10,6 @@
           Selected events: <span class="font-medium text-foreground">{{ selectedCount }}</span>
         </div>
 
-        <!-- Action type toggle -->
         <div class="flex gap-2">
           <Button
             type="button"
@@ -30,7 +29,6 @@
           </Button>
         </div>
 
-        <!-- Company select -->
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">Company</label>
           <Select v-model="selectedCompanyId" @update:model-value="onCompanyChange">
@@ -49,7 +47,6 @@
           </Select>
         </div>
 
-        <!-- Driver select -->
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">To Driver</label>
           <Select v-model="toDriverId" :disabled="!selectedCompanyId || isDriversLoading">

@@ -1,15 +1,21 @@
 // API response shape
 export interface IftaApiResponse {
   id: string
-  startDate: string
-  endDate: string
-  pdfPath: string
-  csvPath: string
-  dateTime: string
-  vehicle: {
-    id: string
-    unit: string | null
-  }
+  status: string
+  timeSubmitted: number
+  timeGenerated: number | null
+  fromDate: string
+  toDate: string
+  url: string | null
+  csvUrl: string | null
+  vehicleId: string
+  vehicleName: string | null
+  vehicleVin: string | null
+  vehicleMake: string | null
+  vehicleModel: string | null
+  vehicleYear: number | null
+  states: string[]
+  errors: string[]
 }
 
 // UI display shape
@@ -22,14 +28,17 @@ export interface IftaRecord {
   status: string
   pdfPath: string
   csvPath: string
+  errors: string[]
 }
 
 // API request for generating IFTA report
 export interface IftaGenerateRequest {
   vehicleIds: string[]
-  startDate: string
-  endDate: string
+  fromDate: string
+  toDate: string
+  timeZoneId: string
   companyId: string
+  states: string[]
 }
 
 // API request for fetching IFTA list
@@ -42,5 +51,9 @@ export interface IftaFilterRequest {
 // Vehicle option for select dropdown
 export interface VehicleOption {
   id: string
-  unit: string | null
+  vin: string | null
+  name: string | null
+  make: string | null
+  model: string | null
+  year: number | null
 }

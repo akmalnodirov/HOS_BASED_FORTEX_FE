@@ -1,5 +1,3 @@
-// Web worker for offloading select-all / clear-all operations on large event lists
-
 interface WorkerMessage {
   action: 'selectAll' | 'clearAll'
   eventIds: string[]

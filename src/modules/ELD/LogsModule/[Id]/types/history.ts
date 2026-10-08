@@ -1,9 +1,8 @@
 import type { Dayjs } from 'dayjs'
 
-// Session types
 export interface HistorySessionRequest {
   driverId: string
-  type: number // 4 for history
+  type: number
   startDate: string
   endDate: string
   status: number
@@ -20,7 +19,6 @@ export interface HistorySessionResponse {
   updatedAt?: string
 }
 
-// Tab types
 export interface HistoryTabRequest {
   sessionId: string
   name?: string
@@ -34,7 +32,6 @@ export interface HistoryTabResponse {
   updatedAt?: string
 }
 
-// Transfer types
 export interface TransferReassignRequest {
   driverId: string
   startDate: string
@@ -65,7 +62,6 @@ export interface TransferGraphParams extends TransferEventParams {
   screenResolution: number
 }
 
-// History state
 export interface HistoryModals {
   transferEvents: boolean
   transferByPeriod: boolean
@@ -83,5 +79,4 @@ export interface HistoryState {
   selectedRows: any[]
 }
 
-// Constants
 export const HISTORY_SESSION_TYPE = 4

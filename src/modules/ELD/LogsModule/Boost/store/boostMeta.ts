@@ -25,7 +25,6 @@ export const useBoostMetaStore = defineStore('boostMeta', () => {
   const boostPixelViolations = shallowRef<ViolationPixelResponse[]>([])
   const boostFreeTimes = shallowRef<BoostFreeTime[] | undefined>([])
 
-  // Table selection
   const selectedRows = ref<any[]>([])
   const selectedRowSet = shallowRef<Set<string>>(new Set())
 
@@ -65,7 +64,6 @@ export const useBoostMetaStore = defineStore('boostMeta', () => {
       }
     )
 
-    // RouteApp flattens; backend may return nested. Keep safe.
     const v = res.data?.successResult as any
     boostPixelViolations.value = Array.isArray(v) ? (v as ViolationPixelResponse[]) : []
   }

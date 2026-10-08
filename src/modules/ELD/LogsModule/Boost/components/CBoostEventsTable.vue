@@ -1,11 +1,9 @@
 <template>
   <div class="space-y-4 bg-white dark:bg-card mt-1 px-6 py-4">
-    <!-- Loading State -->
     <div v-if="loading" class="flex items-center justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
 
-    <!-- Empty State -->
     <div
       v-else-if="!events.length"
       class="flex flex-col items-center justify-center py-12 text-center border rounded-lg"
@@ -19,19 +17,16 @@
       </p>
     </div>
 
-    <!-- Accordion Groups -->
     <div
       v-else
       ref="scrollContainer"
       class="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-lg"
     >
       <div class="min-w-450 select-none">
-        <!-- Table Header - Outside Accordion -->
         <div class="bg-[#f0f0f0] rounded-lg dark:bg-muted/50 sticky top-0 z-10 mb-1">
           <div
             class="grid grid-cols-[40px_60px_130px_150px_80px_150px_200px_80px_100px_100px_150px_90px_100px_120px_100px] gap-2 px-4 py-3"
           >
-            <!-- Select All -->
             <div class="flex items-center">
               <CCustomCheckbox :checked="isAllSelected" @update:checked="toggleSelectAll" />
             </div>
@@ -124,16 +119,13 @@
           </div>
         </div>
 
-        <!-- Date Groups Accordion -->
         <Accordion type="multiple" v-model="openItems" class="w-full">
           <AccordionItem v-for="group in events" :key="group.date" :value="`group-${group.date}`">
             <div class="border rounded-sm mb-1 transition-colors">
-              <!-- Date Header -->
               <AccordionTrigger
                 class="hover:no-underline border-0 px-4 py-2.5 cursor-pointer w-full bg-[#f0f0f0] dark:bg-muted sticky top-11 z-9"
               >
                 <div class="w-full flex items-center gap-12.5 min-w-0">
-                  <!-- Chevron + Date + Count -->
                   <div class="flex items-center gap-2 shrink-0">
                     <ChevronDown
                       :class="[
@@ -147,12 +139,10 @@
                     <span class="text-xs text-muted-foreground"> ({{ group.events.length }}) </span>
                   </div>
 
-                  <!-- Daily Form Summary -->
                   <div class="w-225">
                     <div
                       class="flex items-center justify-between flex-1 min-w-0 text-xs text-foreground"
                     >
-                      <!-- Trailers -->
                       <div class="flex items-center gap-1 min-w-0">
                         <svg
                           width="16"
@@ -170,7 +160,6 @@
                           />
                         </svg>
                       </div>
-                      <!-- Shipping Docs -->
                       <div class="flex items-center gap-1 min-w-0">
                         <svg
                           width="16"
@@ -188,7 +177,6 @@
                           />
                         </svg>
                       </div>
-                      <!-- Co-Driver -->
                       <div class="flex items-center gap-1 shrink-0">
                         <svg
                           width="16"
@@ -208,7 +196,6 @@
 
                         <span>{{ group.dailyForm?.coDriver || 'No' }}</span>
                       </div>
-                      <!-- Signed / Unsigned -->
                       <span
                         v-if="group.dailyForm"
                         :class="
@@ -223,7 +210,6 @@
                     </div>
                   </div>
 
-                  <!-- Edit Button -->
                   <Button
                     type="button"
                     variant="ghost"
@@ -250,7 +236,6 @@
                 </div>
               </AccordionTrigger>
 
-              <!-- Event Rows -->
               <AccordionContent class="pt-0">
                 <div
                   v-for="event in group.events"
@@ -269,7 +254,6 @@
                   "
                   @click="handleRowClick(event.eventId)"
                 >
-                  <!-- Checkbox -->
                   <div class="flex items-center" @click.stop>
                     <CCustomCheckbox
                       :checked="selectedRowIds.includes(event.eventId)"
@@ -277,7 +261,6 @@
                     />
                   </div>
 
-                  <!-- No -->
                   <TooltipProvider v-if="event.errorTitles?.length || event.warningTitles?.length">
                     <Tooltip>
                       <TooltipTrigger as-child>
@@ -300,22 +283,18 @@
                     {{ event.sequenceId }}
                   </div>
 
-                  <!-- Driver -->
                   <div class="text-sm text-foreground truncate">
                     {{ event.driverFullName || '-' }}
                   </div>
 
-                  <!-- Time -->
                   <div class="text-sm text-foreground whitespace-nowrap">
                     {{ formatEventTime(event.startTime) }}
                   </div>
 
-                  <!-- Duration -->
                   <div class="text-sm text-foreground whitespace-nowrap">
                     {{ formatDuration(event.duration) }}
                   </div>
 
-                  <!-- Event -->
                   <div class="flex items-center gap-x-2">
                     <template v-if="findEventByTypeAndCode(event.eventType, event.eventCode)">
                       <div
@@ -337,7 +316,6 @@
                     <span v-else class="text-xs text-muted-foreground">-</span>
                   </div>
 
-                  <!-- Location (draggable) -->
                   <div
                     class="text-sm text-foreground wrap-break-word"
                     :class="
@@ -358,12 +336,10 @@
                     {{ event.calculatedLocation || event.manualLocation || 'N/A' }}
                   </div>
 
-                  <!-- System -->
                   <div class="text-sm text-foreground">
                     {{ RECORD_ORIGIN_LABELS[event.eventRecordOrigin] ?? 'Auto' }}
                   </div>
 
-                  <!-- Odometer (draggable) -->
                   <div
                     class="text-sm text-foreground font-mono"
                     :class="
@@ -376,7 +352,6 @@
                     {{ event.vehicleMiles != null ? Math.round(event.vehicleMiles) : '-' }}
                   </div>
 
-                  <!-- Engine Hours (draggable) -->
                   <div
                     class="text-sm text-foreground"
                     :class="
@@ -389,12 +364,10 @@
                     {{ event.engineHours ?? '-' }}
                   </div>
 
-                  <!-- Notes -->
                   <div class="text-sm text-foreground wrap-break-word">
                     {{ event.annotation || '-' }}
                   </div>
 
-                  <!-- Status -->
                   <div>
                     <span
                       :class="[
@@ -406,7 +379,6 @@
                     </span>
                   </div>
 
-                  <!-- Trailer (draggable) -->
                   <div
                     class="text-sm text-foreground"
                     :class="
@@ -419,7 +391,6 @@
                     {{ event.trailerNumber || '-' }}
                   </div>
 
-                  <!-- Document (draggable) -->
                   <div
                     class="text-sm text-foreground"
                     :class="
@@ -432,7 +403,6 @@
                     {{ event.shippingDocument || '-' }}
                   </div>
 
-                  <!-- Actions -->
                   <div
                     class="flex justify-end gap-1 sticky right-0 bg-white dark:bg-background group-hover:bg-accent z-8 border-l border-border"
                     @click.stop
@@ -503,7 +473,6 @@ import type { BoostUiEventGroup, BoostUiEventRow } from '../composables/useBoost
 import { findEventByTypeAndCode } from '@/utils/events.ts'
 import { useDragDrop, type DragColumnType, type DragPayload } from '../composables/useDragDrop.ts'
 
-// Record origin short names (1=ELD, 2=Driver, 3=User, 4=Unidentified)
 const RECORD_ORIGIN_LABELS: Record<number, string> = {
   1: 'ELD',
   2: 'Driver',
@@ -537,7 +506,6 @@ const emit = defineEmits<{
   'drop-property': [column: DragColumnType, targetEventId: string, data: DragPayload['data']]
 }>()
 
-// Track open accordion items — default open all groups that have events
 const openItems = ref<string[]>([])
 
 watch(
@@ -550,7 +518,6 @@ watch(
 
 const isGroupOpen = (date: string) => openItems.value.includes(`group-${date}`)
 
-// ─── Scroll to event when selectedEventId changes (e.g. graph click) ──────────
 const scrollContainer = ref<HTMLElement | null>(null)
 
 watch(
@@ -577,13 +544,10 @@ watch(
   }
 )
 
-// ─── Flat event list (for select-all, shift-click, global index) ──────────────
 const allEvents = computed<BoostUiEventRow[]>(() => props.events.flatMap((g) => g.events))
 
-// Only selectable events (not archived: actionState !== 4)
 const selectableEvents = computed(() => allEvents.value.filter((e) => e.actionState !== 4))
 
-// Map eventId → global index across all groups
 const globalIndexMap = computed<Map<string, number>>(() => {
   const map = new Map<string, number>()
   let idx = 0
@@ -595,7 +559,6 @@ const globalIndexMap = computed<Map<string, number>>(() => {
   return map
 })
 
-// ─── Shift key tracking ───────────────────────────────────────────────────────
 const isShiftPressed = ref(false)
 const lastClickedIndex = ref<number | null>(null)
 
@@ -606,12 +569,10 @@ function onKeyUp(e: KeyboardEvent) {
   if (e.key === 'Shift') isShiftPressed.value = false
 }
 
-// ─── Drag & Drop ──────────────────────────────────────────────────────────────
 const { setup: setupDragDrop, cleanup: cleanupDragDrop } = useDragDrop(
   (column, targetEventId, data) => emit('drop-property', column, targetEventId, data)
 )
 
-// Build v-bind attributes for a draggable cell
 function draggableAttrs(
   column: DragColumnType,
   event: BoostUiEventRow,
@@ -625,10 +586,6 @@ function draggableAttrs(
     'data-payload': JSON.stringify(payload),
   }
 }
-
-// Drag-drop listeners must be attached AFTER the scroll container appears in DOM.
-// scrollContainer lives inside v-else (only when events are loaded), so it's null at mount.
-// Watch it so listeners are set up/torn down whenever the container enters or leaves the DOM.
 watch(
   scrollContainer,
   (container, prev) => {
@@ -648,7 +605,6 @@ onUnmounted(() => {
   if (scrollContainer.value) cleanupDragDrop(scrollContainer.value)
 })
 
-// ─── Multi-select ─────────────────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selectedRowIds))
 
 const isAllSelected = computed(
@@ -686,7 +642,6 @@ function toggleRow(eventId: string) {
   lastClickedIndex.value = globalIndex
 }
 
-// Use a web worker for select-all on large lists to avoid blocking the UI
 import ToggleEventsWorker from '../workers/toggleEvents.worker.ts?worker'
 
 function handleRowClick(eventId: string) {
@@ -711,7 +666,6 @@ function toggleSelectAll(checked: boolean) {
   }
 }
 
-// ─── Formatters ───────────────────────────────────────────────────────────────
 const formatDateOnly = (date: string) => dayjs(date).format('DD.MM.YYYY')
 
 const formatEventTime = (time: string) => formatTime(time, 'MMM D, h:mm:ss a')

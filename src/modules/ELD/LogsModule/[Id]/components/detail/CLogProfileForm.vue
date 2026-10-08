@@ -1,6 +1,5 @@
 <template>
   <div>
-    <!-- Profile Form Display -->
     <div class="grid grid-cols-2 border border-border rounded-lg">
       <div
         v-for="field in profileFields"
@@ -16,7 +15,6 @@
       </div>
     </div>
 
-    <!-- Edit Modal -->
     <Modal v-model:open="isEditModalOpen">
       <ModalContent class="sm:max-w-[440px]">
         <ModalHeader>
@@ -24,7 +22,6 @@
         </ModalHeader>
 
         <form @submit.prevent="handleSubmit" class="space-y-6">
-          <!-- Co-Drivers -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-foreground"> Co-Drivers </label>
             <div class="relative">
@@ -54,7 +51,6 @@
             </p>
           </div>
 
-          <!-- Shipping Docs -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-foreground"> Shipping Docs </label>
             <Input
@@ -68,7 +64,6 @@
             </p>
           </div>
 
-          <!-- Trailers -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-foreground"> Trailers </label>
             <Input
@@ -82,7 +77,6 @@
             </p>
           </div>
 
-          <!-- Signature Path -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-foreground"> Signature Path </label>
             <div class="relative">
@@ -104,7 +98,6 @@
                 <X class="w-4 h-4" />
               </Button>
 
-              <!-- Dropdown for signature paths -->
               <div
                 v-if="showPathSelector && filteredPaths.length > 0"
                 class="absolute z-50 mt-1 w-full bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto"
@@ -126,7 +119,6 @@
             </p>
           </div>
 
-          <!-- Actions -->
           <div class="flex items-center justify-end gap-x-3 pt-4 border-t">
             <Button type="button" variant="outline" @click="handleCancel" class="w-28">
               Cancel
@@ -189,12 +181,10 @@ const {
 const isEditModalOpen = ref(false)
 const errors = ref<Record<string, string>>({})
 
-// Initialize edit form when driverDailyForm changes
 watch(
   () => props.driverDailyForm,
   (newForm) => {
     if (newForm) {
-      // Set edit form values from driverDailyForm
       editForm.value.coDrivers = newForm.coDriver?.id || null
       editForm.value.shippingDocs = newForm.shippingDocuments.join(',') || ''
       editForm.value.trailers = newForm.trailers.join(',') || ''
@@ -205,7 +195,6 @@ watch(
   { immediate: true }
 )
 
-// Profile fields computed from driverDailyForm
 const profileFields = computed(() => {
   const form = props.driverDailyForm
   return [
@@ -234,8 +223,8 @@ const profileFields = computed(() => {
       value: form?.trailers?.join(', ') || '',
     },
     {
-      label: 'Home Terminal',
-      value: form?.driver?.homeTerminal?.street || '',
+      label: 'Main office',
+      value: form?.driver?.mainOffice || '',
     },
     {
       label: 'Shipping Docs',
@@ -244,23 +233,19 @@ const profileFields = computed(() => {
   ]
 })
 
-// Driver options for select
 const driverOptions = computed(() => {
   return props.drivers || []
 })
 
-// Handle edit button click
 const handleEdit = () => {
   initializeEditForm()
   isEditModalOpen.value = true
   errors.value = {}
 }
 
-// Handle cancel
 const handleCancel = () => {
   isEditModalOpen.value = false
   errors.value = {}
-  // Reset form to original values
   if (props.driverDailyForm) {
     editForm.value.coDrivers = props.driverDailyForm.coDriver?.id || null
     editForm.value.shippingDocs = props.driverDailyForm.shippingDocuments.join(',') || ''
@@ -269,9 +254,7 @@ const handleCancel = () => {
   }
 }
 
-// Handle submit
 const handleSubmit = async () => {
-  // Validate
   const validationErrors = validateEditForm()
   if (validationErrors.length > 0) {
     errors.value = {}
@@ -291,7 +274,6 @@ const handleSubmit = async () => {
   }
 }
 
-// Close dropdown when clicking outside
 watch(showPathSelector, (isOpen) => {
   if (isOpen) {
     const handleClickOutside = (e: MouseEvent) => {
@@ -307,7 +289,6 @@ watch(showPathSelector, (isOpen) => {
   }
 })
 
-// Expose handleEdit for parent component
 defineExpose({
   handleEdit,
 })

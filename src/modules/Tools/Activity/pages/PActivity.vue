@@ -68,7 +68,6 @@
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="ai">AI</SelectItem>
                 <SelectItem value="booster">Booster</SelectItem>
-                <SelectItem value="optimize">Optimize</SelectItem>
                 <SelectItem value="audit">Audit</SelectItem>
               </SelectContent>
             </Select>

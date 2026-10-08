@@ -1,12 +1,10 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-125 p-0 gap-0 overflow-hidden">
-      <!-- Header -->
       <DialogHeader class="px-6 py-4 border-b">
         <DialogTitle class="text-xl font-bold">Violation</DialogTitle>
       </DialogHeader>
 
-      <!-- Content (List of violations) -->
       <div class="px-6 py-6 space-y-3">
         <div
           v-if="violations.length === 0"
@@ -36,7 +34,6 @@
         </div>
       </div>
 
-      <!-- Footer -->
       <div class="px-6 py-4 border-t flex items-center justify-end gap-2 bg-white dark:bg-card">
         <Button variant="outline" @click="$emit('update:open', false)">Cancel</Button>
       </div>

@@ -13,9 +13,7 @@
       </TabsList>
     </Tabs>
 
-    <!-- Right Side Toolbar -->
     <div class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 mb-1">
-      <!-- Booster Toggle -->
       <div class="flex items-center bg-[#F0F0F0] dark:bg-muted rounded p-1 h-8 lg:h-9 2xl:h-10">
         <button
           v-for="b in ['booster 1', 'booster 2', 'booster 3']"
@@ -32,7 +30,6 @@
         </button>
       </div>
 
-      <!-- Search -->
       <Button
         variant="outline"
         size="icon"
@@ -42,7 +39,6 @@
         <Search class="w-3.5 h-3.5 lg:w-4 lg:h-4 2xl:w-5 2xl:h-5" />
       </Button>
 
-      <!-- Date Picker -->
       <Popover v-model:open="isCalendarOpen">
         <PopoverTrigger as-child>
           <Button
@@ -66,7 +62,6 @@
         </PopoverContent>
       </Popover>
 
-      <!-- Create Button -->
       <Button
         class="h-8 lg:h-9 2xl:h-10 bg-[#111] dark:bg-foreground text-white dark:text-background hover:bg-[#111]/90 text-[10px] lg:text-xs 2xl:text-sm px-3 lg:px-4"
       >
@@ -104,14 +99,13 @@ const props = defineProps<Props>()
 const router = useRouter()
 const route = useRoute()
 
-const tabs = ['ALL', 'AI', 'BOOST', 'HISTORY', 'OPTIMIZE', 'TRACKING', 'INSERT INFO LOG']
+const tabs = ['ALL', 'AI', 'BOOST', 'HISTORY', 'TRACKING', 'INSERT INFO LOG']
 const activeTab = ref('BOOST')
 
 defineEmits<{
   (e: 'search-click'): void
 }>()
 
-// Right Toolbar State
 const selectedBooster = ref('booster 1')
 const selectedVehicle = ref('all')
 const isCalendarOpen = ref(false)
@@ -126,18 +120,15 @@ function formatDate(date: any) {
   return `${String(date.month).padStart(2, '0')}.${String(date.day).padStart(2, '0')}.${date.year}`
 }
 
-// Watch for tab changes and navigate accordingly
 watch(activeTab, (newTab) => {
   const driverId = route.params.id
 
   if (!driverId) return
 
-  // Get date from props or use current route query
   const dateParam = props.headerDate?.[0]?.format('YYYY-MM-DD') || (route.query.date as string)
 
   switch (newTab) {
     case 'ALL':
-      // Navigate back to logs detail page
       router.push({
         name: 'ELDLogDetail',
         params: { id: driverId },
@@ -145,16 +136,7 @@ watch(activeTab, (newTab) => {
       })
       break
 
-    case 'OPTIMIZE':
-      router.push({
-        name: 'ELDOptimise',
-        params: { id: driverId },
-        query: dateParam ? { date: dateParam } : undefined,
-      })
-      break
-
     case 'HISTORY':
-      // Navigate to logs detail page with history mode
       router.push({
         name: 'ELDLogDetail',
         params: { id: driverId },

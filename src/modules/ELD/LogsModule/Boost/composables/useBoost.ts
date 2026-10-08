@@ -11,7 +11,6 @@ import { useBoostSessionsStore } from '../store/boostSessions.ts'
 import { useBoostTabsStore } from '../store/boostTabs.ts'
 import { useBoostEventsStore } from '../store/boostEvents.ts'
 import { useBoostMetaStore } from '../store/boostMeta.ts'
-import { useBoostOptimizeStore } from '../store/boostOptimize.ts'
 import { useBoostDailyFormStore } from '../store/boostDailyForm.ts'
 import type {
   DailySummaryResponse,
@@ -80,7 +79,6 @@ export const useBoost = () => {
   const tabsStore = useBoostTabsStore()
   const eventsStore = useBoostEventsStore()
   const metaStore = useBoostMetaStore()
-  const optimizeStore = useBoostOptimizeStore()
   const dailyFormStore = useBoostDailyFormStore()
 
   const { acceptAsTimeZone, convertToTimeZone, getStartOf, getEndOf, formatToUTC } =
@@ -159,7 +157,6 @@ export const useBoost = () => {
 
   const selectedRowIds = ref<string[]>([])
 
-  // ─── Edit Event ─────────────────────────────────────────────────────────────
   const showEditEventModal = ref(false)
   const isEditEventLoading = ref(false)
 
@@ -205,12 +202,10 @@ export const useBoost = () => {
     try {
       ev = await eventsStore.getBoostEvent(eventId)
     } catch {
-      // GET failed — will try local store fallback below
     } finally {
       isEditEventLoading.value = false
     }
 
-    // Fallback: find in local store (handles session-edited events where GET returns null)
     if (!ev) {
       const allEvents = eventsStore.boostEvents?.flatMap((g) => g.events) ?? []
       ev = allEvents.find((e) => e.id === eventId) ?? null
@@ -255,8 +250,6 @@ export const useBoost = () => {
     if (!tabId || !sessionId) return
 
     const { formatToUTC, acceptAsTimeZone } = useTimeZoneHelper()
-
-    // merge date + time fields into ISO datetime
     const dateTimeStr = `${form.startDate}T${String(form.time.hours).padStart(2, '0')}:${String(form.time.minutes).padStart(2, '0')}:${String(form.time.seconds).padStart(2, '0')}`
     const certDateTimeStr = form.certifiedDate
       ? `${form.certifiedDate}T${String(form.certifiedTime.hours).padStart(2, '0')}:${String(form.certifiedTime.minutes).padStart(2, '0')}:${String(form.certifiedTime.seconds).padStart(2, '0')}`
@@ -293,7 +286,6 @@ export const useBoost = () => {
       isEditEventLoading.value = false
     }
   }
-  // ─── Edit Daily Form ─────────────────────────────────────────────────────────
   const showEditDailyFormModal = ref(false)
   const isEditDailyFormLoading = ref(false)
 
@@ -407,7 +399,6 @@ export const useBoost = () => {
       isEditDailyFormLoading.value = false
     }
   }
-  // ─── DOT Inspection Alert ────────────────────────────────────────────────────
   const dotInspectionAlert = computed(() => {
     const all = (eventsStore.boostEvents ?? []).flatMap((g) => g.events ?? [])
     return all.some((ev: any) => ev.isDOTInspected || ev.IsDOTInspected)
@@ -435,9 +426,7 @@ export const useBoost = () => {
       isDotInspectionLoading.value = false
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
-  // ─── Multi Update Events ─────────────────────────────────────────────────────
   const multiUpdateModalOpen = ref(false)
   const isMultiUpdateLoading = ref(false)
 
@@ -481,7 +470,6 @@ export const useBoost = () => {
       isMultiUpdateLoading.value = false
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
   const selectedMoveEventsCount = computed(() => {
     const tabId = tabsStore.selectedTab?.id
@@ -543,7 +531,6 @@ export const useBoost = () => {
   }
 
   const getChartWidth = (width: number) => {
-    // backend expects screenResolution for graph normalization
     screenResolution.value = Math.max(320, Math.floor(width || screenResolution.value))
   }
 
@@ -593,7 +580,6 @@ export const useBoost = () => {
         eventsDurations: eventsStore.selectedMoveEventsDurations ?? [],
       })
 
-      // clear selections after move
       eventsStore.selectedMoveEvents[tabId] = []
       eventsStore.selectedMoveEventsDurations = []
 
@@ -668,7 +654,6 @@ export const useBoost = () => {
       dailyFormStore.getEditDriverDailyForms({ tabId, sessionId }, signal),
     ])
 
-    // keep tab type synced (like RouteApp)
     if (
       typeof tabType === 'number' &&
       tabsStore.selectedTab &&
@@ -704,7 +689,6 @@ export const useBoost = () => {
 
     if (!sessionsStore.sessionId) return
 
-    // Fetch full session to read isSubmitted state from backend
     await sessionsStore.getSession(sessionsStore.sessionId)
     isBoostEventsSubmitted.value = sessionsStore.session?.isSubmitted ?? false
 
@@ -720,11 +704,9 @@ export const useBoost = () => {
     isSubmitLoading.value = true
     try {
       if (isBoostEventsSubmitted.value) {
-        // Rollback
         await eventsStore.rollbackBoostEvents(sessionsStore.sessionId)
         isBoostEventsSubmitted.value = false
       } else {
-        // Confirm if DOT inspection is active
         if (dotInspectionAlert.value) {
           const ok = window.confirm('Are you sure you want to submit this DOT events?')
           if (!ok) return
@@ -766,7 +748,6 @@ export const useBoost = () => {
     const sessionId = sessionsStore.sessionId
     if (!tabId || !sessionId) return
 
-    // Try local store first, fallback to API
     let ev: BoostEventResponse | null | undefined = findEventInStore(targetEventId)
     if (!ev) {
       try {
@@ -874,19 +855,6 @@ export const useBoost = () => {
     }
   }
 
-  async function optimizeSelectedCategories(selectedCategoryIds: string[]) {
-    const tabId = tabsStore.selectedTab?.id
-    const sessionId = sessionsStore.sessionId
-    if (!tabId || !sessionId) return
-    const cats = optimizeStore.optimizeCategories.filter((c) => selectedCategoryIds.includes(c.id))
-    await optimizeStore.optimizeSelectedCategories({
-      sessionId,
-      tabId,
-      eventCategoryInfos: cats,
-    })
-    await getBoostActions(4)
-  }
-
   async function setTabType(tabType: number) {
     if (!tabsStore.selectedTab) return
     await getBoostActions(tabType)
@@ -908,7 +876,6 @@ export const useBoost = () => {
   }
 
   onMounted(async () => {
-    // URL da fromDate/toDate yo'q bo'lsa, initial qiymatlarni darhol yozib qo'yamiz
     if (!route.query.fromDate || !route.query.toDate) {
       await router.replace({
         query: {
@@ -919,7 +886,6 @@ export const useBoost = () => {
       })
     }
 
-    await optimizeStore.getOptimizeCategories()
     await fetchDriverInfo()
 
     if (route.query.sessionId) {
@@ -937,7 +903,6 @@ export const useBoost = () => {
       await loadBoostEvents(false)
     }
 
-    // ─── Register URL sync watcher after init to avoid double-load ───────────
     watch(headerDate, async (newVal) => {
       const [from, to] = newVal
       await router.replace({
@@ -1013,11 +978,7 @@ export const useBoost = () => {
     isGraphLoading: computed(() => eventsStore.isBoostGraphLoading),
     isDailyEventsLoading: computed(() => eventsStore.isBoostEventsLoading),
 
-    // pin times (reset points) – used by CBoostGraph to compute violation block widths
     pinTimes: computed(() => eventsStore.pinTimes),
-
-    // optimize
-    optimizeCategories: computed(() => optimizeStore.optimizeCategories),
 
     // methods
     getChartWidth,
@@ -1031,7 +992,6 @@ export const useBoost = () => {
     deleteBoostEvent,
     deleteSelectedBoostEvents,
     dropProperty,
-    optimizeSelectedCategories,
     setTabType,
     addNewTab,
 

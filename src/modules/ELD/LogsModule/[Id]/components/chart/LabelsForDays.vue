@@ -26,7 +26,6 @@
 </template>
 
 <script lang="ts" setup>
-// Props
 import { computed } from 'vue'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 
@@ -49,10 +48,8 @@ const props = defineProps({
   },
 })
 
-// dark
 const { isDarkMode } = useDarkMode()
 
-// Generate the hour label based on count and day names
 const generateHourLabel = (hour, dayNames) => {
   const adjustedHour = hour % 24
   if (adjustedHour === 0 && dayNames?.length > 0) {
@@ -64,7 +61,6 @@ const generateHourLabel = (hour, dayNames) => {
   }
 }
 
-// Computed property for generated labels
 const generatedLabels = computed(() => {
   return Array.from({ length: props.count }, (_, i) => {
     const label = generateHourLabel(i, props.dayNames)
