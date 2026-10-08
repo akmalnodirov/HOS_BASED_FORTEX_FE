@@ -41,7 +41,9 @@ const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilte
 </script>
 
 <template>
-  <div class="flex min-h-[calc(100vh-65px)] flex-col bg-white p-4 dark:bg-background sm:p-6">
+  <div
+    class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-4 dark:bg-background sm:p-6"
+  >
     <div class="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
         <h2 class="text-xl font-semibold text-foreground">Logs</h2>

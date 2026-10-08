@@ -90,7 +90,7 @@ const openDriver = (driverId: string, date = localDate()) => {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex min-h-0 flex-col overflow-hidden">
     <div
       v-if="error"
       class="flex min-h-48 flex-1 flex-col items-center justify-center rounded-lg border border-border bg-card"
@@ -103,53 +103,52 @@ const openDriver = (driverId: string, date = localDate()) => {
     </div>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
-      <table class="min-w-[1900px] w-full border-collapse text-left text-sm">
+      <table class="w-full min-w-[1320px] table-fixed border-collapse text-left text-sm">
         <thead class="sticky top-0 z-20 bg-muted text-xs uppercase text-muted-foreground">
           <tr>
-            <th class="w-10 px-3 py-3"></th>
-            <th class="w-14 px-3 py-3">No</th>
-            <th class="min-w-52 px-3 py-3">
+            <th class="w-[40px] px-2 py-3"></th>
+            <th class="w-[48px] px-2 py-3">No</th>
+            <th class="w-[190px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('displayName')">
                 Driver
                 <component :is="getSortIcon('displayName')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="min-w-10 px-3 py-3">
+            <th class="w-[64px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('vehicleUnitName')">
                 Unit
                 <component :is="getSortIcon('vehicleUnitName')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="min-w-25 px-3 py-3">
+            <th class="w-[110px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('currentStatus')">
                 Event
                 <component :is="getSortIcon('currentStatus')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="w-15 px-3 py-3">VAN</th>
-            <th class="min-w-50 px-3 py-3">
+            <th class="w-[200px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('location')">
                 Latest location
                 <component :is="getSortIcon('location')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="min-w-30 px-3 py-3">
+            <th class="w-[155px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('statusAt')">
                 Last status
                 <component :is="getSortIcon('statusAt')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="min-w-24 px-3 py-3">Break</th>
-            <th class="min-w-24 px-3 py-3">Driving</th>
-            <th class="min-w-24 px-3 py-3">Shift</th>
-            <th class="min-w-24 px-3 py-3">Cycle</th>
-            <th class="min-w-15 px-3 py-3">
+            <th class="w-[85px] px-2 py-3">Break</th>
+            <th class="w-[85px] px-2 py-3">Driving</th>
+            <th class="w-[85px] px-2 py-3">Shift</th>
+            <th class="w-[85px] px-2 py-3">Cycle</th>
+            <th class="w-[90px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('violationCount')">
                 Violation
                 <component :is="getSortIcon('violationCount')" class="h-3.5 w-3.5" />
               </button>
             </th>
-            <th class="min-w-32 px-3 py-3">
+            <th class="w-[130px] px-2 py-3">
               <button class="flex items-center gap-1" @click="handleSort('connectionStatus')">
                 ELD
                 <component :is="getSortIcon('connectionStatus')" class="h-3.5 w-3.5" />
@@ -161,7 +160,7 @@ const openDriver = (driverId: string, date = localDate()) => {
         <tbody>
           <template v-if="loading">
             <tr v-for="index in 8" :key="index" class="border-t border-border">
-              <td v-for="column in 17" :key="column" class="px-3 py-4">
+              <td v-for="column in 13" :key="column" class="px-2 py-4">
                 <Skeleton class="h-4 w-full min-w-8" />
               </td>
             </tr>
@@ -173,25 +172,30 @@ const openDriver = (driverId: string, date = localDate()) => {
               :class="isRowExpanded(log.driverId) && 'bg-muted/30'"
               @click="openDriver(log.driverId)"
             >
-              <td class="px-3 py-4" @click.stop="toggleRow(log.driverId)">
-                <button type="button" class="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+              <td class="px-2 py-4" @click.stop="toggleRow(log.driverId)">
+                <button
+                  type="button"
+                  class="flex h-7 w-7 items-center justify-center rounded hover:bg-muted"
+                >
                   <ChevronDown
                     class="h-4 w-4 text-muted-foreground transition-transform"
                     :class="!isRowExpanded(log.driverId) && '-rotate-90'"
                   />
                 </button>
               </td>
-              <td class="px-3 py-4 text-muted-foreground">
+              <td class="px-2 py-4 text-muted-foreground">
                 {{ (currentPage - 1) * itemsPerPage + index + 1 }}
               </td>
-              <td class="px-3 py-4">
-                <div class="font-medium text-foreground">{{ log.displayName }}</div>
-                <div class="mt-0.5 text-xs text-muted-foreground">
+              <td class="px-2 py-4">
+                <div class="truncate font-medium text-foreground" :title="log.displayName">
+                  {{ log.displayName }}
+                </div>
+                <div class="mt-0.5 truncate text-xs text-muted-foreground">
                   {{ log.email || log.phoneNumber || 'No contact information' }}
                 </div>
               </td>
-              <td class="px-3 py-4">{{ log.vehicleUnitName || '—' }}</td>
-              <td class="px-3 py-4">
+              <td class="truncate px-2 py-4">{{ log.vehicleUnitName || '—' }}</td>
+              <td class="px-2 py-4">
                 <span
                   class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
                   :class="getEventBadgeClass(log.currentStatus)"
@@ -199,8 +203,7 @@ const openDriver = (driverId: string, date = localDate()) => {
                   {{ log.currentStatus }}
                 </span>
               </td>
-              <td class="px-3 py-4">{{ log.hasVan ? 'Yes' : 'No' }}</td>
-              <td class="max-w-50 px-3 py-4">
+              <td class="px-2 py-4">
                 <div class="truncate" :title="log.location || ''">
                   {{ log.location || 'No location yet' }}
                 </div>
@@ -218,20 +221,20 @@ const openDriver = (driverId: string, date = localDate()) => {
                   {{ log.lastSyncError }}
                 </div>
               </td>
-              <td class="whitespace-nowrap px-3 py-4">{{ formatDate(log.statusAt) }}</td>
-              <td class="whitespace-nowrap px-3 py-4 font-medium tabular-nums">
+              <td class="whitespace-nowrap px-2 py-4">{{ formatDate(log.statusAt) }}</td>
+              <td class="whitespace-nowrap px-2 py-4 font-medium tabular-nums">
                 {{ formatClock(log.break) }}
               </td>
-              <td class="whitespace-nowrap px-3 py-4 font-medium tabular-nums">
+              <td class="whitespace-nowrap px-2 py-4 font-medium tabular-nums">
                 {{ formatClock(log.drive) }}
               </td>
-              <td class="whitespace-nowrap px-3 py-4 font-medium tabular-nums">
+              <td class="whitespace-nowrap px-2 py-4 font-medium tabular-nums">
                 {{ formatClock(log.shift) }}
               </td>
-              <td class="whitespace-nowrap px-3 py-4 font-medium tabular-nums">
+              <td class="whitespace-nowrap px-2 py-4 font-medium tabular-nums">
                 {{ formatClock(log.cycle) }}
               </td>
-              <td class="px-3 py-4">
+              <td class="px-2 py-4">
                 <span
                   class="font-medium"
                   :class="log.violationCount ? 'text-destructive' : 'text-emerald-600'"
@@ -239,9 +242,9 @@ const openDriver = (driverId: string, date = localDate()) => {
                   {{ log.violationCount }}
                 </span>
               </td>
-              <td class="px-3 py-4">
+              <td class="px-2 py-4">
                 <span
-                  class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                  class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
                   :class="getConnectionBadgeClass(log.connectionStatus)"
                 >
                   {{ formatConnection(log.connectionStatus) }}
@@ -250,7 +253,7 @@ const openDriver = (driverId: string, date = localDate()) => {
             </tr>
 
             <tr v-if="isRowExpanded(log.driverId)" class="border-t border-border bg-muted/20">
-              <td colspan="17" class="p-4">
+              <td colspan="13" class="p-4">
                 <div class="overflow-hidden rounded-lg border border-border bg-background">
                   <div class="flex items-center justify-between border-b border-border px-4 py-3">
                     <div>
@@ -359,7 +362,7 @@ const openDriver = (driverId: string, date = localDate()) => {
           </template>
 
           <tr v-if="!loading && paginatedLogs.length === 0">
-            <td colspan="17" class="h-32 text-center text-muted-foreground">
+            <td colspan="13" class="h-32 text-center text-muted-foreground">
               No Route ELD logs found.
             </td>
           </tr>

@@ -23,6 +23,7 @@ export function useVehicles() {
   const totalCount = ref(0)
   const isLoading = ref(false)
   const searchQuery = ref('')
+  const statusFilter = ref<'all' | 'active' | 'inactive'>('all')
   const sorting = useSorting<SortKey>({ defaultKey: 'id', defaultOrder: 'asc' })
   const pagination = usePagination(totalCount, { itemsPerPage: 10 })
   const debouncedSearch = useDebounce(searchQuery, 300, pagination.resetPage)
@@ -34,7 +35,7 @@ export function useVehicles() {
         companyId: getCompanyId(),
         pageNumber: pagination.currentPage.value,
         pageSize: pagination.itemsPerPage.value,
-        status: null,
+        status: statusFilter.value === 'all' ? null : statusFilter.value === 'active',
       })
       const result = response.data?.successResult
       totalCount.value = result?.totalCount ?? 0
@@ -72,12 +73,20 @@ export function useVehicles() {
   })
 
   watch([() => pagination.currentPage.value, () => pagination.itemsPerPage.value], fetchVehicles)
+  watch(statusFilter, async () => {
+    if (pagination.currentPage.value !== 1) {
+      pagination.resetPage()
+      return
+    }
+    await fetchVehicles()
+  })
   onMounted(fetchVehicles)
 
   return {
     allVehicles,
     isLoading,
     searchQuery,
+    statusFilter,
     currentPage: pagination.currentPage,
     itemsPerPage: pagination.itemsPerPage,
     totalPages: pagination.totalPages,

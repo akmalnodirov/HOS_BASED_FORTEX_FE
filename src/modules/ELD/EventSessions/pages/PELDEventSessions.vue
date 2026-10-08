@@ -1,12 +1,10 @@
 <template>
   <div
-    class="min-h-screen bg-white p-[16px_24px] dark:bg-background"
+    class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background"
   >
-    <div class="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <div class="mb-5 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Event sessions
-        </h1>
+        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Event sessions</h1>
         <p class="mt-1 text-sm text-muted-foreground">
           Review local Route ELD workspaces, submissions and rollbacks
         </p>
@@ -60,7 +58,7 @@
       </div>
     </div>
 
-    <div class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="mb-3 grid flex-none grid-cols-2 gap-3 sm:grid-cols-4">
       <button
         type="button"
         :class="summaryCardClass(statusFilter === 'ALL')"
@@ -101,13 +99,15 @@
 
     <div
       v-if="pageError"
-      class="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+      class="mb-3 flex-none rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
     >
       {{ pageError }}
     </div>
 
-    <div class="rounded-lg bg-white shadow-sm dark:bg-card">
-      <div class="overflow-x-auto [&>div]:overflow-visible">
+    <div
+      class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-white shadow-sm dark:bg-card"
+    >
+      <div class="min-h-0 flex-1 overflow-auto [&>div]:overflow-visible">
         <Table class="min-w-[980px]">
           <TableHeader class="sticky top-0 z-20">
             <TableRow
@@ -246,10 +246,7 @@
             </TableRow>
 
             <TableRow v-if="!isLoading && sessions.length === 0">
-              <TableCell 
-                colspan="11" 
-                class="h-28 text-center text-muted-foreground"
-              >
+              <TableCell colspan="11" class="h-28 text-center text-muted-foreground">
                 No event sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -258,15 +255,13 @@
       </div>
 
       <div
-        class="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-border"
+        class="flex flex-none flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-border sm:flex-row sm:items-center sm:justify-between"
       >
         <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            Display on page
-          </span>
+          <span class="text-sm text-gray-600 dark:text-gray-400"> Display on page </span>
 
           <Select :model-value="String(pageSize)" @update:model-value="changePageSize">
-            <SelectTrigger class="w-20"><SelectValue /></SelectTrigger>
+            <SelectTrigger class="h-9 w-20"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="10">10</SelectItem>
               <SelectItem value="25">25</SelectItem>
@@ -279,28 +274,28 @@
           >
         </div>
 
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1">
+        <div class="flex items-center gap-3">
+          <div class="hidden items-center gap-1 md:flex">
             <button
               v-for="pageValue in pageNumbers"
               :key="pageValue"
               :disabled="pageValue === '...'"
               :class="[
-                'h-8 min-w-8 rounded px-2 text-sm font-medium transition-colors',
+                'h-8 min-w-8 rounded px-2 text-sm transition-colors',
                 pageValue === pageNumber
-                  ? 'bg-gray-900 text-white dark:bg-gray-700'
+                  ? 'bg-primary text-primary-foreground'
                   : pageValue === '...'
-                    ? 'cursor-default text-gray-400'
-                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+                    ? 'cursor-default text-muted-foreground'
+                    : 'hover:bg-muted',
               ]"
               @click="typeof pageValue === 'number' && (pageNumber = pageValue)"
             >
               {{ pageValue }}
             </button>
           </div>
-          <div class="ml-3 flex items-center gap-2">
-            <span class="text-sm text-gray-600 dark:text-gray-400"
-              >{{ pageNumber }} of {{ totalPages }} pages</span
+          <div class="flex items-center gap-2">
+            <span class="whitespace-nowrap text-sm text-muted-foreground"
+              >{{ totalCount ? pageNumber : 0 }} of {{ totalPages }} pages</span
             >
             <Button
               variant="outline"

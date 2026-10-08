@@ -1,6 +1,5 @@
 <!-- src/components/drivers/DriversTable.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import {
   Table,
@@ -12,10 +11,12 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import SortIcon from '@/components/icons/SortIcon.vue'
-import { Driver, SortKey, SortOrder } from '../types'
+import type { Driver, SortKey, SortOrder } from '../types'
 
 interface Props {
   drivers: Driver[]
+  currentPage: number
+  itemsPerPage: number
   sortKey: SortKey
   sortOrder: SortOrder
 }
@@ -29,10 +30,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="overflow-x-auto">
-    <Table>
-      <TableHeader>
-        <TableRow class="bg-[#f0f0f0] dark:bg-muted/50 border-0 hover:bg-[#f0f0f0] dark:hover:bg-muted/50">
+  <div
+    class="min-h-0 overflow-auto rounded-lg border border-border bg-card [&>div]:overflow-visible"
+  >
+    <Table class="min-w-[980px]">
+      <TableHeader class="sticky top-0 z-20">
+        <TableRow
+          class="border-0 bg-[#f0f0f0] hover:bg-[#f0f0f0] dark:bg-muted/50 dark:hover:bg-muted/50"
+        >
           <TableHead class="w-16">
             <button
               @click="emit('sort', 'id')"
@@ -105,9 +110,11 @@ const emit = defineEmits<{
         <TableRow
           v-for="(driver, index) in drivers"
           :key="driver.id"
-          class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          class="h-12 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
         >
-          <TableCell class="font-medium p-2">{{ index + 1 }}</TableCell>
+          <TableCell class="p-2 font-medium">
+            {{ (currentPage - 1) * itemsPerPage + index + 1 }}
+          </TableCell>
           <TableCell class="p-2">{{ driver.name }}</TableCell>
           <TableCell class="p-2">{{ driver.unit }}</TableCell>
           <TableCell class="p-2">{{ driver.username }}</TableCell>

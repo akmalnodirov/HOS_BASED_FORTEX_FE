@@ -1,12 +1,10 @@
 <template>
-  <div class="min-h-screen bg-white p-[16px_24px] dark:bg-background">
-    <div
-      class="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"
-    >
+  <div
+    class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background"
+  >
+    <div class="mb-5 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          IFTA reports
-        </h1>
+        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">IFTA reports</h1>
         <p class="mt-1 text-sm text-muted-foreground">
           Mileage by state per vehicle for a selected period
         </p>
@@ -37,45 +35,33 @@
           <RefreshCw :class="['mr-2 h-4 w-4', isRefreshing && 'animate-spin']" />
           Refresh
         </Button>
-        <Button
-          class="h-10"
-          :disabled="!companyId"
-          @click="generateOpen = true"
-        >
+        <Button class="h-10" :disabled="!companyId" @click="generateOpen = true">
           <Plus class="mr-2 h-4 w-4" />
           Generate report(s)
         </Button>
       </div>
     </div>
-    <div class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="mb-3 grid flex-none grid-cols-2 gap-3 sm:grid-cols-4">
       <div class="rounded-md border border-[#E6E6E6] px-4 py-3 dark:border-border">
-        <div class="text-xs text-[#666] dark:text-muted-foreground">
-          Reports
-        </div>
+        <div class="text-xs text-[#666] dark:text-muted-foreground">Reports</div>
         <div class="text-2xl font-semibold">
           {{ reports.length }}
         </div>
       </div>
       <div class="rounded-md border border-[#E6E6E6] px-4 py-3 dark:border-border">
-        <div class="text-xs text-[#666] dark:text-muted-foreground">
-          Ready
-        </div>
+        <div class="text-xs text-[#666] dark:text-muted-foreground">Ready</div>
         <div class="text-2xl font-semibold text-[#589E67]">
           {{ counts.ready }}
         </div>
       </div>
       <div class="rounded-md border border-[#E6E6E6] px-4 py-3 dark:border-border">
-        <div class="text-xs text-[#666] dark:text-muted-foreground">
-          Processing
-        </div>
+        <div class="text-xs text-[#666] dark:text-muted-foreground">Processing</div>
         <div class="text-2xl font-semibold text-foreground">
           {{ counts.processing }}
         </div>
       </div>
       <div class="rounded-md border border-[#E6E6E6] px-4 py-3 dark:border-border">
-        <div class="text-xs text-[#666] dark:text-muted-foreground">
-          Waiting
-        </div>
+        <div class="text-xs text-[#666] dark:text-muted-foreground">Waiting</div>
         <div class="text-2xl font-semibold text-amber-600">
           {{ counts.waiting }}
         </div>
@@ -83,14 +69,16 @@
     </div>
     <div
       v-if="error"
-      class="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+      class="mb-3 flex-none rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
     >
       {{ error }}
     </div>
-    <div class="rounded-lg bg-white shadow-sm dark:bg-card">
-      <div class="overflow-x-auto [&>div]:overflow-visible">
+    <div
+      class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-white shadow-sm dark:bg-card"
+    >
+      <div class="min-h-0 flex-1 overflow-auto [&>div]:overflow-visible">
         <Table class="min-w-[980px]">
-          <TableHeader>
+          <TableHeader class="sticky top-0 z-20">
             <TableRow
               class="border-0 bg-[#F0F0F0] hover:bg-[#F0F0F0] dark:bg-muted/50 dark:hover:bg-muted/50"
             >
@@ -105,61 +93,36 @@
                   "
                   @click="toggleSelectAll"
                 >
-                  <Check
-                    v-if="allSelected"
-                    class="h-3 w-3"
-                  />
+                  <Check v-if="allSelected" class="h-3 w-3" />
                 </button>
               </TableHead>
-              <TableHead
-                class="cursor-pointer select-none"
-                @click="setSort('timeSubmitted')"
-              >
+              <TableHead class="cursor-pointer select-none" @click="setSort('timeSubmitted')">
                 Submitted
                 <ArrowUpDown class="ml-1 inline h-3 w-3" />
               </TableHead>
-              <TableHead
-                class="cursor-pointer select-none"
-                @click="setSort('fromDate')"
-              >
+              <TableHead class="cursor-pointer select-none" @click="setSort('fromDate')">
                 From
                 <ArrowUpDown class="ml-1 inline h-3 w-3" />
               </TableHead>
-              <TableHead
-                class="cursor-pointer select-none"
-                @click="setSort('toDate')"
-              >
+              <TableHead class="cursor-pointer select-none" @click="setSort('toDate')">
                 To
                 <ArrowUpDown class="ml-1 inline h-3 w-3" />
               </TableHead>
-              <TableHead
-                class="cursor-pointer select-none"
-                @click="setSort('vehicleName')"
-              >
+              <TableHead class="cursor-pointer select-none" @click="setSort('vehicleName')">
                 Vehicle
                 <ArrowUpDown class="ml-1 inline h-3 w-3" />
               </TableHead>
-              <TableHead>
-                States
-              </TableHead>
-              <TableHead
-                class="cursor-pointer select-none"
-                @click="setSort('status')"
-              >
+              <TableHead> States </TableHead>
+              <TableHead class="cursor-pointer select-none" @click="setSort('status')">
                 Status
                 <ArrowUpDown class="ml-1 inline h-3 w-3" />
               </TableHead>
-              <TableHead class="w-20 text-center">
-                Actions
-              </TableHead>
+              <TableHead class="w-20 text-center"> Actions </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow v-if="isLoading">
-              <TableCell
-                colspan="8"
-                class="h-28 text-center text-muted-foreground"
-              >
+              <TableCell colspan="8" class="h-28 text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
@@ -180,10 +143,7 @@
                   "
                   @click="onRowCheck(index, $event)"
                 >
-                  <Check
-                    v-if="selectedIds.has(report.id)"
-                    class="h-3 w-3"
-                  />
+                  <Check v-if="selectedIds.has(report.id)" class="h-3 w-3" />
                 </button>
               </TableCell>
               <TableCell class="whitespace-nowrap">
@@ -199,11 +159,7 @@
                 {{ report.vehicleName || report.vehicleId }}
               </TableCell>
               <TableCell class="text-xs text-muted-foreground">
-                {{
-                  report.states.length
-                    ? report.states.join(', ')
-                    : 'All available states'
-                }}
+                {{ report.states.length ? report.states.join(', ') : 'All available states' }}
               </TableCell>
               <TableCell>
                 <span :class="statusClass(report.status)">
@@ -224,10 +180,7 @@
               </TableCell>
             </TableRow>
             <TableRow v-if="!isLoading && !paginatedReports.length">
-              <TableCell
-                colspan="8"
-                class="h-28 text-center text-muted-foreground"
-              >
+              <TableCell colspan="8" class="h-28 text-center text-muted-foreground">
                 No IFTA reports for this company.
               </TableCell>
             </TableRow>
@@ -235,14 +188,12 @@
         </Table>
       </div>
       <div
-        class="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-border"
+        class="flex flex-none flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-border sm:flex-row sm:items-center sm:justify-between"
       >
         <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            Display on page
-          </span>
+          <span class="text-sm text-gray-600 dark:text-gray-400"> Display on page </span>
           <Select v-model="itemsPerPage">
-            <SelectTrigger class="w-20">
+            <SelectTrigger class="h-9 w-20">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -256,33 +207,33 @@
             {{ filteredReports.length.toLocaleString() }} entries
           </span>
         </div>
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1">
+        <div class="flex items-center gap-3">
+          <div class="hidden items-center gap-1 md:flex">
             <button
               v-for="page in pageNumbers"
               :key="page"
               @click="typeof page === 'number' && goToPage(page)"
               :disabled="page === '...'"
               :class="[
-                'min-w-[32px] h-8 px-2 text-sm font-medium rounded transition-colors',
+                'h-8 min-w-8 rounded px-2 text-sm transition-colors',
                 page === currentPage
-                  ? 'bg-gray-900 dark:bg-gray-700 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : page === '...'
-                    ? 'text-gray-400 dark:text-gray-500 cursor-default'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
+                    ? 'cursor-default text-muted-foreground'
+                    : 'hover:bg-muted',
               ]"
             >
               {{ page }}
             </button>
           </div>
-          <div class="ml-4 flex items-center gap-2">
-            <span class="text-sm text-gray-600 dark:text-gray-400">
-              {{ currentPage }} of {{ totalPages }} pages
+          <div class="flex items-center gap-2">
+            <span class="whitespace-nowrap text-sm text-muted-foreground">
+              {{ filteredReports.length ? currentPage : 0 }} of {{ totalPages }} pages
             </span>
             <div class="flex gap-1">
               <Button
                 @click="goToPage(currentPage - 1)"
-                :disabled="currentPage === 1"
+                :disabled="currentPage <= 1"
                 variant="outline"
                 size="icon"
                 class="h-8 w-8"
@@ -291,7 +242,7 @@
               </Button>
               <Button
                 @click="goToPage(currentPage + 1)"
-                :disabled="currentPage === totalPages"
+                :disabled="currentPage >= totalPages"
                 variant="outline"
                 size="icon"
                 class="h-8 w-8"
@@ -370,9 +321,7 @@ const companyId = getCompanyId() || ''
 const { companies } = useCompanies()
 
 const companyName = computed(
-  () =>
-    companies.value.find((company) => company.id === companyId)?.name ||
-    'Selected company'
+  () => companies.value.find((company) => company.id === companyId)?.name || 'Selected company'
 )
 
 const {
@@ -398,18 +347,11 @@ const statusFilter = ref<string[]>([])
 
 const counts = computed(() => ({
   ready: reports.value.filter((report) => report.status === 'READY').length,
-  processing: reports.value.filter(
-    (report) => report.status === 'PROCESSING'
-  ).length,
+  processing: reports.value.filter((report) => report.status === 'PROCESSING').length,
   waiting: reports.value.filter((report) => report.status === 'WAITING').length,
 }))
 
-type SortKey =
-  | 'timeSubmitted'
-  | 'fromDate'
-  | 'toDate'
-  | 'vehicleName'
-  | 'status'
+type SortKey = 'timeSubmitted' | 'fromDate' | 'toDate' | 'vehicleName' | 'status'
 
 const sortKey = ref<SortKey>('timeSubmitted')
 const sortDirection = ref<'asc' | 'desc'>('desc')
@@ -417,9 +359,7 @@ const sortDirection = ref<'asc' | 'desc'>('desc')
 const filteredReports = computed(() => {
   const statuses = new Set(statusFilter.value)
 
-  const values = reports.value.filter(
-    (report) => !statuses.size || statuses.has(report.status)
-  )
+  const values = reports.value.filter((report) => !statuses.size || statuses.has(report.status))
 
   const factor = sortDirection.value === 'asc' ? 1 : -1
 
@@ -447,9 +387,7 @@ const pagination = usePagination(
   { itemsPerPage: 10 }
 )
 
-const paginatedReports = computed(() =>
-  pagination.paginateData(filteredReports.value)
-)
+const paginatedReports = computed(() => pagination.paginateData(filteredReports.value))
 
 const selectedIds = ref<Set<string>>(new Set())
 const anchorIndex = ref<number | null>(null)
@@ -457,9 +395,7 @@ const anchorIndex = ref<number | null>(null)
 const allSelected = computed(
   () =>
     paginatedReports.value.length > 0 &&
-    paginatedReports.value.every((report) =>
-      selectedIds.value.has(report.id)
-    )
+    paginatedReports.value.every((report) => selectedIds.value.has(report.id))
 )
 
 const generateOpen = ref(false)
@@ -470,10 +406,7 @@ const downloadReport = ref<IftaApiResponse | null>(null)
 
 const selectedReadyReports = computed(() =>
   filteredReports.value.filter(
-    (report) =>
-      selectedIds.value.has(report.id) &&
-      report.status === 'READY' &&
-      report.csvUrl
+    (report) => selectedIds.value.has(report.id) && report.status === 'READY' && report.csvUrl
   )
 )
 
@@ -489,12 +422,10 @@ watch(
 
 function setSort(key: SortKey) {
   if (sortKey.value === key) {
-    sortDirection.value =
-      sortDirection.value === 'asc' ? 'desc' : 'asc'
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortKey.value = key
-    sortDirection.value =
-      key === 'timeSubmitted' ? 'desc' : 'asc'
+    sortDirection.value = key === 'timeSubmitted' ? 'desc' : 'asc'
   }
 
   anchorIndex.value = null
@@ -538,13 +469,9 @@ function toggleSelectAll() {
   const next = new Set(selectedIds.value)
 
   if (allSelected.value) {
-    paginatedReports.value.forEach((report) =>
-      next.delete(report.id)
-    )
+    paginatedReports.value.forEach((report) => next.delete(report.id))
   } else {
-    paginatedReports.value.forEach((report) =>
-      next.add(report.id)
-    )
+    paginatedReports.value.forEach((report) => next.add(report.id))
   }
 
   selectedIds.value = next
