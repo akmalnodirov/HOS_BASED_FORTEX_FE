@@ -6,7 +6,7 @@ import ELDRoutes from '@/modules/ELD/router'
 import VehicleRoutes from '@/modules/Vehicles/router'
 import DriverRoutes from '@/modules/Drivers/router'
 import IftaRoutes from '@/modules/Ifta/router'
-import DvirRoutes from '@/modules/Dvir/router'
+import RouteEldAlertRoutes from '@/modules/RouteEldAlerts/router'
 import CompanyRoutes from '@/modules/Company/router'
 import PortalUserRoutes from '@/modules/PortalUsers/router'
 import ToolsRoutes from '@/modules/Tools/router'
@@ -31,7 +31,7 @@ const router = createRouter({
         ...VehicleRoutes,
         ...DriverRoutes,
         ...IftaRoutes,
-        ...DvirRoutes,
+        ...RouteEldAlertRoutes,
         ...CompanyRoutes,
         ...PortalUserRoutes,
         ...ToolsRoutes,

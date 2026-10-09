@@ -1,35 +1,36 @@
-// src/types/dotInspection.ts
+import type { SortOrder } from '@/utils/sort'
+
 export interface DotInspection {
   id: string
-  clientId: string
-  clientName: string
-  companyId: string
-  companyName: string
   driverId: string
   driverName: string
-  startDate: string
-  endDate: string
-  description: string
-  status: number
-  dateTime: string
+  companyId: string
+  companyName: string
+  fromDate: string
+  toDate: string
+  description: string | null
+  isEnabled: boolean
+  createdAt: string
 }
 
-export interface DotInspectionListResponse {
-  successResult: {
-    data: DotInspection[]
-    totalCount: number
-  }
+export interface RouteEldDriverOption {
+  id: string
+  externalCompanyId: string
+  externalCompanyName: string
+  externalDriverId: string
+  displayName: string
+  email: string | null
+  phoneNumber: string | null
 }
 
 export interface CreateDotInspectionRequest {
-  companyId: string
   driverId: string
-  startDate: string
-  endDate: string
-  description: string
-  status: number
+  fromDate: string
+  toDate: string
+  description: string | null
 }
 
-export interface UpdateDotInspectionStatusRequest {
-  status: number
-}
+export type DotInspectionStatusFilter = 'all' | 'enabled' | 'disabled'
+export type DotInspectionSortKey =
+  'driverName' | 'fromDate' | 'toDate' | 'description' | 'isEnabled' | 'createdAt'
+export type { SortOrder }

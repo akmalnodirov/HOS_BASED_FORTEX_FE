@@ -220,6 +220,16 @@ export class ApiEndpoints {
     `${this.BASE_URL}/route-eld/drivers/${id}/signature?file=${encodeURIComponent(file)}`
   static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
     `${ApiEndpoints.ROUTE_ELD_COMPANIES}/${id}/select`
+  static readonly ROUTE_ELD_DOT_INSPECTIONS = `${this.BASE_URL}/route-eld/dot-inspections`
+  static readonly ROUTE_ELD_DOT_INSPECTION = (id: string) =>
+    `${this.ROUTE_ELD_DOT_INSPECTIONS}/${id}`
+  static readonly ROUTE_ELD_DOT_INSPECTION_STATUS = (id: string) =>
+    `${this.ROUTE_ELD_DOT_INSPECTION(id)}/status`
+  static readonly ROUTE_ELD_STATION_ALERTS = `${this.BASE_URL}/route-eld/alerts`
+  static readonly ROUTE_ELD_STATION_ALERT_READ = (id: string) =>
+    `${this.ROUTE_ELD_STATION_ALERTS}/${id}/read`
+  static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
+  static readonly ROUTE_ELD_VIOLATION_ALERTS = `${this.BASE_URL}/route-eld/violation-alerts`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`

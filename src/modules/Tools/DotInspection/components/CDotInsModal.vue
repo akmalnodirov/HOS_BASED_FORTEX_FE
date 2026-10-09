@@ -1,11 +1,13 @@
-<!-- src/components/dotInspection/CreateDotModal.vue -->
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import { Calendar } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Calendar as CalendarIcon } from 'lucide-vue-next'
+import { CalendarDate } from '@internationalized/date'
+import { computed, ref, watch } from 'vue'
+import type { DateRange } from 'reka-ui'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { RangeCalendar } from '@/components/ui/range-calendar'
 import {
   Select,
   SelectContent,
@@ -13,340 +15,196 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { RangeCalendar } from '@/components/ui/range-calendar'
-import type { CreateDotInspectionRequest } from '@/modules/Tools/DotInspection/types'
-import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
-import dayjs, { type Dayjs } from 'dayjs'
-import type { DateRange, DateValue } from 'reka-ui'
-import { CalendarDate } from '@internationalized/date'
-import { cn } from '@/lib/utils'
+import { Textarea } from '@/components/ui/textarea'
+import type {
+  CreateDotInspectionRequest,
+  RouteEldDriverOption,
+} from '@/modules/Tools/DotInspection/types'
 
-interface Company {
-  id: string
-  name: string
-}
-
-interface Props {
+const props = defineProps<{
   open: boolean
-  companies: Company[]
-}
-
-const props = defineProps<Props>()
-const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'submit', data: CreateDotInspectionRequest): void
+  drivers: RouteEldDriverOption[]
 }>()
 
-const { drivers, fetchDrivers } = useCompaniesDrivers()
-const isDriversLoading = ref(false)
+const emit = defineEmits<{
+  (event: 'close'): void
+  (event: 'submit', request: CreateDotInspectionRequest): void
+}>()
 
-// Default to last two days (yesterday and today)
-const getDefaultDateRange = (): [Dayjs, Dayjs] => {
-  const today = dayjs()
-  const yesterday = today.subtract(1, 'day')
-  return [yesterday, today]
-}
-
-const formData = ref({
-  blockDate: getDefaultDateRange() as [Dayjs, Dayjs] | null,
-  company: '',
-  driver: '',
-  description: '',
-})
-
-const errors = ref<Record<string, string>>({})
+const driverId = ref('')
+const fromDate = ref('')
+const toDate = ref('')
+const description = ref('')
 const isSubmitting = ref(false)
 const isCalendarOpen = ref(false)
-
-const companyOptions = computed(() => props.companies || [])
-const driverOptions = computed(() => drivers.value)
-
-// Fetch drivers when company changes
-watch(
-  () => formData.value.company,
-  async (companyId) => {
-    formData.value.driver = ''
-    drivers.value = []
-    if (!companyId) return
-    isDriversLoading.value = true
-    try {
-      await fetchDrivers(companyId)
-    } finally {
-      isDriversLoading.value = false
-    }
-  }
+const errors = ref<Record<string, string>>({})
+const sortedDrivers = computed(() =>
+  [...props.drivers].sort((a, b) => a.displayName.localeCompare(b.displayName))
 )
 
-// Calendar conversion functions
-const dayjsToCalendarDate = (date: Dayjs): CalendarDate => {
-  return new CalendarDate(date.year(), date.month() + 1, date.date())
+function resetForm() {
+  driverId.value = ''
+  fromDate.value = ''
+  toDate.value = ''
+  description.value = ''
+  isCalendarOpen.value = false
+  errors.value = {}
 }
 
-const calendarDateToDayjs = (date: DateValue): Dayjs => {
-  return dayjs(new Date(date.year, date.month - 1, date.day))
+function toCalendarDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new CalendarDate(year, month, day)
 }
 
-// Calendar value (DateRange for RangeCalendar)
-const calendarValue = computed<DateRange>({
-  get: () => {
-    if (!formData.value.blockDate) {
-      const [yesterday, today] = getDefaultDateRange()
-      return {
-        start: dayjsToCalendarDate(yesterday),
-        end: dayjsToCalendarDate(today),
-      }
-    }
-    return {
-      start: dayjsToCalendarDate(formData.value.blockDate[0]),
-      end: dayjsToCalendarDate(formData.value.blockDate[1]),
-    }
-  },
+function toDateString(value: { year: number; month: number; day: number }) {
+  return `${value.year}-${String(value.month).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`
+}
+
+const calendarRange = computed<DateRange>({
+  get: () => ({
+    start: fromDate.value ? toCalendarDate(fromDate.value) : undefined,
+    end: toDate.value ? toCalendarDate(toDate.value) : undefined,
+  }),
   set: (value) => {
-    if (value?.start && value?.end) {
-      formData.value.blockDate = [calendarDateToDayjs(value.start), calendarDateToDayjs(value.end)]
-    }
+    fromDate.value = value.start ? toDateString(value.start) : ''
+    toDate.value = value.end ? toDateString(value.end) : ''
   },
 })
 
-// Handle date selection
-const handleDateSelect = (value: DateRange) => {
-  if (value?.start && value?.end) {
-    clearError('blockDate')
+const periodLabel = computed(() => {
+  if (!fromDate.value || !toDate.value) return 'Select freeze period'
+  return `${fromDate.value} –> ${toDate.value}`
+})
+
+function handleRangeSelect(value: DateRange) {
+  if (value.start) fromDate.value = toDateString(value.start)
+  if (value.end) {
+    toDate.value = toDateString(value.end)
+    delete errors.value.fromDate
+    delete errors.value.toDate
     isCalendarOpen.value = false
   }
 }
 
-// Format date range for display
-const formatDateRange = () => {
-  if (!formData.value.blockDate) {
-    return 'Select date range'
-  }
-  return `${formData.value.blockDate[0].format('DD.MM.YYYY')} - ${formData.value.blockDate[1].format('DD.MM.YYYY')}`
-}
-
-// Reset form when modal opens/closes
 watch(
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) {
-      resetForm()
-    }
+  (open) => {
+    if (open) resetForm()
   }
 )
 
-const resetForm = () => {
-  formData.value = {
-    blockDate: getDefaultDateRange(),
-    company: '',
-    driver: '',
-    description: '',
-  }
+function validate() {
   errors.value = {}
-  isCalendarOpen.value = false
-  drivers.value = []
-}
-
-// Max date for calendar (today - disable future dates)
-const maxDate = computed(() => dayjsToCalendarDate(dayjs()))
-
-const validateForm = (): boolean => {
-  errors.value = {}
-  let isValid = true
-
-  if (!formData.value.blockDate) {
-    errors.value.blockDate = 'Block date is required'
-    isValid = false
+  if (!driverId.value) errors.value.driverId = 'Driver is required'
+  if (!fromDate.value) errors.value.fromDate = 'Start date is required'
+  if (!toDate.value) errors.value.toDate = 'End date is required'
+  if (fromDate.value && toDate.value && fromDate.value > toDate.value) {
+    errors.value.toDate = 'End date must not be before start date'
   }
-
-  if (!formData.value.company) {
-    errors.value.company = 'Company is required'
-    isValid = false
-  }
-
-  if (!formData.value.driver) {
-    errors.value.driver = 'Driver is required'
-    isValid = false
-  }
-
-  if (!formData.value.description.trim()) {
-    errors.value.description = 'Description is required'
-    isValid = false
-  } else if (formData.value.description.length > 120) {
+  if (description.value.length > 120) {
     errors.value.description = 'Description must be 120 characters or less'
-    isValid = false
   }
-
-  return isValid
+  return Object.keys(errors.value).length === 0
 }
 
-const handleSubmit = async () => {
-  if (!validateForm()) {
-    return
-  }
-
+async function handleSubmit() {
+  if (!validate()) return
   isSubmitting.value = true
-
   try {
-    if (!formData.value.blockDate) {
-      throw new Error('Block date is required')
-    }
-
-    const payload: CreateDotInspectionRequest = {
-      companyId: formData.value.company,
-      driverId: formData.value.driver,
-      startDate: formData.value.blockDate[0].format('YYYY-MM-DD'),
-      endDate: formData.value.blockDate[1].format('YYYY-MM-DD'),
-      description: formData.value.description,
-      status: 0,
-    }
-
-    emit('submit', payload)
-  } catch (error) {
-    console.error('Error creating dot inspection:', error)
+    emit('submit', {
+      driverId: driverId.value,
+      fromDate: fromDate.value,
+      toDate: toDate.value,
+      description: description.value.trim() || null,
+    })
   } finally {
     isSubmitting.value = false
   }
 }
 
-const handleClose = () => {
-  if (!isSubmitting.value) {
-    emit('close')
-  }
-}
-
-const clearError = (field: string) => {
-  delete errors.value[field]
+function close() {
+  if (!isSubmitting.value) emit('close')
 }
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="handleClose">
-    <DialogContent class="max-w-lg">
+  <Dialog :open="open" @update:open="close">
+    <DialogContent class="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle class="text-2xl font-semibold">Create dot</DialogTitle>
+        <DialogTitle>Create DOT inspection</DialogTitle>
       </DialogHeader>
-
-      <form @submit.prevent="handleSubmit" class="space-y-4 mt-4">
-        <!-- Block date -->
+      <form class="space-y-4 pt-2" @submit.prevent="handleSubmit">
         <div class="space-y-2">
-          <Label for="blockDate">Block date</Label>
-          <Popover v-model:open="isCalendarOpen">
-            <PopoverTrigger as-child>
-              <Button
-                variant="outline"
-                type="button"
-                :class="
-                  cn(
-                    'w-full justify-start text-left font-normal border-border',
-                    !formData.blockDate && 'text-muted-foreground',
-                    errors.blockDate && 'border-destructive'
-                  )
-                "
-              >
-                <Calendar class="mr-2 h-4 w-4" />
-                <span>{{ formatDateRange() }}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent class="w-auto p-0 border-border" align="start">
-              <RangeCalendar
-                v-model="calendarValue"
-                :number-of-months="2"
-                :max-value="maxDate"
-                @update:model-value="handleDateSelect"
-              />
-            </PopoverContent>
-          </Popover>
-          <p v-if="errors.blockDate" class="text-sm text-destructive">{{ errors.blockDate }}</p>
-        </div>
-
-        <!-- Company -->
-        <div class="space-y-2">
-          <Label for="company">Company</Label>
-          <Select
-            v-model="formData.company"
-            :disabled="isSubmitting"
-            @update:model-value="clearError('company')"
-          >
-            <SelectTrigger id="company" :class="errors.company && 'border-destructive'">
-              <SelectValue placeholder="Select company" />
+          <Label for="dot-driver">Driver</Label>
+          <Select v-model="driverId" :disabled="isSubmitting">
+            <SelectTrigger id="dot-driver" :class="errors.driverId && 'border-destructive'">
+              <SelectValue placeholder="Select driver" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="option in companyOptions" :key="option.id" :value="option.id">
-                {{ option.name }}
+              <SelectItem v-for="driver in sortedDrivers" :key="driver.id" :value="driver.id">
+                {{ driver.displayName }}
               </SelectItem>
-            </SelectContent>
-          </Select>
-          <p v-if="errors.company" class="text-sm text-destructive">{{ errors.company }}</p>
-        </div>
-
-        <!-- Driver -->
-        <div class="space-y-2">
-          <Label for="driver">Driver</Label>
-          <Select
-            v-model="formData.driver"
-            :disabled="isSubmitting || isDriversLoading || !formData.company"
-            @update:model-value="clearError('driver')"
-          >
-            <SelectTrigger id="driver" :class="errors.driver && 'border-destructive'">
-              <SelectValue
-                :placeholder="
-                  isDriversLoading
-                    ? 'Loading...'
-                    : !formData.company
-                      ? 'Select company first'
-                      : 'Select driver'
-                "
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="option in driverOptions" :key="option.id" :value="option.id">
-                {{ option.name }}
-              </SelectItem>
-              <div
-                v-if="!isDriversLoading && formData.company && driverOptions.length === 0"
-                class="py-2 px-3 text-sm text-muted-foreground"
-              >
-                No drivers
+              <div v-if="!sortedDrivers.length" class="px-3 py-2 text-sm text-muted-foreground">
+                No drivers found
               </div>
             </SelectContent>
           </Select>
-          <p v-if="errors.driver" class="text-sm text-destructive">{{ errors.driver }}</p>
+          <p v-if="errors.driverId" class="text-sm text-destructive">{{ errors.driverId }}</p>
         </div>
-
-        <!-- Description -->
         <div class="space-y-2">
-          <Label for="description">Description</Label>
+          <Label>Freeze period</Label>
+          <Popover v-model:open="isCalendarOpen">
+            <PopoverTrigger as-child>
+              <Button
+                type="button"
+                variant="outline"
+                class="w-full justify-start text-left font-normal"
+                :class="(errors.fromDate || errors.toDate) && 'border-destructive'"
+                :disabled="isSubmitting"
+              >
+                <CalendarIcon class="mr-2 h-4 w-4" />
+                {{ periodLabel }}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-auto p-0" align="start">
+              <RangeCalendar
+                v-model="calendarRange"
+                :number-of-months="2"
+                initial-focus
+                @update:model-value="handleRangeSelect"
+              />
+            </PopoverContent>
+          </Popover>
+          <p v-if="errors.fromDate || errors.toDate" class="text-sm text-destructive">
+            {{ errors.fromDate || errors.toDate }}
+          </p>
+        </div>
+        <div class="space-y-2">
+          <Label for="dot-description">Description</Label>
           <Textarea
-            id="description"
-            v-model="formData.description"
-            placeholder="Enter description"
-            maxlength="120"
+            id="dot-description"
+            v-model="description"
             rows="4"
+            maxlength="120"
+            placeholder="Enter description"
             :class="errors.description && 'border-destructive'"
             :disabled="isSubmitting"
-            @input="clearError('description')"
           />
-          <div class="flex justify-between items-center">
-            <p v-if="errors.description" class="text-sm text-destructive">{{ errors.description }}</p>
-            <span class="text-sm text-muted-foreground ml-auto">
-              {{ formData.description.length }} / 120
-            </span>
+          <div class="flex items-center justify-between">
+            <p v-if="errors.description" class="text-sm text-destructive">
+              {{ errors.description }}
+            </p>
+            <span class="ml-auto text-xs text-muted-foreground"
+              >{{ description.length }} / 120</span
+            >
           </div>
         </div>
-
-        <!-- Actions -->
-        <div class="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="outline" @click="handleClose" :disabled="isSubmitting">
+        <div class="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="outline" :disabled="isSubmitting" @click="close">
             Cancel
           </Button>
-          <Button
-            type="submit"
-            class="bg-primary text-primary-foreground hover:bg-primary/90"
-            :disabled="isSubmitting"
-          >
-            <span v-if="!isSubmitting">Save</span>
-            <span v-else>Saving...</span>
+          <Button type="submit" :disabled="isSubmitting || !sortedDrivers.length">
+            {{ isSubmitting ? 'Saving...' : 'Create' }}
           </Button>
         </div>
       </form>

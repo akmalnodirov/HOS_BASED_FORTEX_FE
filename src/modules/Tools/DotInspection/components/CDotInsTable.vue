@@ -1,6 +1,8 @@
-<!-- src/components/dotInspection/DotInspectionTable.vue -->
 <script setup lang="ts">
+import dayjs from 'dayjs'
 import { Power, Trash2 } from 'lucide-vue-next'
+import SortIcon from '@/components/icons/SortIcon.vue'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -9,165 +11,141 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import SortIcon from '@/components/icons/SortIcon.vue'
-import type { DotInspection } from '@/modules/Tools/DotInspection/types'
-import type { SortKey, SortOrder } from '@/modules/Tools/DotInspection/composables/useDotIns'
-import dayjs from 'dayjs'
+import type {
+  DotInspection,
+  DotInspectionSortKey,
+  SortOrder,
+} from '@/modules/Tools/DotInspection/types'
 
-interface Props {
+defineProps<{
   dotInspections: DotInspection[]
-  sortKey: SortKey
+  currentPage: number
+  itemsPerPage: number
+  sortKey: DotInspectionSortKey
   sortOrder: SortOrder
-  getStatusBadge: (status: number) => string
-  getStatusBadgeClass: (status: number) => string
-}
-
-defineProps<Props>()
-
-const emit = defineEmits<{
-  (e: 'sort', key: SortKey): void
-  (e: 'toggle-status', dotId: string, currentStatus: number): void
-  (e: 'delete', dotId: string): void
 }>()
 
-const formatDateRange = (startDate: string, endDate: string) => {
-  return `${dayjs(startDate).format('DD.MM.YYYY')} - ${dayjs(endDate).format('DD.MM.YYYY')}`
+const emit = defineEmits<{
+  (event: 'sort', key: DotInspectionSortKey): void
+  (event: 'toggle-status', inspection: DotInspection): void
+  (event: 'delete', inspectionId: string): void
+}>()
+
+function formatDate(value: string) {
+  return dayjs(value).format('MMM D, YYYY')
 }
 
-const formatDateTime = (dateTime: string) => {
-  return dayjs(dateTime).format('DD.MM.YYYY HH:mm')
+function formatDateTime(value: string) {
+  return dayjs(value).format('MMM D, YYYY h:mm A')
 }
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-lg">
-    <Table>
-      <TableHeader>
-        <TableRow class="bg-[#f0f0f0] dark:bg-muted/50 border-0">
-          <TableHead class="w-16 px-4 py-3">
-            <button
-              @click="emit('sort', 'id')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
-            >
-              No
-              <SortIcon class="w-3 h-3" />
-            </button>
-          </TableHead>
-          <TableHead class="px-4 py-3">
-            <button
-              @click="emit('sort', 'clientName')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
-            >
-              Client
-              <SortIcon class="w-3 h-3" />
-            </button>
-          </TableHead>
-          <TableHead class="px-4 py-3">
-            <button
-              @click="emit('sort', 'companyName')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
-            >
-              Company
-              <SortIcon class="w-3 h-3" />
-            </button>
-          </TableHead>
-          <TableHead class="px-4 py-3">
-            <button
-              @click="emit('sort', 'driverName')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
-            >
+  <div
+    class="min-h-0 overflow-auto rounded-lg border border-border bg-card [&>div]:overflow-visible"
+  >
+    <Table class="min-w-[1050px]">
+      <TableHeader class="sticky top-0 z-20">
+        <TableRow
+          class="border-0 bg-[#f0f0f0] hover:bg-[#f0f0f0] dark:bg-muted/50 dark:hover:bg-muted/50"
+        >
+          <TableHead class="w-16">No</TableHead>
+          <TableHead class="min-w-52">
+            <button class="flex items-center gap-2 font-medium" @click="emit('sort', 'driverName')">
               Driver
-              <SortIcon class="w-3 h-3" />
+              <SortIcon class="h-4 w-4" />
             </button>
           </TableHead>
-          <TableHead class="px-4 py-3">
-            <button
-              @click="emit('sort', 'startDate')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
-            >
-              Date Range
-              <SortIcon class="w-3 h-3" />
+          <TableHead class="min-w-48">
+            <button class="flex items-center gap-2 font-medium" @click="emit('sort', 'fromDate')">
+              Freeze period
+              <SortIcon class="h-4 w-4" />
             </button>
           </TableHead>
-          <TableHead class="px-4 py-3">
-            <span class="text-xs font-semibold text-[#666666] uppercase">Status</span>
-          </TableHead>
-          <TableHead class="px-4 py-3">
+          <TableHead class="min-w-64">
             <button
-              @click="emit('sort', 'dateTime')"
-              class="flex items-center gap-2 text-xs font-semibold text-[#666666] uppercase hover:text-foreground transition-colors cursor-pointer"
+              class="flex items-center gap-2 font-medium"
+              @click="emit('sort', 'description')"
             >
+              Description
+              <SortIcon class="h-4 w-4" />
+            </button>
+          </TableHead>
+          <TableHead class="w-32">
+            <button class="flex items-center gap-2 font-medium" @click="emit('sort', 'isEnabled')">
+              Status
+              <SortIcon class="h-4 w-4" />
+            </button>
+          </TableHead>
+          <TableHead class="min-w-48">
+            <button class="flex items-center gap-2 font-medium" @click="emit('sort', 'createdAt')">
               Created
-              <SortIcon class="w-3 h-3" />
+              <SortIcon class="h-4 w-4" />
             </button>
           </TableHead>
-          <TableHead class="px-4 py-3">
-            <span class="text-xs font-semibold text-[#666666] uppercase">Actions</span>
-          </TableHead>
+          <TableHead class="w-28">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow
-          v-for="(dot, index) in dotInspections"
-          :key="dot.id"
-          class="bg-white dark:bg-card hover:bg-accent/50 transition-colors border-[#DBDBDB] dark:border-border"
+          v-for="(inspection, index) in dotInspections"
+          :key="inspection.id"
+          class="h-12 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
         >
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ index + 1 }}
+          <TableCell class="p-2 font-medium">
+            {{ (currentPage - 1) * itemsPerPage + index + 1 }}
           </TableCell>
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ dot.clientName }}
+          <TableCell class="p-2 font-medium">{{ inspection.driverName }}</TableCell>
+          <TableCell class="p-2">
+            {{ formatDate(inspection.fromDate) }} – {{ formatDate(inspection.toDate) }}
           </TableCell>
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ dot.companyName }}
+          <TableCell class="max-w-80 truncate p-2" :title="inspection.description || ''">
+            {{ inspection.description || '—' }}
           </TableCell>
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ dot.driverName }}
-          </TableCell>
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ formatDateRange(dot.startDate, dot.endDate) }}
-          </TableCell>
-          <TableCell class="px-4 py-3">
-            <Badge
-              :class="getStatusBadgeClass(dot.status)"
-              class="text-[11px] font-normal py-0.5 px-2 h-auto"
+          <TableCell class="p-2">
+            <span
+              :class="[
+                'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                inspection.isEnabled
+                  ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                  : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+              ]"
             >
-              {{ getStatusBadge(dot.status) }}
-            </Badge>
+              {{ inspection.isEnabled ? 'Enabled' : 'Disabled' }}
+            </span>
           </TableCell>
-          <TableCell class="px-4 py-3 text-sm font-normal text-[#090909] dark:text-foreground">
-            {{ formatDateTime(dot.dateTime) }}
-          </TableCell>
-          <TableCell class="px-4 py-3">
-            <div class="flex items-center gap-2">
+          <TableCell class="p-2">{{ formatDateTime(inspection.createdAt) }}</TableCell>
+          <TableCell class="p-2">
+            <div class="flex items-center gap-1">
               <Button
-                @click="emit('toggle-status', dot.id, dot.status)"
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 hover:bg-accent"
-                :title="dot.status === 0 ? 'Disable' : 'Enable'"
+                :class="[
+                  'h-8 w-8',
+                  inspection.isEnabled
+                    ? 'text-destructive hover:bg-destructive/10 hover:text-destructive'
+                    : 'text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950',
+                ]"
+                :title="inspection.isEnabled ? 'Disable' : 'Enable'"
+                @click="emit('toggle-status', inspection)"
               >
-                <Power class="w-4 h-4 text-muted-foreground" />
+                <Power class="h-4 w-4" />
               </Button>
               <Button
-                @click="emit('delete', dot.id)"
                 variant="ghost"
                 size="icon"
                 class="h-8 w-8 hover:bg-destructive/10"
                 title="Delete"
+                @click="emit('delete', inspection.id)"
               >
-                <Trash2 class="w-4 h-4 text-destructive" />
+                <Trash2 class="h-4 w-4 text-destructive" />
               </Button>
             </div>
           </TableCell>
         </TableRow>
-
-        <!-- No results -->
         <TableRow v-if="dotInspections.length === 0">
-          <TableCell colspan="8" class="text-center py-8 text-muted-foreground bg-card">
-            No dot inspections found
+          <TableCell colspan="7" class="h-28 text-center text-muted-foreground">
+            No DOT inspections found
           </TableCell>
         </TableRow>
       </TableBody>

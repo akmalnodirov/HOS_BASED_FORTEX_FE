@@ -275,7 +275,7 @@ const pageTitle = computed(() => {
     '/vehicles': 'Vehicles',
     '/drivers': 'Drivers',
     '/ifta': 'IFTA',
-    '/dvir': 'DVIR',
+    '/route-eld-alerts': 'Alerts',
     '/company': 'Company',
     '/portal-users': 'Portal Users',
 

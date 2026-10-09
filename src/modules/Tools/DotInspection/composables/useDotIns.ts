@@ -1,343 +1,227 @@
 import { computed, onMounted, ref, watch } from 'vue'
-import { useApi } from '@/composables/useAxiosService'
+import { toast } from 'vue-sonner'
 import { ApiEndpoints } from '@/api/endpoints'
+import { useApi } from '@/composables/useAxiosService'
+import { useDebounce } from '@/composables/useDebounce'
+import { useModalState } from '@/composables/useModalState'
+import { usePagination } from '@/composables/usePagination'
+import { useSorting } from '@/composables/useSorting'
+import type { RouteEldCompaniesResponse } from '@/types/company'
+import { getCompanyId } from '@/utils/company'
+import { sortArray } from '@/utils/sort'
 import type {
   CreateDotInspectionRequest,
   DotInspection,
-  DotInspectionListResponse,
-} from '@/modules/Tools/DotInspection/types'
-import { usePagination } from '@/composables/usePagination'
-import { useSorting } from '@/composables/useSorting'
-import { useModalState } from '@/composables/useModalState'
-import { useTimeZoneHelper } from '@/composables/useTimezone'
-import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
-import { getCompanyId } from '@/utils/company'
-import { toast } from 'vue-sonner'
+  DotInspectionSortKey,
+  DotInspectionStatusFilter,
+  RouteEldDriverOption,
+} from '../types'
 
-export type SortKey =
-  | 'id'
-  | 'clientName'
-  | 'companyName'
-  | 'driverName'
-  | 'startDate'
-  | 'endDate'
-  | 'dateTime'
-
-export type SortOrder = 'asc' | 'desc'
-
-export interface UseDotInspectionOptions {
-  autoFetch?: boolean
+interface ApiEnvelope<T> {
+  successResult: T
 }
 
-export function useDotIns(options: UseDotInspectionOptions = {}) {
-  const { autoFetch = true } = options
+function unwrap<T>(value: T | ApiEnvelope<T>): T {
+  if (value && typeof value === 'object' && 'successResult' in value) return value.successResult
+  return value
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const value = error as {
+    response?: { data?: string | { message?: string; errors?: { message?: string }[] } }
+    message?: string
+  }
+  const data = value.response?.data
+  if (typeof data === 'string' && data) return data
+  if (data && typeof data === 'object') {
+    return data.message ?? data.errors?.[0]?.message ?? value.message ?? fallback
+  }
+  return value.message ?? fallback
+}
+
+export function useDotIns() {
   const api = useApi()
-  const authStore = useAuthStore()
-  const { formatToUTC, getStartOf, getEndOf, acceptAsTimeZone } = useTimeZoneHelper()
-
-  // State
   const dotInspections = ref<DotInspection[]>([])
+  const drivers = ref<RouteEldDriverOption[]>([])
+  const externalCompanyId = ref<string | null>(null)
   const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  const totalCount = ref(0)
-
-  // Carriers and drivers from shared composable
-  const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
-
-  // Filters
-  const selectedCompany = ref<string | null>(getCompanyId())
-  const selectedDriver = ref<string | null>(null)
-  const selectedTag = ref<'all' | 'enabled' | 'disabled'>('all')
-
+  const isRefreshing = ref(false)
   const isConfirmLoading = ref(false)
-  const isSettingFilters = ref(false)
-
-  // Modal state using composable
+  const error = ref<string | null>(null)
+  const searchQuery = ref('')
+  const selectedDriver = ref('all')
+  const selectedStatus = ref<DotInspectionStatusFilter>('all')
+  const debouncedSearch = useDebounce(searchQuery, 250)
   const createModal = useModalState()
   const confirmModal = useModalState<{
     type: 'enable' | 'disable' | 'delete'
-    dotId: string
+    inspectionId: string
     message: string
   }>()
-
-  // Sorting using composable
-  const sorting = useSorting<SortKey>({
-    defaultKey: 'id',
-    defaultOrder: 'asc',
+  const sorting = useSorting<DotInspectionSortKey>({
+    defaultKey: 'createdAt',
+    defaultOrder: 'desc',
   })
 
-  // Setup pagination
-  const pagination = usePagination(totalCount, {
-    itemsPerPage: 10,
-  })
+  async function resolveSelectedCompany() {
+    const companyId = getCompanyId()
+    if (!companyId) throw new Error('Select a company before opening DOT inspections.')
+    const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
+    externalCompanyId.value =
+      response.data.successResult.find(
+        (company) => company.id.toLowerCase() === companyId.toLowerCase()
+      )?.externalCompanyId ?? null
+    if (!externalCompanyId.value) throw new Error('The selected company could not be resolved.')
+  }
 
-  // Computed options for dropdowns
-  const companyOptions = computed(() => [...companies.value])
+  async function fetchDrivers() {
+    if (!externalCompanyId.value) await resolveSelectedCompany()
+    const response = await api.get<RouteEldDriverOption[] | ApiEnvelope<RouteEldDriverOption[]>>(
+      ApiEndpoints.ROUTE_ELD_DRIVERS
+    )
+    drivers.value = unwrap(response.data)
+      .filter((driver) => driver.externalCompanyId === externalCompanyId.value)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+  }
 
-  const driverOptions = computed(() => [...drivers.value])
-
-  // Paginated dot inspections (data comes from server already paginated)
-  const paginatedDotInspections = computed(() => dotInspections.value)
-
-  // Fetch dot inspections
-  const fetchDotInspections = async () => {
-    isLoading.value = true
+  async function fetchDotInspections(silent = false) {
+    if (silent) isRefreshing.value = true
+    else isLoading.value = true
     error.value = null
-
     try {
-      const params: Record<string, any> = {
-        PageNumber: pagination.currentPage.value,
-        PageSize: pagination.itemsPerPage.value,
+      if (!externalCompanyId.value) await resolveSelectedCompany()
+      const params: Record<string, string | boolean> = {
+        companyId: externalCompanyId.value as string,
       }
-
-      // Add driver filter
-      if (selectedDriver.value && selectedDriver.value !== 'all') {
-        params.DriverId = selectedDriver.value
-      }
-
-      // Add carrier filter
-      if (selectedCompany.value && selectedCompany.value !== 'all') {
-        params.CompanyId = selectedCompany.value
-      } else {
-        // Use current carrier from localStorage
-        const companyId = getCompanyId()
-        if (companyId) {
-          params.CompanyId = companyId
-        }
-      }
-
-      // Add status filter
-      if (selectedTag.value !== 'all') {
-        params.Status = selectedTag.value === 'enabled' ? 0 : 1
-      }
-
-      const response = await api.get<DotInspectionListResponse>(ApiEndpoints.DOT_INSPECTIONS, {
-        params,
-      })
-
-      if (response.data?.successResult) {
-        if (Array.isArray(response.data.successResult)) {
-          dotInspections.value = response.data.successResult
-          totalCount.value = response.data.successResult.length
-        } else {
-          dotInspections.value = response.data.successResult.data || []
-          totalCount.value = response.data.successResult.totalCount || dotInspections.value.length
-        }
-      }
-    } catch (err: any) {
-      error.value = err.response?.data?.message || err.message || 'Failed to fetch dot inspections'
-      console.error('Error fetching dot inspections:', err)
+      if (selectedDriver.value !== 'all') params.driverId = selectedDriver.value
+      if (selectedStatus.value !== 'all') params.isEnabled = selectedStatus.value === 'enabled'
+      const response = await api.get<DotInspection[] | ApiEnvelope<DotInspection[]>>(
+        ApiEndpoints.ROUTE_ELD_DOT_INSPECTIONS,
+        { params }
+      )
+      dotInspections.value = unwrap(response.data)
+    } catch (exception) {
+      error.value = getErrorMessage(exception, 'Failed to load DOT inspections')
     } finally {
       isLoading.value = false
+      isRefreshing.value = false
     }
   }
 
-  // Watch carrier change to reload drivers and dot inspections
-  watch(selectedCompany, async (newValue) => {
-    if (isSettingFilters.value) return
-    pagination.resetPage()
-    selectedDriver.value = null
-    if (newValue && newValue !== 'all') {
-      await fetchDrivers(newValue)
-      if (drivers.value.length > 0 && !selectedDriver.value) {
-        selectedDriver.value = drivers.value[0].id
-      }
-    } else {
-      drivers.value = []
-    }
-    await fetchDotInspections()
+  const filteredDotInspections = computed(() => {
+    const search = debouncedSearch.value.trim().toLowerCase()
+    const rows = search
+      ? dotInspections.value.filter(
+          (inspection) =>
+            inspection.driverName.toLowerCase().includes(search) ||
+            inspection.description?.toLowerCase().includes(search) ||
+            inspection.fromDate.includes(search) ||
+            inspection.toDate.includes(search)
+        )
+      : [...dotInspections.value]
+    return sortArray(rows, sorting.sortKey.value, sorting.sortOrder.value)
   })
 
-  // Watch driver change
-  watch(selectedDriver, async () => {
-    if (isSettingFilters.value) return
-    pagination.resetPage()
-    await fetchDotInspections()
-  })
+  const totalCount = computed(() => filteredDotInspections.value.length)
+  const pagination = usePagination(totalCount, { itemsPerPage: 10 })
+  const paginatedDotInspections = computed(() =>
+    pagination.paginateData(filteredDotInspections.value)
+  )
 
-  // Watch tag/status change
-  watch(selectedTag, async () => {
+  watch([selectedDriver, selectedStatus], async () => {
     pagination.resetPage()
     await fetchDotInspections()
   })
 
-  // Watch pagination changes
+  watch([debouncedSearch, () => pagination.itemsPerPage.value], () => pagination.resetPage())
+
   watch(
-    [() => pagination.currentPage.value, () => pagination.itemsPerPage.value],
-    async ([newPage, newSize], [oldPage, oldSize]) => {
-      if (newPage !== oldPage || newSize !== oldSize) {
-        await fetchDotInspections()
+    () => pagination.totalPages.value,
+    (totalPages) => {
+      if (totalPages > 0 && pagination.currentPage.value > totalPages) {
+        pagination.goToPage(totalPages)
       }
     }
   )
 
-  // Create dot inspection
-  const createDotInspection = async (data: CreateDotInspectionRequest) => {
-    try {
-      const payload = {
-        ...data,
-        startDate: formatToUTC(getStartOf(data.startDate)),
-        endDate: formatToUTC(getEndOf(data.endDate)),
-      }
-
-      await api.post(ApiEndpoints.DOT_INSPECTIONS, payload, {
-        _showSuccessToast: false,
-      })
-
-      toast.success('DOT inspection created successfully')
-      createModal.close()
-
-      // Update filter selects to show the newly created item
-      isSettingFilters.value = true
-      try {
-        selectedCompany.value = data.companyId
-        await fetchDrivers(data.companyId)
-        selectedDriver.value = data.driverId
-        pagination.resetPage()
-        await fetchDotInspections()
-      } finally {
-        isSettingFilters.value = false
-      }
-    } catch (err: any) {
-      console.error('Error creating dot inspection:', err)
-      toast.error(err.response?.data?.message || 'Failed to create DOT inspection')
-      throw err
-    }
+  async function createDotInspection(request: CreateDotInspectionRequest) {
+    await api.post(ApiEndpoints.ROUTE_ELD_DOT_INSPECTIONS, request)
+    toast.success('DOT inspection created successfully')
+    createModal.close()
+    await fetchDotInspections(true)
   }
 
-  // Open confirm modal
-  const openConfirmModal = (type: 'enable' | 'disable' | 'delete', dotId: string) => {
+  function openConfirmModal(type: 'enable' | 'disable' | 'delete', inspectionId: string) {
     const messages = {
-      enable: 'Do you really want to enable?',
-      disable: 'Do you really want to disable?',
-      delete: 'Do you really want to delete?',
+      enable: 'Do you want to enable this DOT inspection?',
+      disable: 'Do you want to disable this DOT inspection?',
+      delete: 'Do you want to delete this DOT inspection?',
     }
-
-    confirmModal.open({
-      type,
-      dotId,
-      message: messages[type],
-    })
+    confirmModal.open({ type, inspectionId, message: messages[type] })
   }
 
-  // Handle confirm action (enable/disable/delete)
-  const handleConfirmAction = async () => {
-    if (!confirmModal.selectedItem.value) return
-
-    const { type, dotId } = confirmModal.selectedItem.value
-
+  async function handleConfirmAction() {
+    const selected = confirmModal.selectedItem.value
+    if (!selected) return
     isConfirmLoading.value = true
     try {
-      if (type === 'delete') {
-        await api.delete(ApiEndpoints.DOT_INSPECTION_BY_ID(dotId), {
-          _showSuccessToast: false,
-        })
+      if (selected.type === 'delete') {
+        await api.delete(ApiEndpoints.ROUTE_ELD_DOT_INSPECTION(selected.inspectionId))
         toast.success('DOT inspection deleted successfully')
       } else {
-        const status = type === 'enable' ? 0 : 1
-        await api.put(
-          ApiEndpoints.DOT_INSPECTION_STATUS(dotId),
-          { status },
-          {
-            _showSuccessToast: false,
-          }
-        )
-        toast.success(`DOT inspection ${type}d successfully`)
+        await api.patch(ApiEndpoints.ROUTE_ELD_DOT_INSPECTION_STATUS(selected.inspectionId), {
+          isEnabled: selected.type === 'enable',
+        })
+        toast.success(`DOT inspection ${selected.type}d successfully`)
       }
-
-      await fetchDotInspections()
       confirmModal.close()
-    } catch (err: any) {
-      console.error(`Error ${type}ing dot inspection:`, err)
-      toast.error(err.response?.data?.message || `Failed to ${type} DOT inspection`)
-      throw err
+      await fetchDotInspections(true)
+    } catch (exception) {
+      toast.error(getErrorMessage(exception, `Failed to ${selected.type} DOT inspection`))
     } finally {
       isConfirmLoading.value = false
     }
   }
 
-  // Status helpers
-  const getStatusBadge = (status: number) => {
-    return status === 0 ? 'Enabled' : 'Disabled'
-  }
-
-  const getStatusBadgeClass = (status: number) => {
-    return status === 0
-      ? 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900 dark:text-green-300'
-      : 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300'
-  }
-
-  // Auto-fetch on mount
-  if (autoFetch) {
-    onMounted(async () => {
-      await fetchCompanies()
-      if (selectedCompany.value) {
-        await fetchDrivers(selectedCompany.value)
-        if (drivers.value.length > 0 && !selectedDriver.value) {
-          selectedDriver.value = drivers.value[0].id
-        }
-      }
-      await fetchDotInspections()
-    })
-  }
+  onMounted(async () => {
+    isLoading.value = true
+    try {
+      await resolveSelectedCompany()
+      await Promise.all([fetchDrivers(), fetchDotInspections()])
+    } catch (exception) {
+      error.value = getErrorMessage(exception, 'Failed to load DOT inspections')
+      isLoading.value = false
+    }
+  })
 
   return {
-    // State
-    dotInspections,
-    isLoading,
-    error,
-    companies,
     drivers,
-    companyOptions,
-    driverOptions,
-
-    // For backward compatibility with page
-    systemOptions: companyOptions,
-
-    // Filters
-    selectedCompany,
-    selectedDriver,
-    selectedTag,
-
-    // For backward compatibility
-    selectedSystem: selectedCompany,
-
-    // Modal state
-    isCreateModalOpen: createModal.isOpen,
-    openCreateModal: createModal.open,
-    closeCreateModal: createModal.close,
-    isConfirmModalOpen: confirmModal.isOpen,
+    isLoading,
+    isRefreshing,
     isConfirmLoading,
-    confirmModalConfig: confirmModal.selectedItem,
-    openConfirmModal,
-    closeConfirmModal: confirmModal.close,
-
-    // Sorting
+    error,
+    searchQuery,
+    selectedDriver,
+    selectedStatus,
     sortKey: sorting.sortKey,
     sortOrder: sorting.sortOrder,
-    handleSort: sorting.handleSort,
-
-    // Pagination
     currentPage: pagination.currentPage,
     itemsPerPage: pagination.itemsPerPage,
     totalPages: pagination.totalPages,
     totalEntries: pagination.totalEntries,
     pageNumbers: pagination.pageNumbers,
-    goToPage: pagination.goToPage,
-    nextPage: pagination.nextPage,
-    previousPage: pagination.previousPage,
-
-    // Computed
     paginatedDotInspections,
-
-    // Functions
+    isCreateModalOpen: createModal.isOpen,
+    isConfirmModalOpen: confirmModal.isOpen,
+    confirmModalConfig: confirmModal.selectedItem,
+    handleSort: sorting.handleSort,
+    goToPage: pagination.goToPage,
     fetchDotInspections,
-    fetchCompanies,
-    fetchDrivers,
     createDotInspection,
+    openCreateModal: createModal.open,
+    closeCreateModal: createModal.close,
+    openConfirmModal,
+    closeConfirmModal: confirmModal.close,
     handleConfirmAction,
-    getStatusBadge,
-    getStatusBadgeClass,
   }
 }

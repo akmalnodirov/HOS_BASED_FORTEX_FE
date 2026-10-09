@@ -229,10 +229,10 @@ const menuItems: MenuItem[] = [
         path: '/ifta',
       },
       {
-        id: 'dvir',
-        label: 'DVIR',
-        icon: '/icons/file.svg',
-        path: '/dvir',
+        id: 'route-eld-alerts',
+        label: 'Alerts',
+        icon: '/icons/bell.svg',
+        path: '/route-eld-alerts',
       },
       {
         id: 'company',
@@ -263,7 +263,7 @@ const menuItems: MenuItem[] = [
           { id: 'tools-monitoring', label: 'Monitoring', icon: null, path: '/tools/monitoring' },
           {
             id: 'tools-dot-inspection',
-            label: 'Dot inspection',
+            label: 'DOT inspection',
             icon: null,
             path: '/tools/dot-inspection',
           },
