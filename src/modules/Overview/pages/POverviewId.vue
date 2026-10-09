@@ -1,651 +1,206 @@
 <template>
-  <div class="flex w-full" style="height: calc(100vh - 72px)">
-    <!-- Chap Panel (3 kolonna) -->
-    <div v-if="!isFullscreen" class="flex w-1/4 flex-col overflow-hidden h-full">
-      <!-- Routes Mode -->
+  <div class="flex h-[calc(100vh-65px)] min-h-0 w-full overflow-hidden bg-white dark:bg-background">
+    <aside class="flex w-[420px] shrink-0 flex-col border-r border-border bg-white dark:bg-card">
       <div
-        v-if="isRoutingMode"
-        class="flex flex-col flex-1 overflow-hidden bg-white dark:bg-gray-900"
+        class="shrink-0 px-4 py-3 text-white"
+        :style="{ backgroundColor: statusColor(tracking?.driver.currentStatus || '') }"
       >
-        <!-- Header -->
-        <div
-          class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0"
-        >
-          <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Routes</h2>
-          <Button
-            @click="isRoutingMode = false"
-            variant="ghost"
-            size="icon"
-            class="h-7 w-7 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <X class="w-4 h-4" />
-          </Button>
-        </div>
-
-        <!-- From / To inputs -->
-        <div class="p-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <!-- From -->
-          <div class="flex items-center gap-2">
-            <div
-              class="w-3.5 h-3.5 shrink-0 rounded-full border border-[#666666] bg-white dark:bg-gray-700 flex items-center justify-center"
-            >
-              <div class="w-2.5 h-2.5 rounded-full bg-gray-500 dark:bg-gray-400"></div>
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold">
+              {{ tracking?.driver.vehicleName || 'No unit' }}
             </div>
-            <div class="flex-1">
-              <SearchAutocomplete placeholder="From" v-model="routeForm.from" @select="onSelectRouteFrom" />
+            <div class="mt-0.5 truncate text-xs text-white/90">
+              {{ tracking?.driver.driverName || 'Driver' }}
             </div>
           </div>
-          <!-- Dashed connector -->
-          <div class="flex gap-2 my-0">
-            <div class="w-3.5 shrink-0 flex justify-center">
-              <div
-                class="w-0 h-3 border-l-2 border-dotted border-gray-300 dark:border-gray-600"
-              ></div>
-            </div>
-          </div>
-          <!-- To -->
-          <div class="flex items-center gap-2">
-            <div
-              class="w-3.5 h-3.5 shrink-0 rounded-full bg-white border border-[#6082E0] dark:bg-blue-900/20 flex items-center justify-center"
-            >
-              <div class="w-2.5 h-2.5 rounded-full bg-[#3C64D8]"></div>
-            </div>
-            <div class="flex-1">
-              <SearchAutocomplete
-                v-model="routeForm.destinations[0].text"
-                @select="(opt) => onSelectRouteDestination(opt, 0)"
-                placeholder="To"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Add destination / fetch routes button -->
-        <div class="px-4 pb-4 shrink-0">
-          <Button
-            @click="fetchRouteAlternatives"
-            :disabled="!routeForm.fromLat || !routeForm.destinations[0]?.lat || isFetchingRoutes"
-            variant="outline"
-            class="w-full h-10 gap-2 border border-[#666] dark:border-gray-600 text-[#090909] dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 bg-transparent disabled:opacity-40"
-          >
-            <template v-if="isFetchingRoutes">
-              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span>Searching...</span>
-            </template>
-            <template v-else>
-              <Plus class="w-4 h-4" />
-              <span>Add destination</span>
-            </template>
-          </Button>
-        </div>
-
-        <!-- Route alternatives list -->
-        <div class="flex-1 overflow-y-auto">
-          <!-- Loading state -->
-          <div
-            v-if="isFetchingRoutes"
-            class="flex items-center justify-center py-10 gap-2 text-gray-500 dark:text-gray-400"
-          >
-            <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <span class="text-sm">Calculating routes...</span>
-          </div>
-
-          <!-- Empty state -->
-          <div
-            v-else-if="
-              !routeAlternatives.length && routeForm.fromLat && !routeForm.destinations[0]?.lat
-            "
-            class="flex flex-col items-center justify-center py-10 px-4 text-center gap-2"
-          >
-            <Navigation class="w-8 h-8 text-gray-300 dark:text-gray-600" />
-            <p class="text-sm text-gray-400 dark:text-gray-500">
-              Select a destination to see routes
-            </p>
-          </div>
-
-          <!-- Route items -->
-          <div v-else-if="routeAlternatives.length">
-            <div
-              v-for="(route, idx) in routeAlternatives"
-              :key="idx"
-              @click="selectRoute(idx)"
-              :class="[
-                'flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0',
-                selectedRouteIndex === idx
-                  ? 'bg-blue-50 dark:bg-blue-900/20'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-              ]"
-            >
-              <div
-                class="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0"
-              >
-                <Navigation class="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  via {{ route.via }}
-                </p>
-                <p
-                  :class="route.hasTolls ? 'text-red-500' : 'text-green-500'"
-                  class="text-xs font-medium mt-0.5"
-                >
-                  {{ route.hasTolls ? `${route.tollCount} toll road` : 'There are no toll roads' }}
-                </p>
-              </div>
-              <div class="text-right shrink-0">
-                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {{ route.durationText }}
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {{ route.distanceText }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Tracking Mode -->
-      <div v-else-if="focusLiveTracking" class="space-y-4">
-        <div class="bg-white dark:bg-gray-900 p-4">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Live Tracking</h2>
-            <Button @click="liveModal = true" variant="outline" size="sm" class="gap-1">
-              Live share
-              <ChevronRight class="w-4 h-4" />
-            </Button>
-          </div>
-
-          <!-- Live tracking form -->
-          <form @submit.prevent="handleApplyDestinationRoute" class="space-y-4">
-            <div class="space-y-2">
-              <Label for="latitude">Latitude</Label>
-              <Input
-                id="latitude"
-                v-model="liveTrackingForm.latitude"
-                type="text"
-                placeholder="Latitude"
-                disabled
-              />
-            </div>
-
-            <div class="space-y-2">
-              <Label for="longitude">Longitude</Label>
-              <Input
-                id="longitude"
-                v-model="liveTrackingForm.longitude"
-                type="text"
-                placeholder="Longitude"
-                disabled
-              />
-            </div>
-
-            <div class="space-y-2">
-              <Label for="fromLocation">From Location</Label>
-              <Input
-                id="fromLocation"
-                v-model="liveTrackingForm.fromLocation"
-                type="text"
-                placeholder="Enter from location"
-              />
-            </div>
-
-            <div class="space-y-2">
-              <Label for="toDestination">To Destination</Label>
-              <SearchAutocomplete
-                v-model="liveTrackingForm.toDestination"
-                @select="onSelectDestination"
-              />
-            </div>
-
+          <div class="flex gap-2">
             <Button
-              type="submit"
-              class="w-full bg-gray-900 cursor-pointer hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900"
-              :disabled="!isLiveTrackingFormValid"
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
+              :disabled="!tracking?.driver.vehicleId"
+              @click="openShare"
             >
-              Apply Route
+              <Share2 class="h-4 w-4" />
             </Button>
-          </form>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
+              @click="router.push('/overview')"
+            >
+              <X class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div class="my-2 border-t border-white/20" />
+        <div class="space-y-1 text-xs text-white/95">
+          <div class="flex gap-2">
+            <span class="font-medium">Phone Number:</span>
+            <span>{{ tracking?.driver.phoneNumber || 'N/A' }}</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="font-medium">Email:</span>
+            <span class="truncate">{{ tracking?.driver.email || 'N/A' }}</span>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-4 border-t border-white/20 pt-3 text-xs">
+          <div>
+            <div class="text-white/75">Latest speed</div>
+            <div class="mt-1 font-semibold text-white">{{ latestSpeedLabel }}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-white/75">Last update</div>
+            <div class="mt-1 font-semibold text-white">{{ lastUpdateLabel }}</div>
+          </div>
         </div>
       </div>
 
-      <!-- Tarixiy Mode -->
-      <div v-else class="flex flex-col flex-1 overflow-hidden">
-        <!-- Header Section with Status Color -->
-        <div class="p-3" :style="{ backgroundColor: headerStatusColor }">
-          <div class="flex justify-between">
-            <div class="flex flex-col">
-              <span class="text-sm font-medium text-white">{{ driverUnit || 'N/A' }}</span>
-              <span class="text-xs text-white/90 mt-0.5">{{ driverName }}</span>
-            </div>
-            <div class="flex gap-2 my-0">
-              <Button
-                @click="liveModal = true"
-                variant="ghost"
-                size="sm"
-                class="h-7 w-7 p-0 text-white bg-[#ffffff3d] cursor-pointer"
-              >
-                <Share2 class="w-4 h-4" />
-              </Button>
-              <Button
-                @click="$router.push('/overview')"
-                variant="ghost"
-                size="sm"
-                class="h-7 w-7 p-0 text-white bg-[#ffffff3d] cursor-pointer"
-              >
-                <X class="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-          <hr class="my-2 border-[#FFFFFF29]" />
-          <div class="flex flex-col gap-1">
-            <div class="text-sm text-white flex items-center gap-2">
-              <p class="font-normal text-xs">Phone Number:</p>
-              <p class="text-xs">{{ driverPhone || 'N/A' }}</p>
-            </div>
-            <div class="text-sm text-white flex items-center gap-2">
-              <p class="font-normal text-xs">Email:</p>
-              <p class="text-xs">{{ driverEmail || 'N/A' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Delivery Information -->
-        <!--        <div class="bg-white dark:bg-gray-900 p-4"></div>-->
-
-        <!-- History Section -->
-        <div class="flex flex-col flex-1 overflow-hidden bg-white dark:bg-gray-900">
-          <!-- History Summary -->
-          <div
-            v-if="firstEvent && lastEvent"
-            class="p-4 border-b border-gray-100 dark:border-gray-800 bg-[#F5F5F5] dark:bg-gray-800/20"
-          >
-            <div class="flex items-start justify-between mb-4 text-[#666666] text-xs font-normal">
-              <div class="space-y-1">
-                <p>Start:</p>
-                <p class="dark:text-gray-300 whitespace-nowrap">
-                  {{ formatDateTime(lastEvent.startTime) }}
-                </p>
-              </div>
-              <div class="space-y-1 text-center px-2">
-                <p>Distance:</p>
-                <p class="text-[11px] dark:text-gray-300 whitespace-nowrap">
-                  {{ formattedDistance }}
-                </p>
-              </div>
-              <div class="space-y-1 text-right">
-                <p class="text-right">End:</p>
-                <p class="dark:text-gray-300 whitespace-nowrap">
-                  {{ formatDateTime(firstEvent.endTime) }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Visual Timeline -->
-            <div class="flex items-center gap-1 mb-4 px-1">
-              <div
-                class="w-3 h-3 rounded-full border border-gray-900 dark:border-gray-100 shrink-0 relative"
-              >
-                <div
-                  class="absolute inset-0 bg-gray-900 dark:bg-gray-100 rounded-full scale-[0.6]"
-                ></div>
-              </div>
-              <div
-                class="flex-1 h-0.5 border-t-2 border-dotted border-gray-900 dark:border-gray-400 opacity-60"
-              ></div>
-              <div
-                class="w-3 h-3 rounded-full border border-black dark:border-gray-400 shrink-0 relative"
-              >
-                <div
-                  class="absolute inset-0 bg-gray-900 dark:bg-gray-100 rounded-full scale-[0.6]"
-                ></div>
-              </div>
-              <div
-                class="flex-1 h-0.5 border-t-2 border-dotted border-gray-400 dark:border-gray-600 opacity-40"
-              ></div>
-              <div
-                class="w-3 h-3 rounded-full border border-gray-600 dark:border-gray-400 shrink-0 relative"
-              >
-                <div
-                  class="absolute inset-0 bg-[#666666] dark:bg-gray-100 rounded-full scale-[0.6]"
-                ></div>
-              </div>
-            </div>
-
-            <!-- Locations -->
-            <div class="grid grid-cols-2 gap-4 text-xs text-[#090909]">
-              <p class="dark:text-gray-400 leading-snug line-clamp-2">
-                {{ lastEvent.calculatedLocation || lastEvent.manualLocation || 'N/A' }}
-              </p>
-              <p class="dark:text-gray-400 leading-snug text-right line-clamp-2">
-                {{ firstEvent.calculatedLocation || firstEvent.manualLocation || 'N/A' }}
-              </p>
-            </div>
-          </div>
-
-          <div class="p-3 border-b border-gray-200 dark:border-gray-800">
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">History</h2>
-              <Popover v-model:open="isCalendarOpen">
-                <PopoverTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <Calendar class="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent class="w-auto p-0" align="center">
-                  <RangeCalendar
-                    v-model="tempCalendarValueForBinding"
-                    :number-of-months="2"
-                    :is-date-disabled="isDateDisabled"
-                    class="dark:bg-gray-800"
-                  />
-                  <div
-                    class="flex items-center justify-end gap-2 p-3 border-t border-gray-200 dark:border-gray-700"
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      @click="handleCancelDateSelect"
-                      class="bg-white dark:bg-gray-800"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      @click="handleApplyDateSelect"
-                      :disabled="isApplyDisabled"
-                      class="bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600"
-                    >
-                      {{ isApplyLoading ? 'Loading...' : 'Apply' }}
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div class="flex-1 overflow-y-auto">
-            <div
-              v-for="(event, index) in historyEvents"
-              :key="index"
-              class="border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-            >
-              <!-- Drive Event -->
-              <div
-                v-if="event.eventCode === 3 && event.eventType === 1"
-                @click="selectEvent(event)"
-                :class="[
-                  'flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors',
-                  selectedEvent?.eventId === event.eventId
-                    ? 'bg-purple-50 dark:bg-purple-900/20'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-                ]"
-              >
-                <!-- Event Content -->
-                <div class="flex-1">
-                  <div class="flex items-center justify-between mb-2">
-                    <p class="text-sm font-normal">
-                      <!-- Event Number -->
-                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ historyEvents.length - index }}.
-                      </span>
-                      Drive
-                    </p>
-                    <div class="flex items-center gap-1">
-                      <Clock class="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                      <span class="text-xs text-gray-600 dark:text-gray-400">
-                        {{ formatDuration(event.duration) }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-gray-900 dark:text-gray-100">
-                      {{ formatDistance(event.vehicleMiles) }} / {{ event.vehicleSpeed }}mph
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Location/Stop Event -->
-              <div
-                v-else
-                @click="selectEvent(event)"
-                :class="[
-                  'flex items-start gap-2 px-4 py-3 cursor-pointer transition-colors',
-                  selectedEvent?.eventId === event.eventId
-                    ? 'bg-purple-50 dark:bg-purple-900/20'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-                ]"
-              >
-                <!-- Event Content -->
-                <div class="flex-1">
-                  <div class="text-sm text-gray-900 dark:text-gray-100 mb-2">
-                    <!-- Event Number -->
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {{ historyEvents.length - index }}.
-                    </span>
-                    {{
-                      event.calculatedLocation || event.manualLocation || 'Location not available'
-                    }}
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <Calendar class="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                      <span class="text-xs text-gray-600 dark:text-gray-400">
-                        {{ formatEventTimeRange(event.startTime, event.endTime) }}
-                      </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <Clock class="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                      <span class="text-xs text-gray-600 dark:text-gray-400">
-                        {{ formatDuration(event.duration) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              v-if="historyEvents.length === 0"
-              class="text-sm text-gray-500 dark:text-gray-400 text-center py-4 px-4"
-            >
-              No history events available
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- O'ng Panel: Google Map (9 kolonna) -->
-    <div class="flex flex-col relative" :class="isFullscreen ? 'w-full' : 'w-3/4'">
-      <OverviewMapControls
-        :fuel-type="fuelType"
-        :radius="radius"
-        :is-focus-live-tracking="focusLiveTracking"
-        :is-traffic-active="isTrafficActive"
-        :is-parking-active="isParkingActive"
-        :is-routing-active="isRoutingMode"
-        :is-fullscreen-active="isFullscreen"
-        @update:fuel-type="fuelType = $event"
-        @update:radius="radius = $event"
-        @update:map-layer="updateMapLayer"
-        @toggle:traffic="handleTrafficToggle"
-        @toggle:parking="handleParkingToggle"
-        @toggle:routing="handleRoutingToggle"
-        @toggle:is-live-tracking="handleToggleLiveTracking"
-        @toggle:fullscreen="toggleFullscreen"
-        @toggle:weather="toggleWeather"
-        @toggle:stations="toggleStations"
-      />
-      <GoogleMap
-        ref="mapInstance"
-        :api-key="apiKey"
-        :center="mapCenter"
-        :zoom="zoomMap"
-        :libraries="['geometry', 'places']"
-        :map-type-id="mapType"
-        :styles="mapStyles"
-        :disable-default-ui="true"
-        style="width: 100%; height: 100%"
+      <div
+        v-if="firstPoint && lastPoint"
+        class="shrink-0 border-b border-border bg-[#f5f5f5] p-4 dark:bg-muted/20"
       >
-        <!-- Truck Marker -->
-        <CustomMarker
-          v-if="truckPosition.lat && truckPosition.lng"
-          ref="truckMarker"
-          :options="{
-            position: { lat: truckPosition.lat, lng: truckPosition.lng },
-            anchorPoint: 'CENTER',
-          }"
-        >
-          <div
-            class="w-10 h-10"
-            :style="{ transform: `rotate(${truckHeading + ICON_ROT_OFFSET}deg)` }"
-          >
-            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M27.3408 14.3675C28.1634 14.0476 28.5747 13.8877 28.6901 13.6615C28.7902 13.4656 28.7871 13.2329 28.682 13.0397C28.5606 12.8167 28.1453 12.6676 27.3146 12.3694L6.12839 4.76406C5.44879 4.5201 5.109 4.39812 4.88686 4.47505C4.69372 4.54194 4.54194 4.69372 4.47505 4.88685C4.39812 5.109 4.5201 5.44879 4.76406 6.12839L12.3693 27.3147C12.6675 28.1453 12.8166 28.5607 13.0396 28.682C13.2329 28.7872 13.4655 28.7902 13.6614 28.6902C13.8876 28.5747 14.0475 28.1634 14.3674 27.3409L17.8299 18.4375C17.8925 18.2763 17.9239 18.1958 17.9722 18.1279C18.0151 18.0678 18.0677 18.0152 18.1279 17.9723C18.1957 17.9239 18.2763 17.8926 18.4374 17.8299L27.3408 14.3675Z"
-                fill="#465A95"
-                stroke="white"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+        <div class="grid grid-cols-3 text-xs text-muted-foreground">
+          <div>
+            <div>Start:</div>
+            <div class="mt-1 whitespace-nowrap text-foreground">{{ startLabel }}</div>
           </div>
-        </CustomMarker>
+          <div class="text-center">
+            <div>Distance:</div>
+            <div class="mt-1 whitespace-nowrap text-foreground">{{ distanceLabel }}</div>
+          </div>
+          <div class="text-right">
+            <div>End:</div>
+            <div class="mt-1 whitespace-nowrap text-foreground">{{ endLabel }}</div>
+          </div>
+        </div>
+        <div class="my-4 flex items-center gap-1 px-1">
+          <span class="relative h-3 w-3 shrink-0 rounded-full border border-foreground">
+            <span class="absolute inset-[2px] rounded-full bg-foreground" />
+          </span>
+          <span class="h-0 flex-1 border-t-2 border-dotted border-foreground/60" />
+          <span class="relative h-3 w-3 shrink-0 rounded-full border border-foreground">
+            <span class="absolute inset-[2px] rounded-full bg-foreground" />
+          </span>
+          <span class="h-0 flex-1 border-t-2 border-dotted border-muted-foreground/40" />
+          <span class="relative h-3 w-3 shrink-0 rounded-full border border-muted-foreground">
+            <span class="absolute inset-[2px] rounded-full bg-muted-foreground" />
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-xs text-foreground">
+          <p class="line-clamp-2 leading-snug">{{ pointLocation(firstPoint) }}</p>
+          <p class="line-clamp-2 text-right leading-snug">{{ pointLocation(lastPoint) }}</p>
+        </div>
+      </div>
 
-        <!-- Destination Marker -->
-        <CustomMarker
-          v-if="destinationMarker.visible && destinationMarker.lat && destinationMarker.lng"
-          :options="{
-            position: { lat: destinationMarker.lat, lng: destinationMarker.lng },
-            anchorPoint: 'BOTTOM_CENTER',
-          }"
-        >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 40 50"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style="filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))"
-          >
-            <path
-              d="M20 0C11.163 0 4 7.163 4 16C4 28 20 50 20 50C20 50 36 28 36 16C36 7.163 28.837 0 20 0Z"
-              fill="#EA4335"
-            />
-            <circle cx="20" cy="16" r="7" fill="white" />
-          </svg>
-        </CustomMarker>
-
-        <!-- Event Markers (History Points) -->
-        <CustomMarker
-          v-if="!focusLiveTracking"
-          v-for="(tracking, ind) in dailyTrackings?.trackingEventResponse"
-          :key="tracking.eventId"
-          :options="{
-            position: { lat: tracking.latitude, lng: tracking.longitude },
-            anchorPoint: 'CENTER',
-          }"
-          @click="selectEvent(tracking)"
-          class="cursor-pointer"
-        >
-          <Popover :open="Boolean(trackingTooltips[tracking.eventId])">
+      <div class="shrink-0 border-b border-border px-4 py-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold">History</h2>
+          <Popover v-model:open="calendarOpen">
             <PopoverTrigger as-child>
-              <div
-                class="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center shadow-md hover:scale-110 transition-transform"
-              >
-                <span class="text-white text-xs font-semibold">
-                  {{ (dailyTrackings?.trackingEventResponse?.length || 0) - ind }}
-                </span>
-              </div>
+              <Button variant="outline" class="h-8 justify-start gap-2 px-3 text-xs font-normal">
+                <CalendarDays class="h-4 w-4 text-muted-foreground" />
+                {{ selectedDateLabel }}
+              </Button>
             </PopoverTrigger>
-            <PopoverContent class="w-auto p-0 z-[9999]" :side="'top'" :align="'center'">
-              <div class="px-3 py-2 min-w-[150px] max-w-[200px]">
-                <div class="flex flex-col gap-2">
-                  <!-- Location -->
-                  <div class="flex items-start gap-1.5">
-                    <svg
-                      class="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-600"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                    <p class="text-xs font-normal text-gray-700 dark:text-gray-300 break-words">
-                      {{ tracking.calculatedLocation || tracking.manualLocation || 'N/A' }}
-                    </p>
-                  </div>
-
-                  <!-- Annotation -->
-                  <div
-                    v-if="tracking.annotation"
-                    class="flex items-center gap-1.5 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700"
-                  >
-                    <svg
-                      class="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">
-                      {{ tracking.annotation }}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <PopoverContent class="w-auto p-0" align="start">
+              <CalendarComponent
+                v-model="selectedCalendarDate"
+                :max-value="maximumCalendarDate"
+                initial-focus
+              />
             </PopoverContent>
           </Popover>
-        </CustomMarker>
-      </GoogleMap>
-    </div>
+        </div>
+      </div>
 
-    <!-- Live Share Modal -->
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div v-if="isLoading" class="space-y-2 p-4">
+          <Skeleton v-for="index in 7" :key="index" class="h-16 w-full" />
+        </div>
+        <div
+          v-else-if="error"
+          class="m-4 rounded-md border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive"
+        >
+          {{ error }}
+        </div>
+        <div
+          v-else-if="historyEntries.length === 0"
+          class="px-4 py-10 text-center text-sm text-muted-foreground"
+        >
+          No tracking points for this day
+        </div>
+        <div v-else class="divide-y divide-border">
+          <div v-for="(entry, index) in historyEntries" :key="entry.point.id" class="px-4 py-3">
+            <div class="flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-normal">
+                  <span class="mr-1 font-medium text-muted-foreground">
+                    {{ historyEntries.length - index }}.
+                  </span>
+                  <template v-if="historyAddress(entry.point)">
+                    {{ historyAddress(entry.point) }}
+                  </template>
+                  <template v-else>
+                    <span>{{ pointCoordinates(entry.point) }}</span>
+                    <button
+                      type="button"
+                      class="ml-1.5 whitespace-nowrap text-xs font-medium text-primary hover:underline disabled:cursor-wait disabled:opacity-60"
+                      :disabled="isHistoryAddressLoading(entry.point)"
+                      @click="showHistoryAddress(entry.point)"
+                    >
+                      {{ isHistoryAddressLoading(entry.point) ? 'Loading…' : 'Show Address' }}
+                    </button>
+                  </template>
+                </div>
+                <div
+                  class="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground"
+                >
+                  <span class="flex items-center gap-1.5">
+                    <CalendarDays class="h-4 w-4" />
+                    {{ entry.timeRange }}
+                  </span>
+                  <span class="flex items-center gap-1.5">
+                    <Clock class="h-4 w-4" />
+                    {{ entry.duration }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="relative min-w-0 flex-1">
+      <RouteEldTrackingMap
+        :key="`${id}:${selectedDate}`"
+        :points="tracking?.points || []"
+        :is-live="isToday"
+        :current-status="tracking?.driver.currentStatus"
+      />
+      <div
+        v-if="isLoading"
+        class="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px]"
+      >
+        <LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    </main>
+
     <LiveShareModal
       v-model:open="liveModal"
       :emails="liveState.emails"
       :telegrams="liveState.telegrams"
       :expire-at="liveState.expireAt"
       :save-loading="saveLoading"
-      @add-email="addEmail"
-      @remove-email="removeEmail"
-      @add-telegram="addTelegram"
-      @remove-telegram="removeTelegram"
-      @update:email="updateEmail"
-      @update:telegram="updateTelegram"
+      :share-url="generatedShareUrl"
+      @add-email="liveState.emails.push('')"
+      @remove-email="removeRecipient(liveState.emails, $event)"
+      @add-telegram="liveState.telegrams.push('')"
+      @remove-telegram="removeRecipient(liveState.telegrams, $event)"
+      @update:email="(index, value) => updateRecipient(liveState.emails, index, value)"
+      @update:telegram="(index, value) => updateRecipient(liveState.telegrams, index, value)"
       @update:expire-at="liveState.expireAt = $event"
       @submit="submitLiveShare"
     />
@@ -653,69 +208,264 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
-import { GoogleMap, CustomMarker } from 'vue3-google-map'
-import { mapStyles } from '@/utils/maps'
-import { ChevronRight, Share2, X, Calendar, Clock, Car, Plus, Navigation } from 'lucide-vue-next'
-import { useOverviewId } from '../composables/useOverviewId.ts'
+import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
+import { CalendarDate } from '@internationalized/date'
+import type { DateValue } from 'reka-ui'
+import { CalendarDays, Clock, LoaderCircle, Share2, X } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { RangeCalendar } from '@/components/ui/range-calendar'
+import { Skeleton } from '@/components/ui/skeleton'
 import LiveShareModal from '../components/LiveShareModal.vue'
-import SearchAutocomplete from '../components/SearchAutocomplete.vue'
-import OverviewMapControls from '../components/OverviewMapControls.vue'
+import RouteEldTrackingMap from '../components/RouteEldTrackingMap.vue'
+import type { RouteEldLiveTrackingPoint } from '../types'
+import {
+  createRouteEldLiveShare,
+  localDateKey,
+  useRouteEldDriverTracking,
+} from '../composables/useRouteEldOverview'
+import { useGeoLocationsStore } from '../store/geoLocations'
 
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-
-const {
-  // Map
-  mapCenter, zoomMap, truckPosition, truckHeading, focusLiveTracking,
-  destinationMarker, mapInstance, mapType, truckMarker, ICON_ROT_OFFSET, dailyTrackings,
-  // Date range
-  headerDate, updateHeaderDate,
-  // Event selection
-  trackingTooltips, selectEvent, selectedEvent,
-  // Live share
-  liveModal, liveState, saveLoading, updateEmail, updateTelegram,
-  addEmail, removeEmail, addTelegram, removeTelegram, submitLiveShare,
-  // Live tracking form
-  liveTrackingForm, isLiveTrackingFormValid, stopLiveTracking,
-  // Status
-  lastEventCode, lastEventType,
-  // Calendar
-  isCalendarOpen, calendarValue, tempCalendarValueForBinding,
-  isDateDisabled, handleDateSelect, handleCancelDateSelect, handleApplyDateSelect, isApplyLoading,
-  // Map controls
-  updateMapLayer, toggleWeather, toggleStations,
-  isTrafficActive, isParkingActive, handleToggleLiveTracking, isFullscreen, toggleFullscreen,
-  // Driver info
-  driverName, driverUnit, driverPhone, driverEmail,
-  // History
-  historyEvents, formattedDistance, formatDistance, formatDuration,
-  formatDateTime, formatEventTimeRange, getEventName, headerStatusColor, firstEvent, lastEvent,
-  // Route mode (from useRouteMode via useOverviewId)
-  isRoutingMode, routeForm, selectedRouteIndex, isFetchingRoutes, routeAlternatives,
-  onSelectRouteFrom, onSelectRouteDestination, fetchRouteAlternatives, selectRoute,
-  // Mode coordination
-  handleTrafficToggle, handleParkingToggle, handleRoutingToggle,
-  // Live destination
-  onSelectDestination, handleApplyDestinationRoute,
-} = useOverviewId()
-
-// UI-only state — not business logic, stays in the page
-const fuelType = ref(0)
-const radius = ref(50)
-
-const isApplyDisabled = computed(
-  () =>
-    !tempCalendarValueForBinding.value?.start ||
-    !tempCalendarValueForBinding.value?.end ||
-    isApplyLoading.value,
-)
-
-onBeforeUnmount(() => {
-  stopLiveTracking()
+const props = defineProps<{ id: string }>()
+const router = useRouter()
+const geoLocationsStore = useGeoLocationsStore()
+const driverId = computed(() => props.id)
+const today = localDateKey(new Date())
+const selectedDate = ref(today)
+const calendarOpen = ref(false)
+const { tracking, isLoading, isToday, error } = useRouteEldDriverTracking(driverId, selectedDate)
+const liveModal = ref(false)
+const saveLoading = ref(false)
+const generatedShareUrl = ref('')
+const historyAddresses = reactive<Record<string, string>>({})
+const historyAddressLoading = reactive<Record<string, boolean>>({})
+const liveState = reactive({
+  emails: [''],
+  telegrams: [''],
+  expireAt: dayjs().add(1, 'day').endOf('day'),
 })
+
+const orderedPoints = computed(() =>
+  [...(tracking.value?.points || [])].sort((left, right) => left.timestamp - right.timestamp)
+)
+const firstPoint = computed(() => orderedPoints.value[0] ?? null)
+const lastPoint = computed(() => orderedPoints.value.at(-1) ?? null)
+const historyEntries = computed(() =>
+  orderedPoints.value
+    .map((point, index, points) => {
+      const endTimestamp = points[index + 1]?.timestamp ?? point.timestamp
+      return {
+        point,
+        timeRange: formatHistoryRange(point.timestamp, endTimestamp),
+        duration: formatDuration(Math.max(0, endTimestamp - point.timestamp)),
+      }
+    })
+    .reverse()
+)
+const startLabel = computed(() =>
+  firstPoint.value ? formatSummaryTime(firstPoint.value.timestamp) : '—'
+)
+const endLabel = computed(() =>
+  lastPoint.value ? formatSummaryTime(lastPoint.value.timestamp) : '—'
+)
+const distanceLabel = computed(() => `${routeDistance().toFixed(1)} mi`)
+const selectedDateLabel = computed(() =>
+  new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    new Date(`${selectedDate.value}T00:00:00`)
+  )
+)
+const latestSpeedLabel = computed(() => {
+  const speed = lastPoint.value?.speed
+  return speed == null ? '—' : `${speed.toFixed(1)} mph`
+})
+const lastUpdateLabel = computed(() =>
+  lastPoint.value
+    ? new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(lastPoint.value.timestamp)
+    : '—'
+)
+const maximumCalendarDate = toCalendarDate(today)
+const selectedCalendarDate = computed<DateValue>({
+  get: () => toCalendarDate(selectedDate.value),
+  set: (value) => {
+    selectedDate.value = `${value.year}-${String(value.month).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`
+    calendarOpen.value = false
+  },
+})
+function toCalendarDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new CalendarDate(year, month, day)
+}
+
+function openShare() {
+  liveState.emails = ['']
+  liveState.telegrams = ['']
+  liveState.expireAt = dayjs().add(1, 'day').endOf('day')
+  generatedShareUrl.value = ''
+  liveModal.value = true
+}
+
+function updateRecipient(values: string[], index: number, value: string) {
+  values[index] = value
+}
+
+function removeRecipient(values: string[], index: number) {
+  if (values.length > 1) values.splice(index, 1)
+  else values[0] = ''
+}
+
+async function submitLiveShare() {
+  const driver = tracking.value?.driver
+  if (!driver?.vehicleId) {
+    toast.error('This driver has no vehicle available for live sharing.')
+    return
+  }
+  saveLoading.value = true
+  try {
+    const createdShare = await createRouteEldLiveShare({
+      companyId: driver.externalCompanyId,
+      vehicleId: driver.vehicleId,
+      expiresAt: liveState.expireAt.toISOString(),
+      recipientEmails: liveState.emails.map((value) => value.trim()).filter(Boolean),
+      recipientTelegrams: liveState.telegrams.map(normalizeTelegram).filter(Boolean),
+    })
+    generatedShareUrl.value = createdShare.shareUrl
+  } catch {
+    toast.error('The live tracking link could not be sent.')
+  } finally {
+    saveLoading.value = false
+  }
+}
+
+function normalizeTelegram(value: string) {
+  const normalized = value.trim()
+  if (
+    !normalized ||
+    normalized.startsWith('@') ||
+    normalized.startsWith('+') ||
+    /^\d+$/.test(normalized)
+  )
+    return normalized
+  return `@${normalized}`
+}
+
+function statusColor(value: string) {
+  const normalized = value.toUpperCase()
+  if (normalized.includes('DRIVING')) return '#589e67'
+  if (normalized.includes('SLEEP')) return '#954baf'
+  if (normalized.includes('ON')) return '#6082e0'
+  if (normalized.includes('PERSONAL')) return '#d28e3d'
+  return '#af4b4b'
+}
+
+function pointLocation(point: RouteEldLiveTrackingPoint) {
+  return point.location || point.stateCode || 'Location not available'
+}
+
+function historyPointKey(point: RouteEldLiveTrackingPoint) {
+  return `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`
+}
+
+function pointCoordinates(point: RouteEldLiveTrackingPoint) {
+  return `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`
+}
+
+function historyAddress(point: RouteEldLiveTrackingPoint) {
+  return historyAddresses[historyPointKey(point)] || ''
+}
+
+function isHistoryAddressLoading(point: RouteEldLiveTrackingPoint) {
+  return Boolean(historyAddressLoading[historyPointKey(point)])
+}
+
+async function showHistoryAddress(point: RouteEldLiveTrackingPoint) {
+  const key = historyPointKey(point)
+  if (historyAddresses[key] || historyAddressLoading[key]) return
+
+  historyAddressLoading[key] = true
+  try {
+    const address = await geoLocationsStore.getCalculatedAddress({
+      latitude: point.latitude,
+      longitude: point.longitude,
+    })
+
+    if (address) historyAddresses[key] = address
+    else toast.error('The address could not be calculated for this point.')
+  } finally {
+    historyAddressLoading[key] = false
+  }
+}
+
+function formatSummaryTime(value: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value)
+}
+
+function formatClock(value: number) {
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(value)
+}
+
+function formatHistoryRange(start: number, end: number) {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const startLabel = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(startDate)
+  if (startDate.toDateString() === endDate.toDateString())
+    return `${startLabel} - ${formatClock(end)}`
+  return `${startLabel} - ${new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(endDate)}`
+}
+
+function formatDuration(milliseconds: number) {
+  const seconds = Math.floor(milliseconds / 1000)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
+  if (hours) return `${hours}h ${minutes}m ${remainingSeconds}s`
+  if (minutes) return `${minutes}m ${remainingSeconds}s`
+  return `${remainingSeconds}s`
+}
+
+function routeDistance() {
+  const points = orderedPoints.value
+  const firstOdometer = points.find((point) => point.odometer != null)?.odometer
+  const lastOdometer = [...points].reverse().find((point) => point.odometer != null)?.odometer
+  if (firstOdometer != null && lastOdometer != null && lastOdometer >= firstOdometer)
+    return lastOdometer - firstOdometer
+  let meters = 0
+  for (let index = 1; index < points.length; index += 1)
+    meters += distanceMeters(points[index - 1], points[index])
+  return meters / 1609.344
+}
+
+function distanceMeters(start: RouteEldLiveTrackingPoint, end: RouteEldLiveTrackingPoint) {
+  const latitudeDelta = ((end.latitude - start.latitude) * Math.PI) / 180
+  const longitudeDelta = ((end.longitude - start.longitude) * Math.PI) / 180
+  const startLatitude = (start.latitude * Math.PI) / 180
+  const endLatitude = (end.latitude * Math.PI) / 180
+  const value =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+}
 </script>

@@ -41,6 +41,24 @@ export interface RouteEldCompaniesResponse {
   successResult: RouteEldCompany[]
 }
 
+export interface RouteEldCompanyResponse {
+  successResult: RouteEldCompany
+}
+
+export interface RouteEldCompaniesPageResponse {
+  successResult: {
+    data: RouteEldCompany[]
+    pagination: {
+      pageNumber: number
+      pageSize: number
+      totalCount: number
+      totalPages: number
+      hasNextPage: boolean
+      hasPreviousPage: boolean
+    }
+  }
+}
+
 // Flattened company for table display
 export interface CompanyTableItem {
   id: string

@@ -96,10 +96,21 @@
               <!-- Companies List -->
               <div class="max-h-[320px] overflow-y-auto pr-1 flex flex-col gap-3">
                 <div
+                  v-if="isLoading"
+                  class="py-8 flex items-center justify-center text-muted-foreground"
+                >
+                  <LoaderCircle class="h-5 w-5 animate-spin" />
+                </div>
+                <div
                   v-for="company in filteredCompanies"
                   :key="company.id"
-                  class="flex cursor-pointer items-center justify-between rounded border border-border p-3 transition-colors hover:bg-muted/50"
-                  :class="selectedCompanyId === company.id ? 'bg-muted' : ''"
+                  class="flex items-center justify-between rounded border border-border p-3 transition-colors"
+                  :class="[
+                    selectedCompanyId === company.id ? 'bg-muted' : '',
+                    company.isActive && !selectingCompanyId
+                      ? 'cursor-pointer hover:bg-muted/50'
+                      : 'cursor-not-allowed opacity-60',
+                  ]"
                   @click="handleCompanySelection(company)"
                 >
                   <div class="flex items-center gap-3">
@@ -109,29 +120,40 @@
                       <Building class="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <div
-                        class="text-sm font-bold text-gray-900 dark:text-gray-100"
-                        v-html="highlightMatch(company.name)"
-                      ></div>
-                      <div
-                        class="mt-0.5 text-xs font-medium text-gray-400 dark:text-gray-500"
-                        v-html="'USDOT: ' + highlightMatch(company.dotNumber || '—')"
-                      ></div>
+                      <div class="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        {{ company.name }}
+                      </div>
+                      <div class="mt-0.5 text-xs font-medium text-gray-400 dark:text-gray-500">
+                        USDOT: {{ company.dotNumber || '—' }}
+                      </div>
                     </div>
                   </div>
                   <span
                     class="h-2 w-2 rounded-full"
                     :class="company.isActive ? 'bg-emerald-500' : 'bg-gray-300'"
                   ></span>
+                  <LoaderCircle
+                    v-if="selectingCompanyId === company.id"
+                    class="h-4 w-4 animate-spin text-muted-foreground"
+                  />
                 </div>
 
-                <!-- Empty State -->
                 <div
-                  v-if="filteredCompanies.length === 0"
+                  v-if="!isLoading && filteredCompanies.length === 0"
                   class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm font-medium"
                 >
-                  No companies found
+                  {{ error || 'No companies found' }}
                 </div>
+                <Button
+                  v-if="hasMore"
+                  variant="outline"
+                  class="w-full"
+                  :disabled="isLoadingMore"
+                  @click.stop="loadCompanies(true)"
+                >
+                  <LoaderCircle v-if="isLoadingMore" class="mr-2 h-4 w-4 animate-spin" />
+                  Load more
+                </Button>
               </div>
             </div>
 
@@ -169,7 +191,7 @@
   </header>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Menu,
@@ -181,6 +203,7 @@ import {
   LogOut,
   Search,
   Building,
+  LoaderCircle,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -193,7 +216,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useDarkMode } from '@/composables/useDarkMode'
-import { useCompanies } from '@/layouts/Initial/composables/useCompanies'
+import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 
@@ -212,43 +235,38 @@ const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
 
 // Company dropdown state
-const { companies, selectCompany } = useCompanies()
-const searchQuery = ref('')
+const {
+  companies,
+  selectedCompanyId,
+  selectedCompanyName,
+  searchQuery,
+  hasMore,
+  isLoading,
+  isLoadingMore,
+  selectingCompanyId,
+  error,
+  loadCompanies,
+  selectCompany,
+} = useCompanySwitcher()
 const isDropdownOpen = ref(false)
-const selectedCompanyId = ref(localStorage.getItem('companyId'))
-
-// Highlight search text
-const highlightMatch = (text: string | null | undefined): string => {
-  if (!searchQuery.value || !text) return text || ''
-  const pattern = new RegExp(`(${searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-  return text.toString().replace(pattern, '<mark>$1</mark>')
-}
-
-// Filter companies based on search
-const filteredCompanies = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return companies.value
-  }
-
-  const query = searchQuery.value.toLowerCase()
-  return companies.value.filter(
-    (company) =>
-      company.name.toLowerCase().includes(query) || company.dotNumber.toLowerCase().includes(query)
-  )
-})
-
-const selectedCompanyName = computed(
-  () => companies.value.find((company) => company.id === selectedCompanyId.value)?.name ?? ''
-)
+const filteredCompanies = computed(() => companies.value)
 
 const handleCompanySelection = async (company: RouteEldCompany) => {
   if (!company.isActive) return
-  isDropdownOpen.value = false
+  if (company.id === selectedCompanyId.value) {
+    isDropdownOpen.value = false
+    return
+  }
+  if (selectingCompanyId.value) return
   const selected = await selectCompany(company)
   if (!selected) return
-  selectedCompanyId.value = company.id
-  window.location.reload()
+  isDropdownOpen.value = false
+  window.location.assign('/eld/logs')
 }
+
+watch(isDropdownOpen, (open) => {
+  if (open) loadCompanies()
+})
 
 // Page title based on route
 const pageTitle = computed(() => {

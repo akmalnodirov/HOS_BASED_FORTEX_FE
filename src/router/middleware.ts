@@ -2,7 +2,7 @@ import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 
 // Public routes that don't require authentication
-const publicRoutes = ['Login']
+const publicRoutes = ['Login', 'RouteEldLiveShare']
 
 // Check if route requires authentication
 const requiresAuth = (route: RouteLocationNormalized): boolean => {
@@ -33,7 +33,7 @@ export const authMiddleware = async (
   // Check if route is public (Login page)
   if (!requiresAuth(to)) {
     // If token exists, redirect to companies page instead of showing login
-    if (token) {
+    if (token && to.name === 'Login') {
       next('/initial/companies')
       return
     }

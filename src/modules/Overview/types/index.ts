@@ -83,3 +83,77 @@ export interface DriversLastEventsResponse {
   successResult: DriverLastEvent[]
 }
 
+export type RouteEldMotionStatus = 'MOVING' | 'STOPPED' | 'UNKNOWN'
+
+export interface RouteEldLiveTrackingPoint {
+  id: string
+  timestamp: number
+  latitude: number
+  longitude: number
+  speed: number | null
+  odometer: number | null
+  engineHours: number | null
+  motionStatus: RouteEldMotionStatus
+  engineEventCode: string | null
+  stateCode: string | null
+  source: string | null
+  location: string | null
+  driverId: string | null
+  driverName: string | null
+}
+
+export interface RouteEldLiveDriver {
+  driverId: string
+  externalCompanyId: string
+  externalDriverId: string
+  driverName: string
+  email: string | null
+  phoneNumber: string | null
+  vehicleId: string | null
+  vehicleName: string | null
+  vehicleVin: string | null
+  currentStatus: string
+  connectionStatus: string
+  motionStatus: RouteEldMotionStatus
+  latestPoint: RouteEldLiveTrackingPoint | null
+}
+
+export interface RouteEldDriverTracking {
+  driver: RouteEldLiveDriver
+  fromTimestamp: number
+  toTimestamp: number
+  points: RouteEldLiveTrackingPoint[]
+}
+
+export interface RouteEldLiveShareResponse {
+  token: string
+  shareUrl: string
+  companyId: string
+  vehicleId: string
+  vehicleName: string
+  recipientEmail: string | null
+  recipientTelegram: string | null
+  expiresAt: string
+  recipientEmails: string[]
+  recipientTelegrams: string[]
+}
+
+export interface RouteEldLiveShareTracking {
+  expiresAt: string
+  tracking: {
+    vehicle: {
+      companyId: string
+      companyName: string
+      vehicleId: string
+      name: string
+      vin: string | null
+      driverId: string | null
+      driverName: string | null
+      motionStatus: RouteEldMotionStatus
+      latestPoint: RouteEldLiveTrackingPoint | null
+    }
+    fromTimestamp: number
+    toTimestamp: number
+    points: RouteEldLiveTrackingPoint[]
+  }
+}

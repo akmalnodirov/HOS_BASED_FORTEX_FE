@@ -64,6 +64,14 @@ const router = createRouter({
       ],
     },
     ...AuthRoutes,
+    {
+      path: '/share/route-eld/:token',
+      name: 'RouteEldLiveShare',
+      component: () => import('@/modules/Overview/pages/PRouteEldLiveShare.vue'),
+      meta: {
+        layout: 'empty',
+      },
+    },
     // {
     //   path: '/:pathMatch(.*)*',
     //   name: 'NotFound',

@@ -206,6 +206,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
+  static readonly ROUTE_ELD_COMPANIES_PAGE = `${this.ROUTE_ELD_COMPANIES}/page`
+  static readonly ROUTE_ELD_COMPANY = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}`
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
   static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
@@ -230,6 +232,12 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_STATION_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
   static readonly ROUTE_ELD_VIOLATION_ALERTS = `${this.BASE_URL}/route-eld/violation-alerts`
+  static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`
+  static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS = (driverId: string) =>
+    `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points`
+  static readonly ROUTE_ELD_LIVE_SHARE = `${this.BASE_URL}/route-eld/live-share`
+  static readonly ROUTE_ELD_LIVE_SHARE_TRACKING = (token: string) =>
+    `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`
