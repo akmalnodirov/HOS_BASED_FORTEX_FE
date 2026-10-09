@@ -267,6 +267,16 @@ export class ApiEndpoints {
   static readonly ADMIN_STATISTICS_COMPANIES = (adminId: string) =>
     `${ApiEndpoints.STATISTIC_ADMIN_URL}/companies?adminId=${adminId}`
 
+  // ALPR route analysis, reports, geocoding, and camera map endpoints
+  static readonly ALPR_ROUTES_ANALYZE = `${this.BASE_URL}/routes/analyze`
+  static readonly ALPR_REPORTS = `${this.BASE_URL}/reports`
+  static readonly ALPR_REPORT_BY_ID = (id: string) =>
+    `${ApiEndpoints.ALPR_REPORTS}/${encodeURIComponent(id)}`
+  static readonly ALPR_GEOCODE_SEARCH = `${this.BASE_URL}/geocode/search`
+  static readonly ALPR_GEOCODE_REVERSE = `${this.BASE_URL}/geocode/reverse`
+  static readonly ALPR_CAMERA_CLUSTERS = `${this.BASE_URL}/cameras/clusters`
+  static readonly ALPR_CAMERAS = `${this.BASE_URL}/cameras`
+
   // External APIs
   static readonly TELEGRAM_SEND_MESSAGE = 'https://dev-new.routeeld.uz/bot/send_message/'
   static readonly OPEN_METEO_GEOCODING = 'https://geocoding-api.open-meteo.com/v1/search'

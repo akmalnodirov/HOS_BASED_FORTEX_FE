@@ -16,6 +16,7 @@ import TruckStopsRoutes from '@/modules/TruckStops/router'
 import GeofenceRoutes from '@/modules/Geofence/router'
 import ChatRoutes from '@/modules/Chat/router'
 import ProfileRoutes from '@/modules/Profile/router'
+import AlprCameraRoutes from '@/modules/AlprCamera/router'
 import { authMiddleware } from './middleware'
 
 const router = createRouter({
@@ -41,6 +42,7 @@ const router = createRouter({
         ...GeofenceRoutes,
         ...ChatRoutes,
         ...ProfileRoutes,
+        ...AlprCameraRoutes,
       ],
     },
     {

@@ -192,6 +192,15 @@ const menuItems: MenuItem[] = [
         ],
       },
       {
+        id: 'alpr-camera',
+        label: 'ALPR Camera',
+        icon: '/icons/map.svg',
+        children: [
+          { id: 'alpr-camera-route', label: 'Route', icon: null, path: '/alpr-camera/route' },
+          { id: 'alpr-camera-history', label: 'History', icon: null, path: '/alpr-camera/history' },
+        ],
+      },
+      {
         id: 'vehicles',
         label: 'Vehicles',
         icon: '/icons/truck.svg',
