@@ -293,6 +293,7 @@ const pageTitle = computed(() => {
     '/vehicles': 'Vehicles',
     '/drivers': 'Drivers',
     '/ifta': 'IFTA',
+    '/vehicle-reports': 'Vehicle reports',
     '/route-eld-alerts': 'Alerts',
     '/company': 'Company',
     '/portal-users': 'Portal Users',
@@ -301,6 +302,7 @@ const pageTitle = computed(() => {
     '/eld/logs': 'ELD / Logs',
     '/eld/event-sessions': 'ELD / Event Sessions',
     '/eld/unidentified': 'ELD / Event Sessions',
+    '/eld/weight-stations': 'Weight stations',
     '/alpr-camera/route': 'ALPR Camera / Route',
     '/alpr-camera/history': 'ALPR Camera / History',
 

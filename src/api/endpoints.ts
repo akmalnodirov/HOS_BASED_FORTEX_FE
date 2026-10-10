@@ -206,6 +206,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
+  static readonly ROUTE_ELD_VEHICLE_REPORT = `${this.BASE_URL}/route-eld/vehicle-report`
+  static readonly ROUTE_ELD_FULL_VEHICLE_REPORT = `${this.ROUTE_ELD_VEHICLE_REPORT}/full`
   static readonly ROUTE_ELD_COMPANIES_PAGE = `${this.ROUTE_ELD_COMPANIES}/page`
   static readonly ROUTE_ELD_COMPANY = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}`
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
@@ -238,6 +240,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LIVE_SHARE = `${this.BASE_URL}/route-eld/live-share`
   static readonly ROUTE_ELD_LIVE_SHARE_TRACKING = (token: string) =>
     `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
+  static readonly ROUTE_ELD_WEIGHT_STATIONS = `${this.BASE_URL}/route-eld/weigh-stations`
+  static readonly ROUTE_ELD_WEIGHT_STATION_CLUSTERS = `${this.ROUTE_ELD_WEIGHT_STATIONS}/clusters`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`

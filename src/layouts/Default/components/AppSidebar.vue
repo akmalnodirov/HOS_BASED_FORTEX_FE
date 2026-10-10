@@ -49,8 +49,13 @@
                       : 'hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent text-gray-800 dark:text-sidebar-foreground',
                   ]"
                 >
-                  <img :src="item.icon" alt="" class="w-5 h-5 flex-shrink-0 sidebar-icon" />
-                  <!--                  <component v-if="item.icon" :is="item.icon" class="w-5 h-5 flex-shrink-0" />-->
+                  <img
+                    v-if="typeof item.icon === 'string'"
+                    :src="item.icon"
+                    alt=""
+                    class="h-5 w-5 flex-shrink-0 sidebar-icon"
+                  />
+                  <component :is="item.icon" v-else-if="item.icon" class="h-5 w-5 flex-shrink-0" />
                   <span
                     v-show="isOpen"
                     class="flex-1 text-left"
@@ -107,8 +112,13 @@
                     : 'text-gray-800 dark:text-sidebar-foreground hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
                 ]"
               >
-                <img :src="item.icon" alt="" class="w-5 h-5 flex-shrink-0 sidebar-icon" />
-                <!--                <component v-if="item.icon" :is="item.icon" class="w-5 h-5 flex-shrink-0" />-->
+                <img
+                  v-if="typeof item.icon === 'string'"
+                  :src="item.icon"
+                  alt=""
+                  class="h-5 w-5 flex-shrink-0 sidebar-icon"
+                />
+                <component :is="item.icon" v-else-if="item.icon" class="h-5 w-5 flex-shrink-0" />
                 <span v-show="isOpen">{{ item.label }}</span>
               </button>
             </template>
@@ -136,7 +146,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { LogOut, ChevronDown } from 'lucide-vue-next'
+import { FileBarChart2, LogOut, ChevronDown, Scale } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 
@@ -236,6 +246,18 @@ const menuItems: MenuItem[] = [
         label: 'IFTA',
         icon: '/icons/ifta.svg',
         path: '/ifta',
+      },
+      {
+        id: 'weight-stations',
+        label: 'Weight stations',
+        icon: Scale,
+        path: '/eld/weight-stations',
+      },
+      {
+        id: 'vehicle-reports',
+        label: 'Vehicle reports',
+        icon: FileBarChart2,
+        path: '/vehicle-reports',
       },
       {
         id: 'route-eld-alerts',
