@@ -104,7 +104,18 @@
                     : 'text-gray-800 dark:text-sidebar-foreground hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
                 ]"
               >
-                <img :src="item.icon" alt="" class="w-5 h-5 flex-shrink-0 sidebar-icon" />
+                <img
+                  v-if="typeof item.icon === 'string'"
+                  :src="item.icon"
+                  alt=""
+                  class="h-5 w-5 flex-shrink-0 sidebar-icon"
+                />
+                <component
+                  :is="item.icon"
+                  v-else-if="item.icon"
+                  class="h-5 w-5 flex-shrink-0"
+                  aria-hidden="true"
+                />
                 <span v-show="isOpen">{{ item.label }}</span>
               </button>
             </template>
@@ -129,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { FileBarChart2, LogOut, ChevronDown, Scale } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
@@ -138,7 +149,7 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 interface MenuItem {
   id: string
   label: string
-  icon: any
+  icon: string | Component | null
   path?: string
   uppercase?: boolean
   relatedPaths?: string[]

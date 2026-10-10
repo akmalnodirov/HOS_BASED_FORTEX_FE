@@ -95,48 +95,90 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-border [&>tr:first-child]:border-t-0">
-        <tr
+        <TooltipProvider
           v-for="(event, index) in sortedEvents"
           :key="event.id || event.eventId || index"
-          :data-event-id="event.id || event.eventId"
-          class="hover:bg-accent transition-colors cursor-pointer"
-          :class="{
-            'bg-primary/10': selectedEventId === event.id || selectedEventId === event.eventId,
-            'bg-accent border-l-3 border-l-primary':
-              event.id || event.eventId
-                ? selectedRowsSet.has(String(event.id || event.eventId))
-                : false,
-          }"
-          @click="selectRow(event)"
+          :delay-duration="150"
         >
-          <td class="px-4 py-3 font-normal text-foreground">{{ index + 1 }}</td>
-          <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
-          <td class="px-4 py-3 text-center">
-            <span
-              class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
-              :class="getEventBadgeClass(event.eventType, event.eventCode)"
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <tr
+                :data-event-id="event.id || event.eventId"
+                class="cursor-pointer transition-colors hover:bg-accent"
+                :class="[
+                  {
+                    'bg-primary/10':
+                      selectedEventId === event.id || selectedEventId === event.eventId,
+                    'bg-accent border-l-3 border-l-primary':
+                      event.id || event.eventId
+                        ? selectedRowsSet.has(String(event.id || event.eventId))
+                        : false,
+                    'ring-2 ring-inset ring-primary/70':
+                      eventIssuesFor(event).length > 0 &&
+                      (selectedEventId === event.id ||
+                        selectedEventId === event.eventId ||
+                        selectedRowsSet.has(String(event.id || event.eventId))),
+                  },
+                  eventIssueRowClass(event),
+                ]"
+                @click="selectRow(event)"
+              >
+                <td class="px-4 py-3 font-normal text-foreground">{{ index + 1 }}</td>
+                <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span
+                    class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
+                    :class="getEventBadgeClass(event.eventType, event.eventCode)"
+                  >
+                    {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 font-normal text-[#222222] dark:text-foreground">
+                  {{ formatDuration(event) }}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="wrap-break-word whitespace-normal">
+                    {{ getLocation(event) }}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center font-normal">
+                  {{ getOdometer(event) }}
+                </td>
+                <td class="px-4 py-3 text-center font-normal">
+                  {{ getEngineHours(event) }}
+                </td>
+                <td class="px-4 py-3 text-center">{{ getRecordOrigin(event) }}</td>
+                <td class="px-4 py-3 text-center">{{ getRecordStatus(event) }}</td>
+                <td class="px-4 py-3 text-center text-muted-foreground/60">
+                  {{ getNotes(event) }}
+                </td>
+              </tr>
+            </TooltipTrigger>
+            <TooltipContent
+              v-if="eventIssuesFor(event).length"
+              side="top"
+              align="start"
+              :side-offset="8"
+              class="max-w-sm border border-border bg-popover p-2 text-popover-foreground shadow-md"
             >
-              {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
-            </span>
-          </td>
-          <td class="px-4 py-3 font-normal text-[#222222] dark:text-foreground">
-            {{ formatDuration(event) }}
-          </td>
-          <td class="px-4 py-3 text-center">
-            <div class="wrap-break-word whitespace-normal">
-              {{ getLocation(event) }}
-            </div>
-          </td>
-          <td class="px-4 py-3 text-center font-normal">
-            {{ getOdometer(event) }}
-          </td>
-          <td class="px-4 py-3 text-center font-normal">
-            {{ getEngineHours(event) }}
-          </td>
-          <td class="px-4 py-3 text-center">{{ getRecordOrigin(event) }}</td>
-          <td class="px-4 py-3 text-center">{{ getRecordStatus(event) }}</td>
-          <td class="px-4 py-3 text-center text-muted-foreground/60">{{ getNotes(event) }}</td>
-        </tr>
+              <div class="space-y-1">
+                <div
+                  v-for="issue in eventIssuesFor(event)"
+                  :key="`${issue.severity}-${issue.code}`"
+                  class="flex items-start gap-1.5 rounded border px-2 py-1 text-xs font-medium"
+                  :class="eventIssueBadgeClass(issue)"
+                >
+                  <CircleAlert
+                    v-if="normalizeIssueSeverity(issue.severity) === 'ERROR'"
+                    class="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
+                  <TriangleAlert v-else class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{{ issue.title }}</span>
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </tbody>
     </table>
   </div>
@@ -145,9 +187,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import { Pencil } from 'lucide-vue-next'
+import { CircleAlert, Pencil, TriangleAlert } from 'lucide-vue-next'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   getEventKey,
@@ -156,6 +199,7 @@ import {
 } from '@/utils/events.ts'
 import CModalEditStatus from './CModalEditStatus.vue'
 import type { GraphResponse, DailySummaryResponse } from '../../types/chart'
+import type { RouteEldEventIssue } from '../../types/routeEldDetail'
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
 
@@ -164,6 +208,7 @@ const api = useApi()
 
 interface Props {
   events: any[]
+  eventIssues?: RouteEldEventIssue[]
   loading?: boolean
   selectedEventId?: string | null
   formatTime: (date: any, format: string) => string
@@ -179,6 +224,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  eventIssues: () => [],
   loading: false,
   selectedEventId: null,
   selectable: false,
@@ -224,6 +270,40 @@ const selectedRowsSet = computed(() => {
   }
   return internalSelectedRows.value
 })
+
+const eventIssuesByEvent = computed(() => {
+  const issuesByEvent = new Map<string, RouteEldEventIssue[]>()
+  props.eventIssues.forEach((issue) => {
+    const issues = issuesByEvent.get(issue.eventId)
+    if (issues) issues.push(issue)
+    else issuesByEvent.set(issue.eventId, [issue])
+  })
+  return issuesByEvent
+})
+
+function eventIssuesFor(event: any) {
+  const eventId = event?.id || event?.eventId
+  return eventId ? (eventIssuesByEvent.value.get(String(eventId)) ?? []) : []
+}
+
+function eventIssueRowClass(event: any) {
+  const issues = eventIssuesFor(event)
+  if (issues.some((issue) => normalizeIssueSeverity(issue.severity) === 'ERROR'))
+    return '!bg-red-50 hover:!bg-red-100 dark:!bg-red-950/35 dark:hover:!bg-red-950/50 [&_td:first-child]:border-l-4 [&_td:first-child]:border-l-red-500'
+  if (issues.some((issue) => normalizeIssueSeverity(issue.severity) === 'WARNING'))
+    return '!bg-amber-50 hover:!bg-amber-100 dark:!bg-amber-950/35 dark:hover:!bg-amber-950/50 [&_td:first-child]:border-l-4 [&_td:first-child]:border-l-amber-400'
+  return ''
+}
+
+function eventIssueBadgeClass(issue: RouteEldEventIssue) {
+  return normalizeIssueSeverity(issue.severity) === 'ERROR'
+    ? 'border-red-200 bg-red-100 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300'
+    : 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300'
+}
+
+function normalizeIssueSeverity(severity: string) {
+  return severity.toUpperCase()
+}
 
 async function focusEvent(eventId: string) {
   await nextTick()

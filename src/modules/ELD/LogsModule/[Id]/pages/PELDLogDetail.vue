@@ -25,13 +25,21 @@
 
     <div class="my-1 bg-white px-4 dark:bg-card">
       <div class="flex items-center justify-between py-4">
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-3">
           <h3 class="text-xl font-semibold text-foreground">Events</h3>
+          <CLogEventIssues
+            :event-issues="eventIssues"
+            :events="graphEvents"
+            :display-events="displayEvents"
+            :format-time="formatTime"
+            @select-event="handleIssueEvent"
+          />
         </div>
       </div>
       <CLogEventsTable
         ref="eventsTable"
         :events="displayEvents"
+        :event-issues="eventIssues"
         :loading="isDailyEventsLoading"
         :selected-event-id="selectedEventId"
         :format-time="formatTime"
@@ -87,6 +95,7 @@ import CLogEventsTable from '../components/detail/CLogEventsTable.vue'
 import CLogSignature from '../components/detail/CLogSignature.vue'
 import CLogProfileForm from '../components/detail/CLogProfileForm.vue'
 import CLogRouteEldTracking from '../components/detail/CLogRouteEldTracking.vue'
+import CLogEventIssues from '../components/detail/CLogEventIssues.vue'
 import type { useRouteEldLogDetail } from '../composables/useRouteEldLogDetail'
 
 const route = useRoute()
@@ -126,5 +135,9 @@ async function handleGraphEvent(event: { eventId?: string; id?: string }) {
   getSelectedEvent(event)
   await nextTick()
   await eventsTable.value?.focusEvent(String(eventId))
+}
+
+function handleIssueEvent(eventId: string) {
+  void handleGraphEvent({ eventId })
 }
 </script>
