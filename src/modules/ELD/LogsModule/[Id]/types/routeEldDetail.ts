@@ -9,6 +9,7 @@ export interface RouteEldHosStatus {
   currentStatus: string
   connectionStatus: string
   vehicleUnitId: string | null
+  vehicleUnitName: string | null
   latitude: number | null
   longitude: number | null
   location: string | null
@@ -85,6 +86,22 @@ export interface RouteEldTrackingPoint {
   driverId: string | null
 }
 
+export interface RouteEldCalculatedViolation {
+  eventId: string
+  type: string
+  title: string
+  startedAt: number
+  endedAt: number
+}
+
+export interface RouteEldEventIssue {
+  eventId: string
+  severity: string
+  code: string
+  title: string
+  timestamp: number
+}
+
 export interface RouteEldLogDetail {
   driverId: string
   externalDriverId: string
@@ -99,4 +116,6 @@ export interface RouteEldLogDetail {
   previousEvent: RouteEldEvent | null
   hos: RouteEldHosStatus | null
   trackingPoints: RouteEldTrackingPoint[]
+  violations: RouteEldCalculatedViolation[]
+  eventIssues: RouteEldEventIssue[]
 }

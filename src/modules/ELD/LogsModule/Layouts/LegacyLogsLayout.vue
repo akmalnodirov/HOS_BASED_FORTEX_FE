@@ -27,7 +27,9 @@
       />
     </div>
     <RouterView v-slot="{ Component }">
-      <component :is="Component" />
+      <KeepAlive>
+        <component :is="Component" />
+      </KeepAlive>
     </RouterView>
   </div>
 </template>

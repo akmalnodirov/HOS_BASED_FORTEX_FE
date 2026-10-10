@@ -180,7 +180,13 @@ const props = defineProps<Props>()
 const router = useRouter()
 const route = useRoute()
 
-const tabs = ['ALL', 'AI', 'BOOST', 'HISTORY', 'TRACKING']
+const tabs = [
+  'ALL',
+  'AI',
+  'BOOST',
+  'TRACKING',
+  // 'HISTORY'
+]
 const activeTab = ref('ALL')
 
 const isBoostPage = computed(() => route.name === 'ELDBoost')
@@ -236,23 +242,23 @@ watch(activeTab, (newTab, oldTab) => {
       }
       break
 
-    case 'HISTORY':
-      if (route.query.tab === 'history') {
-        router.push({
-          name: 'ELDLogDetail',
-          params: { id: driverId },
-          query: dateParam ? { date: dateParam } : undefined,
-        })
-        emit('history-toggle', false)
-      } else {
-        router.push({
-          name: 'ELDLogDetail',
-          params: { id: driverId },
-          query: { ...route.query, tab: 'history' },
-        })
-        emit('history-toggle', true)
-      }
-      break
+    // case 'HISTORY':
+    //   if (route.query.tab === 'history') {
+    //     router.push({
+    //       name: 'ELDLogDetail',
+    //       params: { id: driverId },
+    //       query: dateParam ? { date: dateParam } : undefined,
+    //     })
+    //     emit('history-toggle', false)
+    //   } else {
+    //     router.push({
+    //       name: 'ELDLogDetail',
+    //       params: { id: driverId },
+    //       query: { ...route.query, tab: 'history' },
+    //     })
+    //     emit('history-toggle', true)
+    //   }
+    //   break
 
     case 'TRACKING':
       if (driverId && route.name !== 'ELDTracking') {

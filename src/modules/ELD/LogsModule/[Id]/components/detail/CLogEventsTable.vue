@@ -1,5 +1,5 @@
 <template>
-  <div class="overflow-x-auto bg-white dark:bg-card max-h-[60vh]">
+  <div ref="tableContainer" class="max-h-[60vh] overflow-x-auto bg-white dark:bg-card">
     <CModalEditStatus
       v-model:open="showEditModal"
       :action="editAction"
@@ -27,90 +27,68 @@
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold w-12"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground"
-            >
-              No
-            </button>
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground">No</button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[160px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Time (CDT)
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[100px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Event
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold min-w-[100px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground">
               Duration
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[220px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Location
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[120px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Odometer
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Engine Hours
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Record Origin
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Record Status
             </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[100px]"
           >
-            <button
-              class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto"
-            >
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
               Notes
             </button>
           </th>
@@ -206,6 +184,9 @@ const props = withDefaults(defineProps<Props>(), {
   selectable: false,
   readonly: false,
   selectedRows: () => [],
+  headerDate: undefined,
+  editChartData: null,
+  dailySummary: null,
   driverVehicles: () => [],
   editLoading: false,
   chartError: '',
@@ -222,6 +203,7 @@ const emit = defineEmits<{
 }>()
 
 const internalSelectedRows = ref<Set<string>>(new Set())
+const tableContainer = ref<HTMLElement | null>(null)
 
 const selectRow = (event: any) => {
   const eventId = event.id || event.eventId
@@ -242,12 +224,22 @@ const selectedRowsSet = computed(() => {
   }
   return internalSelectedRows.value
 })
+
+async function focusEvent(eventId: string) {
+  await nextTick()
+  const rowElement = Array.from(
+    tableContainer.value?.querySelectorAll<HTMLElement>('[data-event-id]') ?? []
+  ).find((element) => element.dataset.eventId === String(eventId))
+
+  if (!rowElement) return false
+  rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  return true
+}
+
 watch(
   () => props.selectedEventId,
   async (newId) => {
     if (!newId) return
-
-    await nextTick()
 
     const event = props.events.find(
       (e) =>
@@ -265,22 +257,11 @@ watch(
       }
     }
 
-    let rowElement = document.querySelector(`[data-event-id="${newId}"]`)
-    if (!rowElement && event) {
-      const eventId = event.id || event.eventId
-      if (eventId) {
-        rowElement = document.querySelector(`[data-event-id="${eventId}"]`)
-      }
-    }
-
-    if (rowElement) {
-      rowElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      })
-    }
+    await focusEvent(String(event?.id || event?.eventId || newId))
   }
 )
+
+defineExpose({ focusEvent })
 
 const isAllSelected = computed(() => {
   if (!props.events || props.events.length === 0) return false
@@ -334,7 +315,6 @@ const toggleRowSelection = (event: any, checked: boolean) => {
     internalSelectedRows.value = next
   }
 }
-
 
 const formatEventTime = (event: any) => {
   if (!event.dateTime && !event.startedAt && !event.createdAt) return '---'

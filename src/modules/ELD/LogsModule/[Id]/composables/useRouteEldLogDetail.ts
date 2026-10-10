@@ -45,9 +45,7 @@ export function useRouteEldLogDetail() {
   const screenResolution = ref(1440)
   let controller: AbortController | null = null
 
-  const events = computed(() =>
-    [...(detail.value?.events ?? [])].sort((first, second) => first.timestamp - second.timestamp)
-  )
+  const events = computed(() => [...(detail.value?.events ?? [])].sort(compareEvents))
   const visualRange = computed(() =>
     dayRange(headerDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
   )
@@ -66,7 +64,8 @@ export function useRouteEldLogDetail() {
           graphSegments.value,
           screenResolution.value,
           headerDate.value,
-          visualRange.value.start
+          visualRange.value.start,
+          visualRange.value.end
         )
       : null
   )
@@ -91,9 +90,7 @@ export function useRouteEldLogDetail() {
     cycleDuration: clockSeconds(detail.value?.hos?.cycle),
   }))
   const dailyEvents = computed(() =>
-    dayEvents.value.map((event, index) =>
-      mapEvent(event, dayEvents.value[index + 1], visualRange.value.end, detail.value?.timeZone)
-    )
+    mapEvents(dayEvents.value, visualRange.value.end, detail.value?.timeZone)
   )
   const driverDailyForm = computed<DriverDailyFormResponse | null>(() =>
     mapProfileForm(detail.value)
@@ -112,7 +109,7 @@ export function useRouteEldLogDetail() {
       name: detail.value?.driverName || 'Unknown Driver',
       email: detail.value?.email || 'N/A',
       phone: detail.value?.phoneNumber || 'N/A',
-      vehicleUnit: detail.value?.hos?.vehicleUnitId || 'N/A',
+      vehicleUnit: detail.value?.hos?.vehicleUnitName || detail.value?.hos?.vehicleUnitId || 'N/A',
       connectionStatus: detail.value?.hos?.connectionStatus ?? 'NOT_CONNECTED',
       status: true,
       workedDurationInSeconds:
@@ -226,7 +223,7 @@ export function useRouteEldLogDetail() {
 
   function getSelectedEvent(event: any) {
     const eventId = event?.eventId || event?.id || null
-    selectedEventId.value = selectedEventId.value === eventId ? null : eventId
+    selectedEventId.value = eventId
   }
 
   function selectEvent(event: TrackingResponse) {
@@ -248,7 +245,9 @@ export function useRouteEldLogDetail() {
         headerDate.value = next
     }
   )
-  watch([driverId, () => headerDate.value.format('YYYY-MM-DD')], fetchDetail, { immediate: true })
+  watch([driverId, () => headerDate.value.format('YYYY-MM-DD')], fetchDetail, {
+    immediate: true,
+  })
   watch(
     () => detail.value?.profileForm?.signature,
     (value) => void fetchSignature(value),
@@ -270,6 +269,11 @@ export function useRouteEldLogDetail() {
     dailyTimeRemainder,
     dailyEvents,
     displayEvents: dailyEvents,
+    graphEvents: dayEvents,
+    graphRangeStart: computed(() => visualRange.value.start),
+    graphRangeEnd: computed(() => visualRange.value.end),
+    violations: computed(() => detail.value?.violations ?? []),
+    eventIssues: computed(() => detail.value?.eventIssues ?? []),
     selectedEventId,
     driverInfo,
     driverDailyForm,
@@ -329,7 +333,7 @@ function buildDutySegments(
         dutyCategories.has(event.eventCategory) &&
         event.timestamp <= end
     )
-    .sort((first, second) => first.timestamp - second.timestamp)
+    .sort(compareEvents)
   const context =
     detail.previousEvent && dutyCategories.has(detail.previousEvent.eventCategory)
       ? detail.previousEvent
@@ -377,11 +381,19 @@ function buildGraph(
   segments: DutySegment[],
   width: number,
   date: Dayjs,
-  dayStart: number
+  dayStart: number,
+  dayEnd: number
 ): GraphResponse {
-  const duties = { '1': [], '2': [], '3': [], '4': [], '5': [], '6': [] } as GraphResponse['duties']
+  const duties = {
+    '1': [],
+    '2': [],
+    '3': [],
+    '4': [],
+    '5': [],
+    '6': [],
+  } as GraphResponse['duties']
   const verticalLines: GraphResponse['verticalLines'] = []
-  const pixelsPerMillisecond = width / 86_400_000
+  const pixelsPerMillisecond = width / Math.max(1, dayEnd - dayStart)
 
   segments.forEach((value, index) => {
     const x1 = Math.max(0, (value.start - dayStart) * pixelsPerMillisecond)
@@ -412,7 +424,13 @@ function buildGraph(
     duties[String(value.order) as keyof GraphResponse['duties']].push(item)
     const next = segments[index + 1]
     if (next && next.order !== value.order)
-      verticalLines.push({ x1: x2, x2, y1: 0, y2: 0, eventOrders: [value.order, next.order] })
+      verticalLines.push({
+        x1: x2,
+        x2,
+        y1: 0,
+        y2: 0,
+        eventOrders: [value.order, next.order],
+      })
   })
 
   return {
@@ -426,14 +444,26 @@ function buildGraph(
   }
 }
 
+function mapEvents(events: RouteEldEvent[], end: number, zone?: string | null) {
+  const dutyEvents = events.filter(isActiveDutyEvent)
+  const nextDutyById = new Map<string, RouteEldEvent | undefined>()
+  dutyEvents.forEach((event, index) => nextDutyById.set(event.id, dutyEvents[index + 1]))
+  return events.map((event) =>
+    mapEvent(event, nextDutyById.get(event.id), end, zone, isActiveDutyEvent(event))
+  )
+}
+
 function mapEvent(
   event: RouteEldEvent,
   next: RouteEldEvent | undefined,
   end: number,
-  zone?: string | null
+  zone: string | null | undefined,
+  includeDuration: boolean
 ) {
   const definition = eventDefinition(event.eventCode, event.eventCategory)
-  const duration = Math.max(0, (Math.min(next?.timestamp ?? end, end) - event.timestamp) / 1000)
+  const duration = includeDuration
+    ? Math.max(0, (Math.min(next?.timestamp ?? end, end) - event.timestamp) / 1000)
+    : 0
   return {
     id: event.id,
     eventId: event.id,
@@ -459,6 +489,37 @@ function mapEvent(
   }
 }
 
+function isActiveDutyEvent(event: RouteEldEvent) {
+  return event.recordStatus === 'ACTIVE' && dutyCategories.has(event.eventCategory)
+}
+
+function compareEvents(first: RouteEldEvent, second: RouteEldEvent) {
+  return (
+    first.timestamp - second.timestamp ||
+    compareSequenceIds(first.sequenceId, second.sequenceId) ||
+    first.id.localeCompare(second.id)
+  )
+}
+
+function compareSequenceIds(first?: string | null, second?: string | null) {
+  const left = parseSequenceId(first)
+  const right = parseSequenceId(second)
+  if (left != null && right != null) return left < right ? -1 : left > right ? 1 : 0
+  if (left != null) return -1
+  if (right != null) return 1
+  return (first ?? '').localeCompare(second ?? '')
+}
+
+function parseSequenceId(value?: string | null) {
+  const normalized = value?.trim().replace(/^0x/i, '')
+  if (!normalized || !/^[0-9a-f]+$/i.test(normalized)) return null
+  try {
+    return BigInt(`0x${normalized}`)
+  } catch {
+    return null
+  }
+}
+
 function mapProfileForm(detail: RouteEldLogDetail | null): DriverDailyFormResponse | null {
   const profile = detail?.profileForm
   if (!detail || !profile) return null
@@ -479,7 +540,10 @@ function mapProfileForm(detail: RouteEldLogDetail | null): DriverDailyFormRespon
       usdotNumber: profile.dotNumber ?? '',
     },
     coDriver: coDriver
-      ? { id: profile.coDriverEmail ?? profile.coDriverName ?? '', user: coDriver }
+      ? {
+          id: profile.coDriverEmail ?? profile.coDriverName ?? '',
+          user: coDriver,
+        }
       : undefined,
     trailers: profile.trailers,
     shippingDocuments: profile.shippingDocuments,
@@ -582,7 +646,11 @@ function eventDefinition(code: string, category: string) {
     DIAG_CLEARED: { type: 7, code: 4, order: 1 },
   }
   if (code.startsWith('CERT') || code.startsWith('DR_CERT_'))
-    return { type: 4, code: Math.max(1, Number(code.match(/\d+/)?.[0] ?? 1)), order: 1 }
+    return {
+      type: 4,
+      code: Math.max(1, Number(code.match(/\d+/)?.[0] ?? 1)),
+      order: 1,
+    }
   return values[code] ?? values[`DS_${category}`] ?? null
 }
 

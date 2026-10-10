@@ -1,6 +1,8 @@
 <template>
-  <RouteEldInitialLayout v-if="route.name === 'ELDLogDetail' || route.name === 'ELDTracking'" />
-  <LegacyLogsLayout v-else />
+  <KeepAlive>
+    <RouteEldInitialLayout v-if="route.name === 'ELDLogDetail' || route.name === 'ELDTracking'" />
+    <LegacyLogsLayout v-else />
+  </KeepAlive>
 </template>
 
 <script setup lang="ts">

@@ -34,8 +34,10 @@
     </div>
     <div :class="isTrackingPage ? 'min-h-0 flex-1 overflow-hidden' : ''">
       <RouterView v-slot="{ Component }">
+        <KeepAlive>
         <component :is="Component" />
-      </RouterView>
+        </KeepAlive>
+    </RouterView>
     </div>
   </div>
 </template>
