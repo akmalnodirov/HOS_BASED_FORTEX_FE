@@ -1,5 +1,12 @@
 export type RouteEldAlertType = 'station' | 'violation' | 'speed'
 
+export interface RouteEldAlertCompany {
+  id: string
+  name: string
+  dotNumber: string | null
+  isActive: boolean
+}
+
 export interface StationAlert {
   id: string
   driverId: string

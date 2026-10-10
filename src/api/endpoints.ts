@@ -206,6 +206,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
+  static readonly ROUTE_ELD_SOURCE_COMPANIES = `${this.BASE_URL}/route-eld/source-companies`
   static readonly ROUTE_ELD_VEHICLE_REPORT = `${this.BASE_URL}/route-eld/vehicle-report`
   static readonly ROUTE_ELD_FULL_VEHICLE_REPORT = `${this.ROUTE_ELD_VEHICLE_REPORT}/full`
   static readonly ROUTE_ELD_COMPANIES_PAGE = `${this.ROUTE_ELD_COMPANIES}/page`

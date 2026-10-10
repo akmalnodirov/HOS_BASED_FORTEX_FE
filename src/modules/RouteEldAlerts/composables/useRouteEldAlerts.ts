@@ -1,9 +1,13 @@
 import { ref } from 'vue'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
-import { getCompanyId } from '@/utils/company'
-import type { RouteEldCompaniesResponse } from '@/types/company'
-import type { RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
+import type {
+  RouteEldAlertCompany,
+  RouteEldAlertType,
+  SpeedAlert,
+  StationAlert,
+  ViolationAlert,
+} from '../types'
 
 interface ApiEnvelope<T> {
   successResult: T
@@ -34,55 +38,66 @@ export function useRouteEldAlerts() {
   const stationAlerts = ref<StationAlert[]>([])
   const speedAlerts = ref<SpeedAlert[]>([])
   const violationAlerts = ref<ViolationAlert[]>([])
+  const companies = ref<RouteEldAlertCompany[]>([])
+  const companiesLoading = ref(false)
+  const companiesError = ref<string | null>(null)
   const isLoading = ref(false)
   const isRefreshing = ref(false)
   const markingReadId = ref<string | null>(null)
   const error = ref<string | null>(null)
-  const externalCompanyId = ref<string | null>(null)
   const loadedTypes = new Set<RouteEldAlertType>()
   let requestVersion = 0
 
-  async function resolveSelectedCompany() {
-    const companyId = getCompanyId()
-    if (!companyId) throw new Error('Select a company before opening alerts.')
-    const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
-    externalCompanyId.value =
-      response.data.successResult.find(
-        (company) => company.id.toLowerCase() === companyId.toLowerCase()
-      )?.externalCompanyId ?? null
-    if (!externalCompanyId.value) throw new Error('The selected company could not be resolved.')
+  async function fetchCompanies() {
+    companiesLoading.value = true
+    companiesError.value = null
+    try {
+      const response = await api.get<RouteEldAlertCompany[] | ApiEnvelope<RouteEldAlertCompany[]>>(
+        ApiEndpoints.ROUTE_ELD_SOURCE_COMPANIES,
+        { _skipErrorHandling: true }
+      )
+      companies.value = unwrap(response.data).sort((left, right) =>
+        left.name.localeCompare(right.name)
+      )
+    } catch (exception) {
+      companies.value = []
+      companiesError.value = errorMessage(exception, 'Failed to load Route ELD companies')
+    } finally {
+      companiesLoading.value = false
+    }
   }
 
-  async function fetchAlerts(type: RouteEldAlertType, silent = false) {
+  async function fetchAlerts(type: RouteEldAlertType, companyId: string | null, silent = false) {
     const version = ++requestVersion
     if (silent) isRefreshing.value = true
     else isLoading.value = true
     error.value = null
     try {
-      if (!externalCompanyId.value) await resolveSelectedCompany()
-      const params = { companyId: externalCompanyId.value }
+      const params = companyId ? { companyId } : {}
       if (type === 'station') {
         const response = await api.get<StationAlert[] | ApiEnvelope<StationAlert[]>>(
           ApiEndpoints.ROUTE_ELD_STATION_ALERTS,
           { params: { ...params, limit: 500 } }
         )
-        stationAlerts.value = unwrap(response.data)
+        if (version === requestVersion) stationAlerts.value = unwrap(response.data)
       } else if (type === 'speed') {
         const response = await api.get<SpeedAlert[] | ApiEnvelope<SpeedAlert[]>>(
           ApiEndpoints.ROUTE_ELD_SPEED_ALERTS,
           { params }
         )
-        speedAlerts.value = unwrap(response.data)
+        if (version === requestVersion) speedAlerts.value = unwrap(response.data)
       } else {
         const response = await api.get<ViolationAlert[] | ApiEnvelope<ViolationAlert[]>>(
           ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS,
           { params }
         )
-        violationAlerts.value = unwrap(response.data)
+        if (version === requestVersion) violationAlerts.value = unwrap(response.data)
       }
-      loadedTypes.add(type)
+      if (version === requestVersion) loadedTypes.add(type)
     } catch (exception) {
-      error.value = errorMessage(exception, 'Failed to load Route ELD alerts')
+      if (version === requestVersion) {
+        error.value = errorMessage(exception, 'Failed to load Route ELD alerts')
+      }
     } finally {
       if (version === requestVersion) {
         isLoading.value = false
@@ -91,8 +106,19 @@ export function useRouteEldAlerts() {
     }
   }
 
-  async function ensureAlerts(type: RouteEldAlertType) {
-    if (!loadedTypes.has(type)) await fetchAlerts(type)
+  async function ensureAlerts(type: RouteEldAlertType, companyId: string | null) {
+    if (!loadedTypes.has(type)) await fetchAlerts(type, companyId)
+  }
+
+  function resetAlerts() {
+    requestVersion++
+    loadedTypes.clear()
+    stationAlerts.value = []
+    speedAlerts.value = []
+    violationAlerts.value = []
+    error.value = null
+    isLoading.value = false
+    isRefreshing.value = false
   }
 
   async function markStationRead(id: string) {
@@ -110,12 +136,17 @@ export function useRouteEldAlerts() {
     stationAlerts,
     speedAlerts,
     violationAlerts,
+    companies,
+    companiesLoading,
+    companiesError,
     isLoading,
     isRefreshing,
     markingReadId,
     error,
+    fetchCompanies,
     fetchAlerts,
     ensureAlerts,
+    resetAlerts,
     markStationRead,
   }
 }

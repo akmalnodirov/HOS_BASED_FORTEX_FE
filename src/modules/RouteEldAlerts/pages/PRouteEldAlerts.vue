@@ -8,6 +8,19 @@
         <p class="mt-1 text-sm text-muted-foreground">{{ pageDescription }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <Select v-model="selectedCompanyId" :disabled="companiesLoading">
+          <SelectTrigger class="h-10 w-56">
+            <SelectValue
+              :placeholder="companiesLoading ? 'Loading companies…' : 'Select company'"
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All companies</SelectItem>
+            <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
+              {{ company.name }}{{ company.isActive ? '' : ' (Inactive)' }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Select v-model="alertType">
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -28,7 +41,12 @@
             </SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" class="h-10" :disabled="isRefreshing" @click="refresh">
+        <Button
+          variant="outline"
+          class="h-10"
+          :disabled="isRefreshing || companiesLoading"
+          @click="refresh"
+        >
           <RefreshCw class="mr-2 h-4 w-4" :class="isRefreshing && 'animate-spin'" />
           Refresh
         </Button>
@@ -47,10 +65,10 @@
     </div>
 
     <div
-      v-if="error"
+      v-if="pageError"
       class="mb-3 flex-none rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
     >
-      {{ error }}
+      {{ pageError }}
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
@@ -353,20 +371,30 @@ const {
   stationAlerts,
   speedAlerts,
   violationAlerts,
+  companies,
+  companiesLoading,
+  companiesError,
   isLoading,
   isRefreshing,
   markingReadId,
   error,
+  fetchCompanies,
   fetchAlerts,
   ensureAlerts,
+  resetAlerts,
   markStationRead,
 } = useRouteEldAlerts()
 
+const selectedCompanyId = ref('all')
 const alertType = ref<RouteEldAlertType>('station')
 const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
 const pageSize = ref(25)
+const requestCompanyId = computed(() =>
+  selectedCompanyId.value === 'all' ? null : selectedCompanyId.value
+)
+const pageError = computed(() => companiesError.value ?? error.value)
 
 const pageDescription = computed(() => {
   if (alertType.value === 'station') return 'Driver approaches to Route ELD weigh stations'
@@ -550,7 +578,14 @@ watch(alertType, async (value) => {
   search.value = ''
   statusFilter.value = 'all'
   pageNumber.value = 1
-  await ensureAlerts(value)
+  await ensureAlerts(value, requestCompanyId.value)
+})
+watch(selectedCompanyId, async () => {
+  search.value = ''
+  statusFilter.value = 'all'
+  pageNumber.value = 1
+  resetAlerts()
+  await ensureAlerts(alertType.value, requestCompanyId.value)
 })
 watch([search, statusFilter, pageSize], () => {
   pageNumber.value = 1
@@ -559,10 +594,13 @@ watch(totalPages, (value) => {
   if (pageNumber.value > value) pageNumber.value = value
 })
 
-onMounted(() => ensureAlerts('station'))
+onMounted(async () => {
+  await fetchCompanies()
+  await ensureAlerts('station', requestCompanyId.value)
+})
 
 function refresh() {
-  void fetchAlerts(alertType.value, true)
+  void fetchAlerts(alertType.value, requestCompanyId.value, true)
 }
 
 function rowNumber(index: number) {
