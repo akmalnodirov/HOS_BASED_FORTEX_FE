@@ -1,233 +1,106 @@
-<template>
-  <div class="min-h-screen bg-white p-[16px_24px]">
-    <div>
-      <!-- Header -->
-      <div class="mb-5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Permissions</h2>
-            <!-- Search -->
-            <div class="relative">
-              <Search
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
-              />
-              <Input v-model="searchQuery" placeholder="Search" class="pl-9 w-64" />
-            </div>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <!-- Add Permission Button -->
-            <!--            <Button-->
-            <!--              @click="openAddModal"-->
-            <!--              class="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900"-->
-            <!--            >-->
-            <!--              <span class="text-xl mr-1">+</span>-->
-            <!--              Add Permission-->
-            <!--            </Button>-->
-          </div>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <PermissionsTable
-        :permissions="paginatedPermissions"
-        :sort-key="sortKey"
-        :sort-order="sortOrder"
-        @sort="handleSort"
-        @edit="openEditModal"
-        @delete="handleDeletePermission"
-      />
-
-      <!-- Footer / Pagination -->
-      <div
-        class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between"
-      >
-        <!-- Items per page -->
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-600 dark:text-gray-400">Display on page</span>
-          <Select v-model="itemsPerPage">
-            <SelectTrigger class="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem :value="10">10</SelectItem>
-              <SelectItem :value="25">25</SelectItem>
-              <SelectItem :value="50">50</SelectItem>
-              <SelectItem :value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {{ totalEntries.toLocaleString() }} entries
-          </span>
-        </div>
-
-        <!-- Pagination -->
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1">
-            <button
-              v-for="page in pageNumbers"
-              :key="page"
-              @click="typeof page === 'number' && goToPage(page)"
-              :disabled="page === '...'"
-              :class="[
-                'min-w-[32px] h-8 px-2 text-sm font-medium rounded transition-colors',
-                page === currentPage
-                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                  : page === '...'
-                    ? 'text-gray-400 dark:text-gray-500 cursor-default'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
-              ]"
-            >
-              {{ page }}
-            </button>
-          </div>
-
-          <div class="flex items-center gap-2 ml-4">
-            <span class="text-sm text-gray-600 dark:text-gray-400">
-              {{ currentPage }} of {{ totalPages }} pages
-            </span>
-            <div class="flex gap-1">
-              <Button
-                @click="goToPage(currentPage - 1)"
-                :disabled="currentPage === 1"
-                variant="outline"
-                size="icon"
-                class="h-8 w-8"
-              >
-                <ChevronLeft class="w-4 h-4" />
-              </Button>
-              <Button
-                @click="goToPage(currentPage + 1)"
-                :disabled="currentPage === totalPages"
-                variant="outline"
-                size="icon"
-                class="h-8 w-8"
-              >
-                <ChevronRight class="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add/Edit Permission Modal -->
-    <PermissionsModal
-      :open="isModalOpen"
-      :permission="editingPermission"
-      @close="closeModal"
-      @save="handleSavePermission"
-    />
-
-    <!-- Delete Confirmation Modal -->
-    <DeleteConfirmation
-      :open="isDeleteModalOpen"
-      :is-deleting="isDeleting"
-      title="Delete permission"
-      description="Are you sure you want to delete this permission? This action cannot be undone."
-      @close="isDeleteModalOpen = false"
-      @confirm="confirmDeletePermission"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import PermissionsTable from '@/modules/UserManager/Permissions/components/CPermissionsTable.vue'
-import PermissionsModal, {
-  type PermissionFormData,
-} from '@/modules/UserManager/Permissions/components/CPermissionsModal.vue'
-import DeleteConfirmation from '@/modules/UserManager/components/CDeleteConfirmation.vue'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import PermissionsTable, { type Permission } from '@/modules/UserManager/Permissions/components/CPermissionsTable.vue'
+import PermissionsModal, { type PermissionFormData } from '@/modules/UserManager/Permissions/components/CPermissionsModal.vue'
 import { usePermissions } from '@/modules/UserManager/Permissions/composables/usePermissions'
-import type { Permission } from '@/modules/UserManager/Permissions/components/CPermissionsTable.vue'
 
-const {
-  searchQuery,
-  itemsPerPage,
-  currentPage,
-  sortKey,
-  sortOrder,
-  paginatedPermissions,
-  totalPages,
-  totalEntries,
-  pageNumbers,
-  handleSort,
-  goToPage,
-  addPermission,
-  updatePermission,
-  deletePermission,
-} = usePermissions()
-
-// Modal
+const permissions = usePermissions()
 const isModalOpen = ref(false)
-const editingPermission = ref<{ id?: string | number; name: string; code?: string } | null>(null)
+const editingPermission = ref<Permission | null>(null)
 
-// Delete Modal
-const isDeleteModalOpen = ref(false)
-const permissionToDelete = ref<Permission | null>(null)
-const isDeleting = ref(false)
-
-const openAddModal = () => {
-  editingPermission.value = null
+function openEditModal(permission: Permission) {
+  editingPermission.value = permission
   isModalOpen.value = true
 }
 
-const openEditModal = (permission: Permission) => {
-  editingPermission.value = {
-    id: permission.id,
-    name: permission.name,
-    code: (permission as any).code || '',
-  }
-  isModalOpen.value = true
-}
-
-const handleSavePermission = async (data: PermissionFormData) => {
-  try {
-    if (editingPermission.value && editingPermission.value.id) {
-      await updatePermission(editingPermission.value.id, data)
-    } else {
-      await addPermission(data)
-    }
-
-    isModalOpen.value = false
-    editingPermission.value = null
-  } catch (error) {
-    console.error('Error saving permission:', error)
-  }
-}
-
-const handleDeletePermission = (permission: Permission) => {
-  permissionToDelete.value = permission
-  isDeleteModalOpen.value = true
-}
-
-const confirmDeletePermission = async () => {
-  if (permissionToDelete.value) {
-    isDeleting.value = true
-    try {
-      await deletePermission(permissionToDelete.value.id)
-      isDeleteModalOpen.value = false
-      permissionToDelete.value = null
-    } catch (error) {
-      console.error('Error deleting permission:', error)
-    } finally {
-      isDeleting.value = false
-    }
-  }
-}
-
-const closeModal = () => {
+async function savePermission(data: PermissionFormData) {
+  if (!editingPermission.value) return
+  await permissions.updatePermission(editingPermission.value.id, data)
   isModalOpen.value = false
   editingPermission.value = null
 }
 </script>
+
+<template>
+  <div class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background">
+    <div class="mb-5 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div>
+        <h2 class="text-xl font-semibold text-foreground">Permissions</h2>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Review permission keys and update their display names.
+        </p>
+      </div>
+      <div class="relative">
+        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="permissions.searchQuery.value" placeholder="Search permissions" class="w-64 pl-9" />
+      </div>
+    </div>
+
+    <PermissionsTable
+      class="min-h-0 flex-1"
+      :permissions="permissions.paginatedPermissions.value"
+      :sort-key="permissions.sortKey.value"
+      :sort-order="permissions.sortOrder.value"
+      :loading="permissions.isLoading.value"
+      :error="permissions.error.value"
+      @sort="permissions.handleSort"
+      @edit="openEditModal"
+    />
+
+    <div class="mt-4 flex flex-none flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-muted-foreground">Display on page</span>
+        <Select v-model="permissions.itemsPerPage.value">
+          <SelectTrigger class="h-9 w-20"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="10">10</SelectItem>
+            <SelectItem :value="25">25</SelectItem>
+            <SelectItem :value="50">50</SelectItem>
+            <SelectItem :value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+        <span class="text-sm text-muted-foreground">{{ permissions.totalEntries.value }} entries</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden items-center gap-1 md:flex">
+          <button
+            v-for="page in permissions.pageNumbers.value"
+            :key="page"
+            :disabled="page === '...'"
+            :class="[
+              'h-8 min-w-8 rounded px-2 text-sm transition-colors',
+              page === permissions.currentPage.value
+                ? 'bg-primary text-primary-foreground'
+                : page === '...'
+                  ? 'cursor-default text-muted-foreground'
+                  : 'hover:bg-muted',
+            ]"
+            @click="typeof page === 'number' && permissions.goToPage(page)"
+          >
+            {{ page }}
+          </button>
+        </div>
+        <span class="whitespace-nowrap text-sm text-muted-foreground">
+          {{ permissions.totalEntries.value ? permissions.currentPage.value : 0 }} of {{ permissions.totalPages.value }} pages
+        </span>
+        <Button variant="outline" size="icon" class="h-8 w-8" :disabled="permissions.currentPage.value <= 1" @click="permissions.goToPage(permissions.currentPage.value - 1)">
+          <ChevronLeft class="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" class="h-8 w-8" :disabled="permissions.currentPage.value >= permissions.totalPages.value" @click="permissions.goToPage(permissions.currentPage.value + 1)">
+          <ChevronRight class="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+
+    <PermissionsModal
+      :open="isModalOpen"
+      :permission="editingPermission"
+      @close="isModalOpen = false"
+      @save="savePermission"
+    />
+  </div>
+</template>

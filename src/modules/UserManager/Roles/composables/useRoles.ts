@@ -288,18 +288,6 @@ export function useRoles() {
     }
   }
 
-  // Watchers with proper cleanup
-  const stopPaginationWatcher = watch(
-    [() => pagination.currentPage.value, () => pagination.itemsPerPage.value],
-    () => {
-      // Refetch roles when pagination changes (like RouteApp)
-      // Only refetch if we're not filtering locally and component is still mounted
-      if (isMounted.value && !debouncedSearch.value) {
-        fetchRoles()
-      }
-    }
-  )
-
   // Auto-fetch on mount
   onMounted(async () => {
     isMounted.value = true
@@ -310,7 +298,6 @@ export function useRoles() {
   onUnmounted(() => {
     isMounted.value = false
     stopWatcher() // Stop the watcher
-    stopPaginationWatcher() // Stop pagination watcher
   })
 
   return {

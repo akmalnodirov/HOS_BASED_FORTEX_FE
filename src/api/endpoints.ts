@@ -243,6 +243,11 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
   static readonly ROUTE_ELD_WEIGHT_STATIONS = `${this.BASE_URL}/route-eld/weigh-stations`
   static readonly ROUTE_ELD_WEIGHT_STATION_CLUSTERS = `${this.ROUTE_ELD_WEIGHT_STATIONS}/clusters`
+  static readonly ROUTE_ELD_DISPATCHERS = `${this.BASE_URL}/route-eld/dispatchers`
+  static readonly ROUTE_ELD_DISPATCHER = (id: string) =>
+    `${this.ROUTE_ELD_DISPATCHERS}/${id}`
+  static readonly ROUTE_ELD_DISPATCHER_COMPANIES = `${this.ROUTE_ELD_DISPATCHERS}/companies`
+  static readonly ROUTE_ELD_DISPATCHER_ROLES = `${this.ROUTE_ELD_DISPATCHERS}/roles`
 
   // IFTA endpoints
   private static readonly IFTA_URL = `${this.BASE_URL}/ifta`

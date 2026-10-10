@@ -8,9 +8,8 @@ import DriverRoutes from '@/modules/Drivers/router'
 import IftaRoutes from '@/modules/Ifta/router'
 import RouteEldAlertRoutes from '@/modules/RouteEldAlerts/router'
 import CompanyRoutes from '@/modules/Company/router'
-import PortalUserRoutes from '@/modules/PortalUsers/router'
+import PortalUserRoutes from '@/modules/Users/router'
 import ToolsRoutes from '@/modules/Tools/router'
-import ConfigurationRoutes from '@/modules/Configuration/router'
 import UserManagerRoutes from '@/modules/UserManager/router'
 import TruckStopsRoutes from '@/modules/TruckStops/router'
 import GeofenceRoutes from '@/modules/Geofence/router'
@@ -38,7 +37,6 @@ const router = createRouter({
         ...CompanyRoutes,
         ...PortalUserRoutes,
         ...ToolsRoutes,
-        ...ConfigurationRoutes,
         ...UserManagerRoutes,
         ...TruckStopsRoutes,
         ...GeofenceRoutes,
@@ -84,7 +82,6 @@ const router = createRouter({
   ],
 })
 
-// Apply authentication middleware
 router.beforeEach(authMiddleware)
 
 export default router

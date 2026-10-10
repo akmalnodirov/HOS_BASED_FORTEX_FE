@@ -1,5 +1,5 @@
 <template>
-  <RouteEldInitialLayout v-if="route.name === 'ELDLogDetail'" />
+  <RouteEldInitialLayout v-if="route.name === 'ELDLogDetail' || route.name === 'ELDTracking'" />
   <LegacyLogsLayout v-else />
 </template>
 

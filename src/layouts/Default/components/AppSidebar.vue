@@ -20,13 +20,10 @@
         </span>
       </div>
 
-      <!-- Separator aligned with header border -->
       <Separator class="bg-gray-300 dark:bg-sidebar-border" />
 
-      <!-- Navigation -->
       <nav class="flex-1 overflow-y-auto py-4 px-2">
         <div v-for="section in menuItems" :key="section.id" class="mb-6">
-          <!-- Section Header -->
           <div
             v-if="isOpen"
             class="px-3 mb-2 text-xs font-semibold text-gray-600 dark:text-sidebar-foreground/70 uppercase tracking-wider"
@@ -34,10 +31,8 @@
             {{ section.label }}
           </div>
 
-          <!-- Menu Items -->
           <div class="space-y-1">
             <template v-for="item in section.children" :key="item.id">
-              <!-- Parent Menu Item with Children -->
               <div v-if="item.children">
                 <button
                   @click="toggleMenu(item.id)"
@@ -72,12 +67,10 @@
                   />
                 </button>
 
-                <!-- Sub Menu Items -->
                 <div
                   v-show="isMenuExpanded(item.id) && isOpen"
                   class="ml-8 mt-1 space-y-1 relative"
                 >
-                  <!-- Vertical line connecting to parent -->
                   <div
                     class="absolute -left-3 top-0 bottom-0 w-[1px] bg-[#dbdbdb] dark:bg-sidebar-border"
                   ></div>
@@ -100,7 +93,6 @@
                 </div>
               </div>
 
-              <!-- Simple Menu Item without Children -->
               <button
                 v-else
                 @click="navigateTo(item.path)"
@@ -112,13 +104,7 @@
                     : 'text-gray-800 dark:text-sidebar-foreground hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
                 ]"
               >
-                <img
-                  v-if="typeof item.icon === 'string'"
-                  :src="item.icon"
-                  alt=""
-                  class="h-5 w-5 flex-shrink-0 sidebar-icon"
-                />
-                <component :is="item.icon" v-else-if="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <img :src="item.icon" alt="" class="w-5 h-5 flex-shrink-0 sidebar-icon" />
                 <span v-show="isOpen">{{ item.label }}</span>
               </button>
             </template>
@@ -128,7 +114,6 @@
 
       <Separator class="bg-gray-300 dark:bg-sidebar-border" />
 
-      <!-- Logout Button -->
       <button
         @click="handleLogout"
         :class="[
@@ -142,7 +127,7 @@
     </div>
   </aside>
 </template>
-<!-- src/components/layout/AppSidebar.vue -->
+
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -272,10 +257,10 @@ const menuItems: MenuItem[] = [
         path: '/company',
       },
       {
-        id: 'portal-users',
-        label: 'Portal Users',
+        id: 'users',
+        label: 'Users',
         icon: '/icons/user.svg',
-        path: '/portal-users',
+        path: '/users',
       },
     ],
   },
@@ -290,7 +275,6 @@ const menuItems: MenuItem[] = [
         icon: '/icons/users.svg',
         uppercase: true,
         children: [
-          { id: 'tools-activity', label: 'Activity', icon: null, path: '/tools/activity' },
           { id: 'tools-monitoring', label: 'Monitoring', icon: null, path: '/tools/monitoring' },
           {
             id: 'tools-dot-inspection',
@@ -298,15 +282,6 @@ const menuItems: MenuItem[] = [
             icon: null,
             path: '/tools/dot-inspection',
           },
-          {
-            id: 'tools-deletion-menu',
-            label: 'Deletion Menu',
-            icon: null,
-            path: '/tools/deletion-menu',
-          },
-          { id: 'tools-audit', label: 'Audit', icon: null, path: '/tools/audit' },
-          { id: 'tools-users', label: 'Users', icon: null, path: '/tools/users' },
-          { id: 'tools-elds', label: 'ELDs', icon: null, path: '/tools/elds' },
           {
             id: 'tools-statistic-admin',
             label: 'Statistic Admin',
@@ -318,52 +293,6 @@ const menuItems: MenuItem[] = [
             label: 'Statistic Company',
             icon: null,
             path: '/tools/statistic-company',
-          },
-        ],
-      },
-      {
-        id: 'configuration',
-        label: 'Configuration',
-        icon: '/icons/gear.svg',
-        uppercase: true,
-        children: [
-          {
-            id: 'config-issuer-states',
-            label: 'Issuer States',
-            icon: null,
-            path: '/config/issuer-states',
-          },
-          { id: 'config-hos-rules', label: 'HOS Rules', icon: null, path: '/config/hos-rules' },
-          { id: 'config-restarts', label: 'Restart', icon: null, path: '/config/restarts' },
-          {
-            id: 'config-rest-breaks',
-            label: 'Rest Breaks',
-            icon: null,
-            path: '/config/rest-breaks',
-          },
-          {
-            id: 'config-cargo-types',
-            label: 'Cargo Types',
-            icon: null,
-            path: '/config/cargo-types',
-          },
-          {
-            id: 'config-vehicle-fuels',
-            label: 'Vehicle Fuels',
-            icon: null,
-            path: '/config/vehicle-fuels',
-          },
-          {
-            id: 'tools-eld-connections',
-            label: 'ELD Connections',
-            icon: null,
-            path: '/tools/eld-connections',
-          },
-          {
-            id: 'tools-maintenance-types',
-            label: 'Maintenance Types',
-            icon: null,
-            path: '/tools/maintenance-types',
           },
         ],
       },
@@ -381,15 +310,6 @@ const menuItems: MenuItem[] = [
   },
 ]
 
-// Load expanded menus from localStorage - disabled to keep menus collapsed by default
-// onMounted(() => {
-//   const saved = localStorage.getItem('expanded-menus')
-//   if (saved) {
-//     expandedMenus.value = JSON.parse(saved)
-//   }
-// })
-
-// Save expanded menus to localStorage
 watch(
   expandedMenus,
   (newValue) => {
@@ -433,13 +353,11 @@ const navigateTo = (path?: string) => {
 const authStore = useAuthStore()
 
 const handleLogout = async () => {
-  // Use authStore logout method to clear all auth data
   await authStore.logout()
 }
 </script>
 
 <style scoped>
-/* Custom scrollbar */
 nav::-webkit-scrollbar {
   width: 6px;
 }
@@ -465,7 +383,6 @@ nav::-webkit-scrollbar-thumb:hover {
   background: #5a5a5a;
 }
 
-/* Icon styling for dark mode */
 .dark .sidebar-icon {
   filter: brightness(0) invert(1);
   opacity: 0.9;

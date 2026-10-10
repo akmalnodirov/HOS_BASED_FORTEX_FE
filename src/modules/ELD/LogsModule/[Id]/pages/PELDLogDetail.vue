@@ -63,18 +63,10 @@
       </div>
     </div>
 
-    <CLogTracking
-      :daily-trackings="dailyTrackings"
-      :every-trackings="everyTrackings"
-      :selected-event="selectedEvent"
-      :tracking-tooltips="trackingTooltips"
-      :map-center="mapCenter"
-      :zoom-map="zoomMap"
-      :tracking-collapse="trackingCollapse"
-      :directions-segments="directionsSegments"
-      :render-route-on-map="renderRouteOnMap"
-      @select-event="selectEvent"
-      @toggle-collapse="toggleTrackingCollapse"
+    <CLogRouteEldTracking
+      :points="detail?.trackingPoints ?? []"
+      :current-status="detail?.hos?.currentStatus"
+      :time-zone="detail?.timeZone"
     />
   </div>
 </template>
@@ -86,7 +78,7 @@ import CLogGraph from '../components/detail/CLogGraph.vue'
 import CLogEventsTable from '../components/detail/CLogEventsTable.vue'
 import CLogSignature from '../components/detail/CLogSignature.vue'
 import CLogProfileForm from '../components/detail/CLogProfileForm.vue'
-import CLogTracking from '../components/detail/CLogTracking.vue'
+import CLogRouteEldTracking from '../components/detail/CLogRouteEldTracking.vue'
 import type { useRouteEldLogDetail } from '../composables/useRouteEldLogDetail'
 
 const route = useRoute()
@@ -94,6 +86,7 @@ const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 
 const {
   error,
+  detail,
   chartData,
   dailySummary,
   dailyPixelViolations,
@@ -111,16 +104,5 @@ const {
   formatTime,
   driverDailyForm,
   signatureImageUrl,
-  dailyTrackings,
-  everyTrackings,
-  selectedEvent,
-  trackingTooltips,
-  trackingCollapse,
-  mapCenter,
-  zoomMap,
-  selectEvent,
-  toggleTrackingCollapse,
-  directionsSegments,
-  renderRouteOnMap,
 } = logDetail
 </script>

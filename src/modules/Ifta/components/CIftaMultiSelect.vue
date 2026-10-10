@@ -59,10 +59,22 @@
             No matches
           </div>
         </div>
-        <div v-if="modelValue.length" class="border-t border-border p-2">
+        <div
+          v-if="showSelectAll || modelValue.length"
+          class="flex items-center justify-between gap-3 border-t border-border p-2"
+        >
           <button
+            v-if="showSelectAll"
             type="button"
-            class="text-xs text-muted-foreground hover:text-foreground"
+            class="text-xs font-medium text-primary hover:underline"
+            @click="toggleAll"
+          >
+            {{ allSelected ? 'Deselect all' : 'Select all' }}
+          </button>
+          <button
+            v-if="modelValue.length && !allSelected"
+            type="button"
+            class="ml-auto text-xs text-muted-foreground hover:text-foreground"
             @click="emit('update:modelValue', [])"
           >
             Clear ({{ modelValue.length }})
@@ -92,8 +104,15 @@ const props = withDefaults(
     searchable?: boolean
     searchPlaceholder?: string
     showChips?: boolean
+    showSelectAll?: boolean
   }>(),
-  { placeholder: 'Select', searchable: false, searchPlaceholder: 'Search', showChips: false }
+  {
+    placeholder: 'Select',
+    searchable: false,
+    searchPlaceholder: 'Search',
+    showChips: false,
+    showSelectAll: false,
+  }
 )
 const emit = defineEmits<{ (event: 'update:modelValue', value: string[]): void }>()
 
@@ -106,6 +125,9 @@ const filtered = computed(() => {
 })
 const selectedOptions = computed(() =>
   props.options.filter((option) => selected.value.has(option.value))
+)
+const allSelected = computed(
+  () => props.options.length > 0 && props.options.every((option) => selected.value.has(option.value))
 )
 const summary = computed(() => {
   if (!props.modelValue.length) return props.placeholder
@@ -124,5 +146,10 @@ function toggle(value: string) {
       ? props.modelValue.filter((item) => item !== value)
       : [...props.modelValue, value]
   )
+}
+
+function toggleAll() {
+  search.value = ''
+  emit('update:modelValue', allSelected.value ? [] : props.options.map((option) => option.value))
 }
 </script>

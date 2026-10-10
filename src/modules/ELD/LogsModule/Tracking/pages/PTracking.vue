@@ -1,39 +1,28 @@
 <template>
-  <div>
-    <CLogTracking
-      :daily-trackings="dailyTrackings"
-      :every-trackings="everyTrackings"
-      :selected-event="selectedEvent"
-      :tracking-tooltips="trackingTooltips"
-      :map-center="mapCenter"
-      :zoom-map="zoomMap"
-      :tracking-collapse="trackingCollapse"
-      :directions-segments="directionsSegments"
-      :render-route-on-map="renderRouteOnMap"
-      @select-event="selectEvent"
-      @toggle-collapse="toggleTrackingCollapse"
-    />
+  <div v-if="isGraphLoading" class="flex h-full items-center justify-center bg-white dark:bg-background">
+    <LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
+  <div
+    v-else-if="error"
+    class="m-4 rounded-md border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive"
+  >
+    {{ error }}
+  </div>
+  <CLogRouteEldTracking
+    v-else
+    fill-available
+    :points="detail?.trackingPoints ?? []"
+    :current-status="detail?.hos?.currentStatus"
+    :time-zone="detail?.timeZone"
+  />
 </template>
 
 <script setup lang="ts">
 import { inject } from 'vue'
+import { LoaderCircle } from 'lucide-vue-next'
+import CLogRouteEldTracking from '@/modules/ELD/LogsModule/[Id]/components/detail/CLogRouteEldTracking.vue'
+import type { useRouteEldLogDetail } from '@/modules/ELD/LogsModule/[Id]/composables/useRouteEldLogDetail'
 
-import CLogTracking from '@/modules/ELD/LogsModule/[Id]/components/detail/CLogTracking.vue'
-
-const logDetail = inject('logDetail') as ReturnType<typeof import('@/modules/ELD/LogsModule/[Id]/composables/useELDLogDetail.ts').useELDLogDetail>
-
-const {
-  dailyTrackings,
-  everyTrackings,
-  selectedEvent,
-  trackingTooltips,
-  trackingCollapse,
-  mapCenter,
-  zoomMap,
-  selectEvent,
-  toggleTrackingCollapse,
-  directionsSegments,
-  renderRouteOnMap,
-} = logDetail
+const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
+const { detail, error, isGraphLoading } = logDetail
 </script>

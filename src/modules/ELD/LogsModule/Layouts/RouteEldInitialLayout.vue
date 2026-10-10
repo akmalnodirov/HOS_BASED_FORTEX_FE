@@ -1,6 +1,12 @@
 <template>
-  <div class="space-y-6">
-    <div class="mb-1 bg-white p-[16px_24px_0_24px] dark:bg-card">
+  <div
+    :class="
+      isTrackingPage
+        ? 'flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden'
+        : 'space-y-6'
+    "
+  >
+    <div class="mb-1 flex-none bg-white p-[16px_24px_0_24px] dark:bg-card">
       <CLogHeader
         :driver-info="
           driverInfo ? { ...driverInfo, signaturePath: driverDailyForm?.signaturePath } : undefined
@@ -26,20 +32,25 @@
         @boost-create-click="handleBoostCreate"
       />
     </div>
-    <RouterView v-slot="{ Component }">
-      <component :is="Component" />
-    </RouterView>
+    <div :class="isTrackingPage ? 'min-h-0 flex-1 overflow-hidden' : ''">
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" />
+      </RouterView>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { provide, ref } from 'vue'
+import { computed, provide, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import type { Dayjs } from 'dayjs'
 import CLogHeader from '../[Id]/components/detail/CLogHeader.vue'
 import CLogTabs from '../[Id]/components/detail/CLogTabs.vue'
 import { useRouteEldLogDetail } from '../[Id]/composables/useRouteEldLogDetail'
 
 const logDetail = useRouteEldLogDetail()
+const route = useRoute()
+const isTrackingPage = computed(() => route.name === 'ELDTracking')
 const {
   dailySummary,
   weeklyViolations,
