@@ -24,6 +24,7 @@ const formData = ref<RouteEldDriverUpdateFormData>({
   hasVan: false,
   trailers: '',
   disableSleeperBerth: false,
+  isMonitoringEnabled: false,
 })
 const errors = ref<Partial<Record<keyof RouteEldDriverUpdateFormData, string>>>({})
 const isSubmitting = ref(false)
@@ -39,6 +40,7 @@ watch(
       hasVan: driver.hasVan ?? false,
       trailers: driver.trailers ?? '',
       disableSleeperBerth: driver.disableSleeperBerth ?? false,
+      isMonitoringEnabled: driver.isMonitoringEnabled ?? false,
     }
     errors.value = {}
   },
@@ -131,10 +133,24 @@ const handleClose = () => {
         </div>
 
         <div class="space-y-3">
-          <Label>DashCam permissions</Label>
+          <Label>Route ELD settings</Label>
           <div class="grid gap-3 sm:grid-cols-2">
-            <Label for="hasVan" class="flex cursor-pointer items-center gap-3 rounded-lg border p-3">
-              <Checkbox id="hasVan" v-model:checked="formData.hasVan" :disabled="isSubmitting" />
+            <Label
+              for="isMonitoringEnabled"
+              class="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
+            >
+              <Checkbox
+                id="isMonitoringEnabled"
+                v-model="formData.isMonitoringEnabled"
+                :disabled="isSubmitting"
+              />
+              <span class="font-normal">Enable monitoring</span>
+            </Label>
+            <Label
+              for="hasVan"
+              class="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
+            >
+              <Checkbox id="hasVan" v-model="formData.hasVan" :disabled="isSubmitting" />
               <span class="font-normal">VAN permission</span>
             </Label>
             <Label
@@ -143,7 +159,7 @@ const handleClose = () => {
             >
               <Checkbox
                 id="disableSleeperBerth"
-                v-model:checked="formData.disableSleeperBerth"
+                v-model="formData.disableSleeperBerth"
                 :disabled="isSubmitting"
               />
               <span class="font-normal">Disable sleeper berth</span>

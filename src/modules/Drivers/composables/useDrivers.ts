@@ -71,8 +71,10 @@ export function useDrivers() {
 
   // State
   const drivers = ref<Driver[]>([])
+  const routeEldDrivers = ref<RouteEldDriverApiResponse[]>([])
   const totalCount = ref(0)
   const isLoading = ref(false)
+  const monitoringChangingIds = ref<Set<string>>(new Set())
   const searchQuery = ref('')
   const driverFilter = ref<DriverFilter>('all')
   const statusFilter = ref<DriverFilter>('all')
@@ -144,6 +146,7 @@ export function useDrivers() {
     hasVan: routeEldDriver?.hasVan || false,
     trailers: routeEldDriver?.trailers || '',
     disableSleeperBerth: routeEldDriver?.disableSleeperBerth || false,
+    isMonitoringEnabled: routeEldDriver?.isMonitoringEnabled ?? false,
   })
 
   // Fetch drivers from API
@@ -156,16 +159,17 @@ export function useDrivers() {
           pageNumber: pagination.currentPage.value,
           pageSize: pagination.itemsPerPage.value,
         }),
-        api.get<RouteEldDriversResponse>(ApiEndpoints.ROUTE_ELD_DRIVERS),
+        api.get<RouteEldDriversResponse>(ApiEndpoints.ROUTE_ELD_DRIVERS, {
+          params: { companyId: getCompanyId() },
+        }),
       ])
 
       if (driversResult.status === 'rejected') throw driversResult.reason
       const response = driversResult.value
-      const routeEldDrivers =
+      const routeEldData =
         routeEldResult.status === 'fulfilled' ? routeEldResult.value.data?.successResult || [] : []
-      const routeEldDriversById = new Map(
-        routeEldDrivers.map((driver) => [driver.driverId, driver])
-      )
+      routeEldDrivers.value = routeEldData
+      const routeEldDriversById = new Map(routeEldData.map((driver) => [driver.id, driver]))
 
       if (response.data?.successResult) {
         const apiData = response.data.successResult.data || []
@@ -276,6 +280,23 @@ export function useDrivers() {
   // Server-side paginated, so return filtered as-is
   const paginatedDrivers = computed(() => filteredDrivers.value)
 
+  const summary = computed(() => ({
+    total: routeEldDrivers.value.length || totalCount.value,
+    active: routeEldDrivers.value.filter((driver) => driver.isActive).length,
+    monitoringEnabled: routeEldDrivers.value.filter((driver) => driver.isMonitoringEnabled).length,
+    monitoringDisabled: routeEldDrivers.value.filter(
+      (driver) => !driver.isMonitoringEnabled
+    ).length,
+  }))
+
+  const applyMonitoringState = (id: number | string, isMonitoringEnabled: boolean) => {
+    const driverId = String(id)
+    const driver = drivers.value.find((item) => String(item.id) === driverId)
+    if (driver) driver.isMonitoringEnabled = isMonitoringEnabled
+    const routeEldDriver = routeEldDrivers.value.find((item) => item.id === driverId)
+    if (routeEldDriver) routeEldDriver.isMonitoringEnabled = isMonitoringEnabled
+  }
+
   // Status modal state
   const isStatusModalOpen = ref(false)
   const statusModalDriver = ref<Driver | null>(null)
@@ -359,16 +380,38 @@ export function useDrivers() {
         hasVan: driverData.hasVan ?? false,
         trailers: driverData.hasVan ? driverData.trailers || null : null,
         disableSleeperBerth: driverData.disableSleeperBerth ?? false,
+        isMonitoringEnabled: driverData.isMonitoringEnabled,
       }
 
       const response = await api.put(ApiEndpoints.ROUTE_ELD_DRIVER(id as string), request)
       if (response.status === 200) {
+        applyMonitoringState(id, driverData.isMonitoringEnabled)
         toast.success('Driver updated successfully')
         await fetchDrivers()
       }
     } catch (error) {
       console.error('Error updating driver:', error)
       throw error
+    }
+  }
+
+  const setMonitoring = async (driver: Driver) => {
+    const id = String(driver.id)
+    if (monitoringChangingIds.value.has(id)) return
+
+    const isMonitoringEnabled = !driver.isMonitoringEnabled
+    monitoringChangingIds.value = new Set(monitoringChangingIds.value).add(id)
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_DRIVER_MONITORING(id), { isMonitoringEnabled })
+      applyMonitoringState(id, isMonitoringEnabled)
+      toast.success(`Monitoring ${isMonitoringEnabled ? 'enabled' : 'disabled'} for ${driver.name}`)
+    } catch (error) {
+      console.error('Error updating driver monitoring:', error)
+      toast.error('Could not update monitoring')
+    } finally {
+      const pending = new Set(monitoringChangingIds.value)
+      pending.delete(id)
+      monitoringChangingIds.value = pending
     }
   }
 
@@ -405,6 +448,8 @@ export function useDrivers() {
     sortKey: sorting.sortKey,
     sortOrder: sorting.sortOrder,
     isLoading,
+    monitoringChangingIds,
+    summary,
 
     // Pagination (from usePagination)
     currentPage: pagination.currentPage,
@@ -440,6 +485,7 @@ export function useDrivers() {
     isStatusChanging,
     addDriver,
     updateDriver,
+    setMonitoring,
     logoutDriver,
     fetchDrivers,
   }

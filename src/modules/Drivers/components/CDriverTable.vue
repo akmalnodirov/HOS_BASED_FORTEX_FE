@@ -1,6 +1,6 @@
 <!-- src/components/drivers/DriversTable.vue -->
 <script setup lang="ts">
-import { Pencil } from 'lucide-vue-next'
+import { Eye, EyeOff, LoaderCircle, Pencil } from 'lucide-vue-next'
 import {
   Table,
   TableBody,
@@ -19,6 +19,7 @@ interface Props {
   itemsPerPage: number
   sortKey: SortKey
   sortOrder: SortOrder
+  monitoringChangingIds: Set<string>
 }
 
 defineProps<Props>()
@@ -26,6 +27,7 @@ defineProps<Props>()
 const emit = defineEmits<{
   (e: 'sort', key: SortKey): void
   (e: 'edit', driver: Driver): void
+  (e: 'toggle-monitoring', driver: Driver): void
 }>()
 </script>
 
@@ -102,6 +104,9 @@ const emit = defineEmits<{
             </button>
           </TableHead>
           <TableHead>
+            <span class="font-medium dark:text-gray-300">Monitoring</span>
+          </TableHead>
+          <TableHead class="w-28">
             <span class="font-medium dark:text-gray-300">Actions</span>
           </TableHead>
         </TableRow>
@@ -131,15 +136,48 @@ const emit = defineEmits<{
             </span>
           </TableCell>
           <TableCell class="p-2">
-            <Button @click="emit('edit', driver)" variant="ghost" size="icon" class="h-8 w-8">
-              <Pencil class="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </Button>
+            <span
+              :class="[
+                'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                driver.isMonitoringEnabled
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-600',
+              ]"
+            >
+              {{ driver.isMonitoringEnabled ? 'Enabled' : 'Disabled' }}
+            </span>
+          </TableCell>
+          <TableCell class="p-2">
+            <div class="flex items-center gap-1">
+              <Button @click="emit('edit', driver)" variant="ghost" size="icon" class="h-8 w-8">
+                <Pencil class="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                :class="driver.isMonitoringEnabled ? 'text-red-600' : 'text-blue-600'"
+                :disabled="monitoringChangingIds.has(String(driver.id))"
+                :aria-label="
+                  driver.isMonitoringEnabled ? 'Disable monitoring' : 'Enable monitoring'
+                "
+                :title="driver.isMonitoringEnabled ? 'Disable monitoring' : 'Enable monitoring'"
+                @click="emit('toggle-monitoring', driver)"
+              >
+                <LoaderCircle
+                  v-if="monitoringChangingIds.has(String(driver.id))"
+                  class="h-4 w-4 animate-spin"
+                />
+                <EyeOff v-else-if="driver.isMonitoringEnabled" class="h-4 w-4" />
+                <Eye v-else class="h-4 w-4" />
+              </Button>
+            </div>
           </TableCell>
         </TableRow>
 
         <!-- No results -->
         <TableRow v-if="drivers.length === 0">
-          <TableCell colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400">
+          <TableCell colspan="9" class="text-center py-8 text-gray-500 dark:text-gray-400">
             No drivers found
           </TableCell>
         </TableRow>

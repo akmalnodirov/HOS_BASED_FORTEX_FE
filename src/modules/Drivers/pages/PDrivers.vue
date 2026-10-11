@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,10 +26,28 @@ const {
   totalPages,
   totalEntries,
   pageNumbers,
+  summary,
+  monitoringChangingIds,
   handleSort,
   goToPage,
   updateDriver,
+  setMonitoring,
 } = useDrivers()
+
+const summaryCards = computed(() => [
+  { label: 'Total drivers', value: summary.value.total, className: '' },
+  { label: 'Active drivers', value: summary.value.active, className: 'text-green-600' },
+  {
+    label: 'Monitoring enabled',
+    value: summary.value.monitoringEnabled,
+    className: 'text-blue-600',
+  },
+  {
+    label: 'Monitoring disabled',
+    value: summary.value.monitoringDisabled,
+    className: 'text-orange-600',
+  },
+])
 
 const isModalOpen = ref(false)
 const editingDriver = ref<Driver | null>(null)
@@ -80,6 +98,16 @@ const closeModal = () => {
         </Select>
       </div>
     </div>
+    <div class="mb-4 grid flex-none grid-cols-2 gap-3 xl:grid-cols-4">
+      <div
+        v-for="card in summaryCards"
+        :key="card.label"
+        class="rounded-lg border border-border bg-card px-4 py-3"
+      >
+        <div class="text-xs text-muted-foreground">{{ card.label }}</div>
+        <div class="mt-1 text-2xl font-semibold" :class="card.className">{{ card.value }}</div>
+      </div>
+    </div>
     <DriversTable
       class="min-h-0 flex-1"
       :drivers="paginatedDrivers"
@@ -87,8 +115,10 @@ const closeModal = () => {
       :items-per-page="itemsPerPage"
       :sort-key="sortKey"
       :sort-order="sortOrder"
+      :monitoring-changing-ids="monitoringChangingIds"
       @sort="handleSort"
       @edit="openEditModal"
+      @toggle-monitoring="setMonitoring"
     />
     <div
       class="mt-4 flex flex-none flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"

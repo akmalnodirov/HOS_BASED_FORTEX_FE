@@ -205,6 +205,8 @@ export class ApiEndpoints {
   static readonly DRIVERS_LOGOUT_BY_ID = (id: string) => `${ApiEndpoints.DRIVERS_URL}/logout/${id}`
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
+  static readonly ROUTE_ELD_DRIVER_MONITORING = (id: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${id}/monitoring`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
   static readonly ROUTE_ELD_SOURCE_COMPANIES = `${this.BASE_URL}/route-eld/source-companies`
   static readonly ROUTE_ELD_VEHICLE_REPORT = `${this.BASE_URL}/route-eld/vehicle-report`

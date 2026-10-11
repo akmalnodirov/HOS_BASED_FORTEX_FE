@@ -89,10 +89,14 @@ export interface DriverApiResponse {
 }
 
 export interface RouteEldDriverApiResponse {
-  driverId: string
+  id: string
+  externalCompanyId: string
+  externalDriverId: string
   hasVan: boolean
   trailers: string | null
   disableSleeperBerth: boolean
+  isMonitoringEnabled: boolean
+  isActive: boolean
 }
 
 export interface RouteEldDriverUpdateFormData {
@@ -101,6 +105,7 @@ export interface RouteEldDriverUpdateFormData {
   hasVan: boolean
   trailers: string
   disableSleeperBerth: boolean
+  isMonitoringEnabled: boolean
 }
 
 export interface RouteEldDriverUpdateRequest {
@@ -109,6 +114,7 @@ export interface RouteEldDriverUpdateRequest {
   hasVan: boolean
   trailers: string | null
   disableSleeperBerth: boolean
+  isMonitoringEnabled: boolean
 }
 
 // API request shape for creating/updating
@@ -172,6 +178,7 @@ export interface Driver {
   hasVan?: boolean
   trailers?: string
   disableSleeperBerth?: boolean
+  isMonitoringEnabled?: boolean
 }
 
 export interface DriverFormData {
