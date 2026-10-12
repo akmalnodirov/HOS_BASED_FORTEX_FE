@@ -79,7 +79,7 @@ export interface RouteEldTrackingPoint {
   speed: number | null
   odometer: number | null
   engineHours: number | null
-  motionStatus: string
+  motionStatus: string | null
   engineEventCode: string | null
   stateCode: string | null
   source: string | null

@@ -115,7 +115,7 @@
               :x="(event.x1 + event.x2) / 2"
               :y="orderY(event.order) - 8"
               text-anchor="middle"
-              font-size="11"
+              font-size="12"
               fill="currentColor"
               class="pointer-events-none text-[#465A95] dark:text-[#9BA9D2]"
             >
@@ -126,11 +126,22 @@
               :x="(event.x1 + event.x2) / 2"
               :y="orderY(event.order) + 14"
               text-anchor="middle"
-              font-size="10"
+              font-size="12"
               fill="currentColor"
               class="pointer-events-none text-[#465A95] dark:text-[#9BA9D2]"
             >
-              {{ speedMilesLabel(event.value) }}
+              {{ milesLabel(event.value) }}
+            </text>
+            <text
+              v-if="event.x2 - event.x1 >= 42 && event.value.distanceMiles"
+              :x="(event.x1 + event.x2) / 2"
+              :y="orderY(event.order) + 28"
+              text-anchor="middle"
+              font-size="12"
+              fill="currentColor"
+              class="pointer-events-none text-[#465A95] dark:text-[#9BA9D2]"
+            >
+              {{ speedLabel(event.value) }}
             </text>
             <rect
               :x="event.x1"
@@ -444,11 +455,31 @@ function durationLabel(seconds: number) {
   return minute ? `${hour}h ${minute}m` : `${hour}h`
 }
 
+function speedLabel(event: GraphDuties) {
+  return `${segmentSpeed(event).toFixed(1)} mph`
+}
+
+function milesLabel(event: GraphDuties) {
+  const miles = segmentMiles(event)
+  return `${Number.isInteger(miles) ? miles.toFixed(0) : miles.toFixed(1)} mi`
+}
+
 function speedMilesLabel(event: GraphDuties) {
-  const miles = Math.max(0, event.distanceMiles ?? 0)
-  const speed = event.speedMph ?? (event.duration > 0 ? miles / (event.duration / 3600) : 0)
-  const milesText = Number.isInteger(miles) ? miles.toFixed(0) : miles.toFixed(1)
-  return `${speed.toFixed(1)} mph · ${milesText} mi`
+  return `${speedLabel(event)} · ${milesLabel(event)}`
+}
+
+function segmentMiles(event: GraphDuties) {
+  return Math.max(0, Number(event.distanceMiles) || 0)
+}
+
+function segmentSpeed(event: GraphDuties) {
+  const miles = segmentMiles(event)
+  const explicitSpeed = Number(event.speedMph)
+  return Number.isFinite(explicitSpeed)
+    ? Math.max(0, explicitSpeed)
+    : event.duration > 0
+      ? miles / (event.duration / 3600)
+      : 0
 }
 
 function segmentTitle(event: GraphDuties) {

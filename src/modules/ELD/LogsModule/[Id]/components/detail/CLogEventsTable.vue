@@ -21,7 +21,7 @@
     <div v-else-if="!events || events.length === 0" class="flex items-center justify-center p-8">
       <div class="text-muted-foreground">No events found</div>
     </div>
-    <table v-else class="min-w-350! w-full text-sm text-left text-muted-foreground">
+    <table v-else class="w-full min-w-full text-left text-sm text-muted-foreground">
       <thead class="text-xs text-foreground uppercase bg-[#F0F0F0] dark:bg-muted/50">
         <tr>
           <th
@@ -39,6 +39,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('event')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[100px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -46,6 +47,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('duration')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold min-w-[100px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground">
@@ -53,6 +55,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('location')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[220px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -60,6 +63,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('odometer')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[120px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -67,6 +71,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('engineHours')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -74,6 +79,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('recordOrigin')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -81,6 +87,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('recordStatus')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[150px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -88,6 +95,7 @@
             </button>
           </th>
           <th
+            v-if="isColumnVisible('notes')"
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[100px]"
           >
             <button class="flex items-center gap-1 cursor-pointer hover:text-foreground mx-auto">
@@ -129,7 +137,7 @@
                   {{ event.sequenceId ? parseInt(event.sequenceId, 16) : '' }}
                 </td>
                 <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
-                <td class="px-4 py-3 text-center">
+                <td v-if="isColumnVisible('event')" class="px-4 py-3 text-center">
                   <span
                     class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
                     :class="getEventBadgeClass(event.eventType, event.eventCode)"
@@ -137,23 +145,33 @@
                     {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
                   </span>
                 </td>
-                <td class="px-4 py-3 font-normal text-[#222222] dark:text-foreground">
+                <td
+                  v-if="isColumnVisible('duration')"
+                  class="px-4 py-3 font-normal text-[#222222] dark:text-foreground"
+                >
                   {{ formatDuration(event) }}
                 </td>
-                <td class="px-4 py-3 text-center">
+                <td v-if="isColumnVisible('location')" class="px-4 py-3 text-center">
                   <div class="wrap-break-word whitespace-normal">
                     {{ getLocation(event) }}
                   </div>
                 </td>
-                <td class="px-4 py-3 text-center font-normal">
+                <td v-if="isColumnVisible('odometer')" class="px-4 py-3 text-center font-normal">
                   {{ getOdometer(event) }}
                 </td>
-                <td class="px-4 py-3 text-center font-normal">
+                <td v-if="isColumnVisible('engineHours')" class="px-4 py-3 text-center font-normal">
                   {{ getEngineHours(event) }}
                 </td>
-                <td class="px-4 py-3 text-center">{{ getRecordOrigin(event) }}</td>
-                <td class="px-4 py-3 text-center">{{ getRecordStatus(event) }}</td>
-                <td class="px-4 py-3 text-center text-muted-foreground/60">
+                <td v-if="isColumnVisible('recordOrigin')" class="px-4 py-3 text-center">
+                  {{ getRecordOrigin(event) }}
+                </td>
+                <td v-if="isColumnVisible('recordStatus')" class="px-4 py-3 text-center">
+                  {{ getRecordStatus(event) }}
+                </td>
+                <td
+                  v-if="isColumnVisible('notes')"
+                  class="px-4 py-3 text-center text-muted-foreground/60"
+                >
                   {{ getNotes(event) }}
                 </td>
               </tr>
@@ -204,6 +222,10 @@ import {
 import CModalEditStatus from './CModalEditStatus.vue'
 import type { GraphResponse, DailySummaryResponse } from '../../types/chart'
 import type { RouteEldEventIssue } from '../../types/routeEldDetail'
+import type {
+  LogEventTableColumn,
+  LogEventTableColumnVisibility,
+} from '../../composables/useLogEventTableColumns'
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
 
@@ -225,6 +247,7 @@ interface Props {
   driverVehicles?: any[]
   editLoading?: boolean
   chartError?: string
+  columnVisibility: LogEventTableColumnVisibility
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -241,6 +264,10 @@ const props = withDefaults(defineProps<Props>(), {
   editLoading: false,
   chartError: '',
 })
+
+function isColumnVisible(column: LogEventTableColumn) {
+  return props.columnVisibility[column]
+}
 
 const emit = defineEmits<{
   'select-row': [event: any]

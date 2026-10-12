@@ -35,11 +35,18 @@
             @select-event="handleIssueEvent"
           />
         </div>
+        <CLogEventTableColumnSettings
+          :options="eventTableColumnOptions"
+          :model-value="eventTableColumnVisibility"
+          @toggle="setEventTableColumnVisible"
+          @show-all="showAllEventTableColumns"
+        />
       </div>
       <CLogEventsTable
         ref="eventsTable"
         :events="displayEvents"
         :event-issues="eventIssues"
+        :column-visibility="eventTableColumnVisibility"
         :loading="isDailyEventsLoading"
         :selected-event-id="selectedEventId"
         :format-time="formatTime"
@@ -96,12 +103,20 @@ import CLogSignature from '../components/detail/CLogSignature.vue'
 import CLogProfileForm from '../components/detail/CLogProfileForm.vue'
 import CLogRouteEldTracking from '../components/detail/CLogRouteEldTracking.vue'
 import CLogEventIssues from '../components/detail/CLogEventIssues.vue'
+import CLogEventTableColumnSettings from '../components/detail/CLogEventTableColumnSettings.vue'
+import { useLogEventTableColumns } from '../composables/useLogEventTableColumns'
 import type { useRouteEldLogDetail } from '../composables/useRouteEldLogDetail'
 
 const route = useRoute()
 const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 const eventsTable = ref<{ focusEvent: (eventId: string) => Promise<boolean> } | null>(null)
 const graphSection = ref<HTMLElement | null>(null)
+const {
+  columnOptions: eventTableColumnOptions,
+  visibility: eventTableColumnVisibility,
+  setColumnVisible: setEventTableColumnVisible,
+  showAllColumns: showAllEventTableColumns,
+} = useLogEventTableColumns()
 
 const {
   error,

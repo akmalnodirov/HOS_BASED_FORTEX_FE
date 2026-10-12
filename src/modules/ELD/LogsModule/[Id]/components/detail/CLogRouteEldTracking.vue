@@ -113,8 +113,8 @@ const historyEntries = computed(() =>
     .reverse()
 )
 
-function normalizeMotionStatus(value: string): RouteEldMotionStatus {
-  const normalized = value.toUpperCase()
+function normalizeMotionStatus(value?: string | null): RouteEldMotionStatus {
+  const normalized = value?.toUpperCase() ?? ''
   if (normalized === 'MOVING') return 'MOVING'
   if (normalized === 'STOPPED') return 'STOPPED'
   return 'UNKNOWN'
