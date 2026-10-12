@@ -1,13 +1,21 @@
 <template>
   <div class="w-full min-w-0 bg-white dark:bg-card">
     <div class="flex items-center justify-end border-b border-border/60 px-3 py-2">
-      <span class="mr-2 text-xs font-medium text-muted-foreground">Graph markers</span>
-      <CLogGraphMarkerSettings
-        :options="markerOptions"
-        :model-value="markerSettings"
-        @toggle="setMarkerEnabled"
-        @toggle-all="setAllMarkersEnabled"
+      <CLogViolations
+        v-if="violations.length"
+        :violations="violations"
+        :events="events"
+        @select-event="selectViolationEvent"
       />
+      <div class="flex items-center" :class="violations.length ? 'ml-3' : ''">
+        <span class="mr-2 text-xs font-medium text-muted-foreground">Graph markers</span>
+        <CLogGraphMarkerSettings
+          :options="markerOptions"
+          :model-value="markerSettings"
+          @toggle="setMarkerEnabled"
+          @toggle-all="setAllMarkersEnabled"
+        />
+      </div>
     </div>
 
     <div class="flex w-full min-w-0 py-3">
@@ -137,6 +145,31 @@
           </g>
 
           <g
+            v-for="violation in violationBands"
+            :key="`violation-${violation.type}-${violation.eventId}-${violation.startedAt}`"
+            class="cursor-pointer"
+            @click.stop="selectViolationEvent(violation.eventId)"
+          >
+            <rect
+              :x="violation.startX"
+              :y="chartTop"
+              :width="Math.max(2, violation.endX - violation.startX)"
+              :height="chartBottom - chartTop"
+              class="fill-red-400/20 stroke-red-500/70 dark:fill-red-500/15"
+              :stroke-width="selectedEventId === violation.eventId ? 2 : 1"
+            />
+            <text
+              v-if="violation.endX - violation.startX >= 80"
+              :x="violation.startX + 5"
+              :y="chartTop + 11"
+              class="pointer-events-none fill-red-700 text-[10px] font-semibold dark:fill-red-300"
+            >
+              {{ violation.shortTitle }}
+            </text>
+            <title>{{ violation.title }}</title>
+          </g>
+
+          <g
             v-for="marker in intermediateMarkers"
             :key="`intermediate-${marker.event.id}`"
             class="cursor-pointer text-[#465A95] dark:text-[#9BA9D2]"
@@ -234,6 +267,7 @@ import type {
 } from '../../types/routeEldDetail'
 import { useRouteEldLogGraphMarkers } from '../../composables/useRouteEldLogGraphMarkers'
 import CLogGraphMarkerSettings from './CLogGraphMarkerSettings.vue'
+import CLogViolations from './CLogViolations.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -258,7 +292,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'select-event': [event: GraphDuties | RouteEldEvent]
+  'select-event': [event: GraphDuties | RouteEldEvent | { eventId: string }]
 }>()
 
 const graphWidth = 1440
@@ -291,6 +325,17 @@ const eventX = (event: Pick<RouteEldEvent, 'timestamp'>) => {
     Math.max(0, ((event.timestamp - props.rangeStart) / duration) * graphWidth)
   )
 }
+
+const violationBands = computed(() =>
+  props.violations
+    .map((violation) => ({
+      ...violation,
+      startX: Math.max(0, eventX({ timestamp: violation.startedAt })),
+      endX: Math.min(graphWidth, eventX({ timestamp: violation.endedAt })),
+      shortTitle: violation.title.replace(' limit', ''),
+    }))
+    .filter((violation) => violation.startX < graphWidth && violation.endX > violation.startX)
+)
 
 const { markerOptions, markerSettings, graphMarkers, setMarkerEnabled, setAllMarkersEnabled } =
   useRouteEldLogGraphMarkers({
@@ -369,6 +414,10 @@ function markerTimeZone(code?: string | null) {
       } as Record<string, string>
     )[code?.trim().toUpperCase() ?? ''] ?? 'America/Chicago'
   )
+}
+
+function selectViolationEvent(eventId: string) {
+  emit('select-event', { eventId })
 }
 
 function orderY(order: number) {

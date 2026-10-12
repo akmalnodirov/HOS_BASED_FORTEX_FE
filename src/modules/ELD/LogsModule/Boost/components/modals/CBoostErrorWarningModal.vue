@@ -7,7 +7,7 @@
         </DialogTitle>
       </DialogHeader>
 
-      <div class="p-6 max-h-[60vh] overflow-y-auto">
+      <div class="p-6 max-h-[48vh] overflow-y-auto">
         <Table>
           <TableHeader class="bg-[#f8f9fd] dark:bg-muted/50 sticky top-0 z-10">
             <TableRow>

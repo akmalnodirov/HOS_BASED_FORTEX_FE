@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="pr-5">
+    <div ref="graphSection" class="scroll-mt-0 pr-5">
       <div v-if="isGraphLoading" class="flex items-center justify-center p-8">
         <div class="text-muted-foreground">Loading chart...</div>
       </div>
@@ -50,15 +50,15 @@
         :edit-loading="editLoading"
         :chart-error="chartError"
         readonly
-        @select-row="getSelectedEvent"
+        @select-row="handleTableEvent"
         @chart:container-update="getChartWidth"
       />
     </div>
 
     <div class="mb-1 grid grid-cols-1 items-stretch gap-1 md:grid-cols-4">
       <div class="col-span-1 flex">
-        <div class="flex flex-1 flex-col bg-white p-[16px_24px] dark:bg-card">
-          <h3 class="mb-5 text-xl font-semibold text-foreground">Signature</h3>
+        <div class="flex flex-1 flex-col bg-white p-[12px_24px] dark:bg-card">
+          <h3 class="mb-2 text-xl font-semibold text-foreground">Signature</h3>
           <div class="flex flex-1 items-center justify-center">
             <CLogSignature :signature-path="signatureImageUrl" />
           </div>
@@ -101,6 +101,7 @@ import type { useRouteEldLogDetail } from '../composables/useRouteEldLogDetail'
 const route = useRoute()
 const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 const eventsTable = ref<{ focusEvent: (eventId: string) => Promise<boolean> } | null>(null)
+const graphSection = ref<HTMLElement | null>(null)
 
 const {
   error,
@@ -139,5 +140,25 @@ async function handleGraphEvent(event: { eventId?: string; id?: string }) {
 
 function handleIssueEvent(eventId: string) {
   void handleGraphEvent({ eventId })
+}
+
+async function handleTableEvent(event: { eventId?: string; id?: string }) {
+  getSelectedEvent(event)
+  await nextTick()
+  revealGraphIfNeeded()
+}
+
+function revealGraphIfNeeded() {
+  if (typeof window === 'undefined' || !graphSection.value) return
+  const graphBounds = graphSection.value.getBoundingClientRect()
+  const headerHeight = 0
+  const graphTop = window.scrollY + graphBounds.top
+  const targetScrollY = Math.max(0, graphTop - headerHeight)
+  if (window.scrollY <= targetScrollY) return
+
+  window.scrollBy({
+    top: targetScrollY - window.scrollY,
+    behavior: 'smooth',
+  })
 }
 </script>

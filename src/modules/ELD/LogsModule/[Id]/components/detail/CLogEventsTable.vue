@@ -1,5 +1,5 @@
 <template>
-  <div ref="tableContainer" class="max-h-[60vh] overflow-x-auto bg-white dark:bg-card">
+  <div ref="tableContainer" class="max-h-[48vh] overflow-x-auto bg-white dark:bg-card">
     <CModalEditStatus
       v-model:open="showEditModal"
       :action="editAction"
@@ -25,9 +25,11 @@
       <thead class="text-xs text-foreground uppercase bg-[#F0F0F0] dark:bg-muted/50">
         <tr>
           <th
-            class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold w-12"
+            class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold whitespace-nowrap w-16"
           >
-            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground">No</button>
+            <button class="flex items-center gap-1 cursor-pointer hover:text-foreground">
+              Seq. Id
+            </button>
           </th>
           <th
             class="px-4 py-3 text-sm text-[#666666] dark:text-muted-foreground font-semibold text-center min-w-[160px]"
@@ -123,7 +125,9 @@
                 ]"
                 @click="selectRow(event)"
               >
-                <td class="px-4 py-3 font-normal text-foreground">{{ index + 1 }}</td>
+                <td class="px-4 py-3 font-normal text-foreground">
+                  {{ event.sequenceId ? parseInt(event.sequenceId, 16) : '' }}
+                </td>
                 <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
                 <td class="px-4 py-3 text-center">
                   <span
@@ -250,13 +254,16 @@ const emit = defineEmits<{
 
 const internalSelectedRows = ref<Set<string>>(new Set())
 const tableContainer = ref<HTMLElement | null>(null)
+let pendingTableSelectionId: string | null = null
 
 const selectRow = (event: any) => {
   const eventId = event.id || event.eventId
   if (!eventId) return
-  internalSelectedRows.value = new Set([String(eventId)])
+  const selectedId = String(eventId)
+  pendingTableSelectionId = selectedId
+  internalSelectedRows.value = new Set([selectedId])
   emit('select-row', event)
-  emit('update:selectedEventId', String(eventId))
+  emit('update:selectedEventId', selectedId)
 }
 
 const selectedRowsSet = computed(() => {
@@ -320,6 +327,12 @@ watch(
   () => props.selectedEventId,
   async (newId) => {
     if (!newId) return
+    const selectedId = String(newId)
+    if (pendingTableSelectionId === selectedId) {
+      pendingTableSelectionId = null
+      return
+    }
+    pendingTableSelectionId = null
 
     const event = props.events.find(
       (e) =>

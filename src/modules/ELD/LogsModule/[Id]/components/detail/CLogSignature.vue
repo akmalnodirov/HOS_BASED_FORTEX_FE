@@ -1,6 +1,6 @@
 <template>
   <div
-    class="w-full h-40 border rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden border-border"
+    class="w-full h-36 border rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden border-border"
   >
     <img
       v-if="signaturePath"

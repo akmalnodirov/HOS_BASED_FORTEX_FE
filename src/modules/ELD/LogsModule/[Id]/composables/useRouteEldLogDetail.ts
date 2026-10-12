@@ -50,10 +50,11 @@ export function useRouteEldLogDetail() {
     dayRange(headerDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
   )
   const dayEvents = computed(() =>
-    events.value.filter(
-      (event) =>
-        event.timestamp >= visualRange.value.start && event.timestamp < visualRange.value.end
-    )
+    events.value
+    // events.value.filter(
+    //   (event) =>
+    //     event.timestamp >= visualRange.value.start && event.timestamp < visualRange.value.end
+    // )
   )
   const graphSegments = computed(() =>
     buildDutySegments(detail.value, visualRange.value.start, visualRange.value.end)
