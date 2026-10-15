@@ -1,4 +1,4 @@
-export type RouteEldAlertType = 'station' | 'violation' | 'speed'
+export type RouteEldAlertType = 'station' | 'alpr' | 'violation' | 'speed'
 
 export interface RouteEldAlertCompany {
   id: string
@@ -27,6 +27,63 @@ export interface StationAlert {
   occurredAt: string
   resolvedAt: string | null
   isRead: boolean
+}
+
+export interface AlprCameraAlert {
+  id: string
+  driverId: string
+  driverName: string
+  cameraId: number
+  cameraName: string
+  cameraLatitude: number
+  cameraLongitude: number
+  bearingConfidence: string | null
+  brand: string | null
+  operator: string | null
+  driverLatitude: number
+  driverLongitude: number
+  driverLocation: string | null
+  distanceMiles: number
+  occurredAt: string
+  resolvedAt: string | null
+  isRead: boolean
+}
+
+export interface RouteEldWeighStationApproachMessage {
+  alertId: string
+  driverId: string
+  driverName: string
+  weightStationId: string
+  stationName: string
+  location: string | null
+  direction: string | null
+  marker: string | null
+  stationType: string | null
+  distanceMiles: number
+  latitude: number
+  longitude: number
+  driverLatitude: number
+  driverLongitude: number
+  driverLocation: string | null
+  occurredAt: string
+}
+
+export interface RouteEldAlprCameraApproachMessage {
+  alertId: string
+  driverId: string
+  driverName: string
+  cameraId: number
+  cameraName: string
+  distanceMiles: number
+  latitude: number
+  longitude: number
+  bearingConfidence: string | null
+  brand: string | null
+  operator: string | null
+  driverLatitude: number
+  driverLongitude: number
+  driverLocation: string | null
+  occurredAt: string
 }
 
 export interface SpeedAlert {

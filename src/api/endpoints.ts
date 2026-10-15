@@ -296,6 +296,9 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_STATION_ALERTS = `${this.BASE_URL}/route-eld/alerts`
   static readonly ROUTE_ELD_STATION_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_STATION_ALERTS}/${id}/read`
+  static readonly ROUTE_ELD_ALPR_CAMERA_ALERTS = `${this.BASE_URL}/route-eld/alpr-camera-alerts`
+  static readonly ROUTE_ELD_ALPR_CAMERA_ALERT_READ = (id: string) =>
+    `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
   static readonly ROUTE_ELD_VIOLATION_ALERTS = `${this.BASE_URL}/route-eld/violation-alerts`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`

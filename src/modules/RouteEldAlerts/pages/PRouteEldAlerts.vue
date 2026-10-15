@@ -25,6 +25,7 @@
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="station">Station Alerts</SelectItem>
+            <SelectItem value="alpr">ALPR Camera Alerts</SelectItem>
             <SelectItem value="violation">Violation Alerts</SelectItem>
             <SelectItem value="speed">Speed Alerts</SelectItem>
           </SelectContent>
@@ -172,6 +173,116 @@
           <tr v-if="!isLoading && paginatedStationAlerts.length === 0">
             <td colspan="10" class="h-28 text-center text-muted-foreground">
               No station alerts match the selected filters.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table
+        v-else-if="alertType === 'alpr'"
+        class="w-full min-w-[1380px] border-collapse text-left text-sm"
+      >
+        <thead class="sticky top-0 z-20 bg-muted text-xs text-muted-foreground">
+          <tr>
+            <th class="h-12 w-14 px-3">No</th>
+            <th class="px-3">Driver</th>
+            <th class="px-3">Camera</th>
+            <th class="px-3">Driver location</th>
+            <th class="px-3">Camera location</th>
+            <th class="px-3">Brand / operator</th>
+            <th class="px-3">Distance</th>
+            <th class="px-3">Occurred</th>
+            <th class="px-3">Status</th>
+            <th class="w-28 px-3 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="isLoading">
+            <td colspan="10" class="h-28 text-center text-muted-foreground">Loading…</td>
+          </tr>
+          <tr
+            v-for="(alert, index) in paginatedAlprCameraAlerts"
+            v-else
+            :key="alert.id"
+            class="h-12 border-t border-border transition-colors hover:bg-muted/40"
+          >
+            <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
+            <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td class="px-3">
+              <div class="font-medium">{{ alert.cameraName }}</div>
+              <div class="text-xs text-muted-foreground">
+                {{ alert.bearingConfidence || 'Bearing unknown' }}
+              </div>
+            </td>
+            <td class="max-w-64 px-3">
+              <a
+                :href="mapUrl(alert.driverLatitude, alert.driverLongitude)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2 hover:text-primary hover:underline"
+              >
+                <MapPin class="h-4 w-4 shrink-0 text-blue-600" />
+                <span class="truncate" :title="alprDriverLocation(alert)">
+                  {{ alprDriverLocation(alert) }}
+                </span>
+              </a>
+            </td>
+            <td class="max-w-64 px-3">
+              <a
+                :href="mapUrl(alert.cameraLatitude, alert.cameraLongitude)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2 hover:text-primary hover:underline"
+              >
+                <MapPin class="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span class="truncate" :title="alprCameraLocation(alert)">
+                  {{ alprCameraLocation(alert) }}
+                </span>
+              </a>
+            </td>
+            <td class="px-3">
+              <div>{{ alert.brand || '—' }}</div>
+              <div class="text-xs text-muted-foreground">{{ alert.operator || '—' }}</div>
+            </td>
+            <td class="whitespace-nowrap px-3">{{ alert.distanceMiles.toFixed(2) }} mi</td>
+            <td class="whitespace-nowrap px-3">{{ formatDate(alert.occurredAt) }}</td>
+            <td class="px-3">
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
+                  :class="
+                    alert.resolvedAt
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-orange-100 text-orange-700'
+                  "
+                >
+                  {{ alert.resolvedAt ? 'Resolved' : 'Active' }}
+                </span>
+                <span
+                  v-if="!alert.isRead"
+                  class="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
+                >
+                  Unread
+                </span>
+              </div>
+            </td>
+            <td class="px-3 text-center">
+              <Button
+                v-if="!alert.isRead"
+                variant="ghost"
+                size="sm"
+                :disabled="markingReadId === alert.id"
+                @click="markAlprCameraRead(alert.id)"
+              >
+                <LoaderCircle v-if="markingReadId === alert.id" class="mr-2 h-4 w-4 animate-spin" />
+                Mark read
+              </Button>
+              <span v-else class="text-xs text-muted-foreground">Read</span>
+            </td>
+          </tr>
+          <tr v-if="!isLoading && paginatedAlprCameraAlerts.length === 0">
+            <td colspan="10" class="h-28 text-center text-muted-foreground">
+              No ALPR camera alerts match the selected filters.
             </td>
           </tr>
         </tbody>
@@ -363,12 +474,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
+import { useRoute } from 'vue-router'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
-import type { RouteEldAlertType, SpeedAlert, StationAlert } from '../types'
+import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
+import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert } from '../types'
 
 const { formatToTimeZone } = useTimeZoneHelper()
+const route = useRoute()
 const {
   stationAlerts,
+  alprCameraAlerts,
   speedAlerts,
   violationAlerts,
   companies,
@@ -383,10 +498,19 @@ const {
   ensureAlerts,
   resetAlerts,
   markStationRead,
+  markAlprCameraRead,
 } = useRouteEldAlerts()
+const { latestWeighStationAlert, latestAlprCameraAlert } = useRouteEldAlertSocket()
 
 const selectedCompanyId = ref('all')
-const alertType = ref<RouteEldAlertType>('station')
+const requestedAlertType = route.query.type
+const alertType = ref<RouteEldAlertType>(
+  requestedAlertType === 'alpr' ||
+    requestedAlertType === 'violation' ||
+    requestedAlertType === 'speed'
+    ? requestedAlertType
+    : 'station'
+)
 const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
@@ -398,18 +522,20 @@ const pageError = computed(() => companiesError.value ?? error.value)
 
 const pageDescription = computed(() => {
   if (alertType.value === 'station') return 'Driver approaches to Route ELD weigh stations'
+  if (alertType.value === 'alpr') return 'Drivers approaching ALPR cameras'
   if (alertType.value === 'speed') return 'Drivers exceeding the state speed limit from Route ELD'
   return 'Drivers with HOS violations from Route ELD daily logs'
 })
 
 const searchPlaceholder = computed(() => {
   if (alertType.value === 'station') return 'Search driver or station'
+  if (alertType.value === 'alpr') return 'Search driver or camera'
   if (alertType.value === 'speed') return 'Search driver or location'
   return 'Search driver, date or note'
 })
 
 const statusOptions = computed(() => {
-  if (alertType.value === 'station') {
+  if (alertType.value === 'station' || alertType.value === 'alpr') {
     return [
       { value: 'all', label: 'All alerts' },
       { value: 'unread', label: 'Unread' },
@@ -430,6 +556,23 @@ const filteredStationAlerts = computed(() => {
     const matchesSearch =
       !query ||
       [alert.driverName, alert.stationName, alert.location, alert.stateCode, alert.direction].some(
+        (value) => value?.toLowerCase().includes(query)
+      )
+    const matchesStatus =
+      statusFilter.value === 'all' ||
+      (statusFilter.value === 'unread' && !alert.isRead) ||
+      (statusFilter.value === 'active' && !alert.resolvedAt) ||
+      (statusFilter.value === 'resolved' && !!alert.resolvedAt)
+    return matchesSearch && matchesStatus
+  })
+})
+
+const filteredAlprCameraAlerts = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  return alprCameraAlerts.value.filter((alert) => {
+    const matchesSearch =
+      !query ||
+      [alert.driverName, alert.cameraName, alert.brand, alert.operator, alert.driverLocation].some(
         (value) => value?.toLowerCase().includes(query)
       )
     const matchesStatus =
@@ -475,6 +618,7 @@ const filteredViolationAlerts = computed(() => {
 
 const filteredCount = computed(() => {
   if (alertType.value === 'station') return filteredStationAlerts.value.length
+  if (alertType.value === 'alpr') return filteredAlprCameraAlerts.value.length
   if (alertType.value === 'speed') return filteredSpeedAlerts.value.length
   return filteredViolationAlerts.value.length
 })
@@ -505,6 +649,9 @@ const pageSlice = computed(() => {
 const paginatedStationAlerts = computed(() =>
   filteredStationAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
 )
+const paginatedAlprCameraAlerts = computed(() =>
+  filteredAlprCameraAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
+)
 const paginatedSpeedAlerts = computed(() =>
   filteredSpeedAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
 )
@@ -529,6 +676,26 @@ const summaryCards = computed(() => {
       {
         label: 'Unread',
         value: stationAlerts.value.filter((alert) => !alert.isRead).length,
+        className: 'text-red-600',
+      },
+    ]
+  }
+  if (alertType.value === 'alpr') {
+    return [
+      { label: 'Alerts loaded', value: alprCameraAlerts.value.length, className: '' },
+      {
+        label: 'Active approaches',
+        value: alprCameraAlerts.value.filter((alert) => !alert.resolvedAt).length,
+        className: 'text-orange-600',
+      },
+      {
+        label: 'Resolved',
+        value: alprCameraAlerts.value.filter((alert) => !!alert.resolvedAt).length,
+        className: 'text-green-600',
+      },
+      {
+        label: 'Unread',
+        value: alprCameraAlerts.value.filter((alert) => !alert.isRead).length,
         className: 'text-red-600',
       },
     ]
@@ -580,6 +747,20 @@ watch(alertType, async (value) => {
   pageNumber.value = 1
   await ensureAlerts(value, requestCompanyId.value)
 })
+watch(
+  () => route.query.type,
+  (value) => {
+    if (value === 'station' || value === 'alpr' || value === 'violation' || value === 'speed') {
+      alertType.value = value
+    }
+  }
+)
+watch(latestWeighStationAlert, () => {
+  if (alertType.value === 'station') void fetchAlerts('station', requestCompanyId.value, true)
+})
+watch(latestAlprCameraAlert, () => {
+  if (alertType.value === 'alpr') void fetchAlerts('alpr', requestCompanyId.value, true)
+})
 watch(selectedCompanyId, async () => {
   search.value = ''
   statusFilter.value = 'all'
@@ -596,7 +777,7 @@ watch(totalPages, (value) => {
 
 onMounted(async () => {
   await fetchCompanies()
-  await ensureAlerts('station', requestCompanyId.value)
+  await ensureAlerts(alertType.value, requestCompanyId.value)
 })
 
 function refresh() {
@@ -638,6 +819,17 @@ function stationLocation(alert: StationAlert) {
   return (
     alert.location || `${alert.stationLatitude.toFixed(5)}, ${alert.stationLongitude.toFixed(5)}`
   )
+}
+
+function alprDriverLocation(alert: AlprCameraAlert) {
+  return (
+    alert.driverLocation ||
+    `${alert.driverLatitude.toFixed(5)}, ${alert.driverLongitude.toFixed(5)}`
+  )
+}
+
+function alprCameraLocation(alert: AlprCameraAlert) {
+  return `${alert.cameraLatitude.toFixed(5)}, ${alert.cameraLongitude.toFixed(5)}`
 }
 
 function speedLocation(alert: SpeedAlert) {

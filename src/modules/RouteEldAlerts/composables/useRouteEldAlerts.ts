@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import type {
+  AlprCameraAlert,
   RouteEldAlertCompany,
   RouteEldAlertType,
   SpeedAlert,
@@ -36,6 +37,7 @@ function errorMessage(error: unknown, fallback: string) {
 export function useRouteEldAlerts() {
   const api = useApi()
   const stationAlerts = ref<StationAlert[]>([])
+  const alprCameraAlerts = ref<AlprCameraAlert[]>([])
   const speedAlerts = ref<SpeedAlert[]>([])
   const violationAlerts = ref<ViolationAlert[]>([])
   const companies = ref<RouteEldAlertCompany[]>([])
@@ -80,6 +82,12 @@ export function useRouteEldAlerts() {
           { params: { ...params, limit: 500 } }
         )
         if (version === requestVersion) stationAlerts.value = unwrap(response.data)
+      } else if (type === 'alpr') {
+        const response = await api.get<AlprCameraAlert[] | ApiEnvelope<AlprCameraAlert[]>>(
+          ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS,
+          { params: { ...params, limit: 500 } }
+        )
+        if (version === requestVersion) alprCameraAlerts.value = unwrap(response.data)
       } else if (type === 'speed') {
         const response = await api.get<SpeedAlert[] | ApiEnvelope<SpeedAlert[]>>(
           ApiEndpoints.ROUTE_ELD_SPEED_ALERTS,
@@ -114,6 +122,7 @@ export function useRouteEldAlerts() {
     requestVersion++
     loadedTypes.clear()
     stationAlerts.value = []
+    alprCameraAlerts.value = []
     speedAlerts.value = []
     violationAlerts.value = []
     error.value = null
@@ -132,8 +141,20 @@ export function useRouteEldAlerts() {
     }
   }
 
+  async function markAlprCameraRead(id: string) {
+    markingReadId.value = id
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERT_READ(id), null)
+      const alert = alprCameraAlerts.value.find((item) => item.id === id)
+      if (alert) alert.isRead = true
+    } finally {
+      markingReadId.value = null
+    }
+  }
+
   return {
     stationAlerts,
+    alprCameraAlerts,
     speedAlerts,
     violationAlerts,
     companies,
@@ -148,5 +169,6 @@ export function useRouteEldAlerts() {
     ensureAlerts,
     resetAlerts,
     markStationRead,
+    markAlprCameraRead,
   }
 }

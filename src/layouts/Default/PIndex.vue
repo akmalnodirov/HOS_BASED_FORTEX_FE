@@ -41,6 +41,9 @@ import { useRoute } from 'vue-router'
 import AppSidebar from '@/layouts/Default/components/AppSidebar.vue'
 import AppHeader from '@/layouts/Default/components/AppHeader.vue'
 import CToggle from '@/layouts/Default/components/CToggle.vue'
+import { useRouteEldAlertNotifications } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
+
+useRouteEldAlertNotifications()
 
 const route = useRoute()
 const isSidebarOpen = ref(true)

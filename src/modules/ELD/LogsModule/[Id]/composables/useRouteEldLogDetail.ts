@@ -53,15 +53,9 @@ export function useRouteEldLogDetail() {
   const visualRange = computed(() =>
     dayRange(detailDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
   )
-  const dayEvents = computed(
-    () => events.value
-    // events.value.filter(
-    //   (event) =>
-    //     event.timestamp >= visualRange.value.start && event.timestamp < visualRange.value.end
-    // )
-  )
+  const dayEvents = computed(() => events.value)
   const graphSegments = computed(() =>
-    buildDutySegments(detail.value, visualRange.value.start, visualRange.value.end)
+    buildDutySegments(detail.value, visualRange.value.start, visualRange.value.cutoff)
   )
   const chartData = computed<GraphResponse | null>(() =>
     detail.value
@@ -95,7 +89,7 @@ export function useRouteEldLogDetail() {
     cycleDuration: clockSeconds(detail.value?.hos?.cycle),
   }))
   const dailyEvents = computed(() =>
-    mapEvents(dayEvents.value, visualRange.value.end, detail.value?.timeZone)
+    mapEvents(dayEvents.value, visualRange.value.cutoff, detail.value?.timeZone)
   )
   const driverDailyForm = computed<DriverDailyFormResponse | null>(() =>
     mapProfileForm(detail.value)
@@ -156,7 +150,7 @@ export function useRouteEldLogDetail() {
       lastName: '',
       email: detail.value.email ?? '',
       phoneNumber: detail.value.phoneNumber ?? '',
-      trackingEventResponse: trackingEvents(detail.value, visualRange.value.end),
+      trackingEventResponse: trackingEvents(detail.value, visualRange.value.cutoff),
     }
   })
   const mapCenter = computed(() => trackingCenter(detail.value?.trackingPoints ?? []))
@@ -693,9 +687,10 @@ function dayRange(date: string, code?: string | null) {
   const next = new Date(`${date}T00:00:00Z`)
   next.setUTCDate(next.getUTCDate() + 1)
   const nextDate = next.toISOString().slice(0, 10)
-  const dayEnd = dayStartTimestamp(nextDate, code)
+  const end = dayStartTimestamp(nextDate, code)
   const now = Date.now()
-  return { start, end: now > start && now < dayEnd ? now : dayEnd }
+  const cutoff = Math.min(end, Math.max(start, now))
+  return { start, end, cutoff }
 }
 
 function dayStartTimestamp(date: string, code?: string | null) {
