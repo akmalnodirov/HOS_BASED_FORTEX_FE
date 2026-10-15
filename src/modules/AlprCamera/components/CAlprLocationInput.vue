@@ -5,6 +5,7 @@
       :placeholder="placeholder"
       autocomplete="off"
       class="h-10 pr-9"
+      :class="coordinateError && 'border-destructive focus-visible:ring-destructive/30'"
       @update:model-value="handleInput"
       @focus="handleFocus"
       @blur="closeLater"
@@ -14,6 +15,10 @@
       class="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground"
     />
     <MapPin v-else class="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+
+    <p v-if="coordinateError" class="mt-1 text-xs font-medium text-destructive">
+      {{ coordinateError }}
+    </p>
 
     <div
       v-if="open"
@@ -42,7 +47,9 @@ import { LoaderCircle, MapPin } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
-import type { AlprLocation } from '../types'
+import { formatAlprCoordinates, parseAlprCoordinateInput } from '../utils/alprCoordinates'
+import type { AlprCoordinates } from '../utils/alprCoordinates'
+import type { AlprLocation, AlprReverseGeocodeResult } from '../types'
 
 const props = defineProps<{
   modelValue: string
@@ -61,6 +68,7 @@ const query = ref(props.modelValue)
 const suggestions = ref<AlprLocation[]>([])
 const loading = ref(false)
 const open = ref(false)
+const coordinateError = ref('')
 const focused = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let requestVersion = 0
@@ -75,6 +83,7 @@ watch(
       cancelSearch()
       suggestions.value = []
       open.value = false
+      coordinateError.value = ''
     }
   }
 )
@@ -87,12 +96,24 @@ function handleInput(value: string | number) {
   cancelSearch()
   suggestions.value = []
   open.value = false
+  coordinateError.value = ''
 
   emit('update:modelValue', nextValue)
   if (valueChangedSelection) emit('clear')
 
   const trimmed = nextValue.trim()
   if (trimmed.length < 3) return
+
+  const parsed = parseAlprCoordinateInput(trimmed)
+  if (parsed.kind === 'invalid') {
+    coordinateError.value = 'Enter latitude from -90 to 90 and longitude from -180 to 180.'
+    return
+  }
+
+  if (parsed.kind === 'coordinates') {
+    void selectCoordinates(parsed.value)
+    return
+  }
 
   debounceTimer = setTimeout(() => search(trimmed), 300)
 }
@@ -126,12 +147,40 @@ async function search(value: string) {
   }
 }
 
+async function selectCoordinates(coordinates: AlprCoordinates) {
+  const fallbackLabel = formatAlprCoordinates(coordinates)
+  const fallbackLocation: AlprLocation = {
+    ...coordinates,
+    label: fallbackLabel,
+  }
+  selectSuggestion(fallbackLocation)
+
+  const version = ++requestVersion
+  loading.value = true
+  try {
+    const response = await api.get<AlprReverseGeocodeResult>(ApiEndpoints.ALPR_GEOCODE_REVERSE, {
+      params: coordinates,
+      _skipErrorHandling: true,
+    })
+    if (version !== requestVersion) return
+
+    const label = response.data.label?.trim()
+    if (!label || label === fallbackLabel) return
+    selectSuggestion({ ...fallbackLocation, label })
+  } catch {
+    // The validated coordinates remain selected when a label cannot be resolved.
+  } finally {
+    if (version === requestVersion) loading.value = false
+  }
+}
+
 function selectSuggestion(suggestion: AlprLocation) {
   cancelSearch()
   selectedLabel = suggestion.label
   query.value = suggestion.label
   suggestions.value = []
   open.value = false
+  coordinateError.value = ''
   emit('update:modelValue', suggestion.label)
   emit('select', suggestion)
 }
