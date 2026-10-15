@@ -37,6 +37,15 @@
         <Button
           variant="outline"
           size="sm"
+          class="h-9 px-4 text-xs text-blue-600"
+          :disabled="!selectedTab"
+          @click="$emit('ai-advice-click')"
+        >
+          <Sparkles class="mr-2 h-4 w-4" /> AI Advice
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           :class="[
             'h-9 px-6 text-xs',
             isSubmitted
@@ -47,7 +56,9 @@
           @click="$emit('submit-click')"
         >
           <span v-if="submitLoading" class="flex items-center gap-1.5">
-            <span class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <span
+              class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+            />
             {{ isSubmitted ? 'Rolling back...' : 'Submitting...' }}
           </span>
           <span v-else>{{ isSubmitted ? 'Rollback' : 'Submit' }}</span>
@@ -60,10 +71,12 @@
         variant="outline"
         size="sm"
         class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#E74C3C]/10 hover:text-[#AF4B4B/20] disabled:opacity-40 disabled:cursor-not-allowed"
-        :disabled="!hasErrorWarning"
+        :disabled="errorCount + warningCount === 0"
         @click="$emit('error-warning-click')"
       >
-        <span>Error/Warning</span>
+        <span class="text-red-600">Errors: {{ errorCount }}</span>
+        <span class="text-muted-foreground">·</span>
+        <span class="text-amber-600">Warnings: {{ warningCount }}</span>
       </Button>
 
       <div v-if="freeTimes.length" class="flex items-center gap-1">
@@ -71,14 +84,18 @@
           <ChevronLeft class="w-4 h-4" />
         </Button>
 
-        <div ref="freeTimesContainer" class="max-w-112.5 overflow-hidden">
+        <div
+          ref="freeTimesContainer"
+          class="max-w-112.5 overflow-hidden"
+          @wheel.prevent="scrollFreeTimesWithWheel"
+        >
           <div
             ref="freeTimesContent"
             class="flex items-center gap-2 transition-transform duration-300"
             :style="{ transform: `translateX(-${scrollOffset}px)` }"
           >
             <button
-              v-for="(freeTime, index) in freeTimes"
+              v-for="(freeTime, index) in freeTimes.filter((e) => e.eventDurationInSeconds > 3600)"
               :key="freeTime.eventId || index"
               class="shrink-0 px-4 py-1.5 bg-[#f8f9fd] dark:bg-muted border-[#d6e1ff] dark:border-border border rounded-md text-xs font-medium text-[#090909] dark:text-foreground hover:bg-[#e8ecfa] dark:hover:bg-muted/80 hover:border-[#b8c8ff] dark:hover:border-border transition-colors cursor-pointer"
               @click="handleFreeTimeClick(freeTime)"
@@ -122,7 +139,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
+import { Plus, ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -143,7 +160,8 @@ const props = withDefaults(
     freeTimes?: BoostFreeTime[]
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
-    hasErrorWarning?: boolean
+    errorCount?: number
+    warningCount?: number
   }>(),
   {
     submitDisabled: false,
@@ -152,7 +170,8 @@ const props = withDefaults(
     freeTimes: () => [],
     tabs: () => [],
     selectedTab: null,
-    hasErrorWarning: false,
+    errorCount: 0,
+    warningCount: 0,
   }
 )
 
@@ -165,6 +184,7 @@ const emit = defineEmits<{
   (e: 'free-time-click', freeTime: BoostFreeTime): void
   (e: 'select-tab', tab: TabResponse): void
   (e: 'remove-tab', tabId: string): void
+  (e: 'ai-advice-click'): void
 }>()
 
 const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
@@ -203,6 +223,16 @@ const scrollRight = () => {
     const maxScroll = Math.max(0, contentWidth - containerWidth)
     scrollOffset.value = Math.min(maxScroll, scrollOffset.value + scrollStep)
   }
+}
+
+const scrollFreeTimesWithWheel = (event: WheelEvent) => {
+  if (!freeTimesContainer.value || !freeTimesContent.value) return
+  const maxScroll = Math.max(
+    0,
+    freeTimesContent.value.scrollWidth - freeTimesContainer.value.clientWidth
+  )
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+  scrollOffset.value = Math.max(0, Math.min(maxScroll, scrollOffset.value + delta))
 }
 
 const formatHHMM = (seconds: number): string => {

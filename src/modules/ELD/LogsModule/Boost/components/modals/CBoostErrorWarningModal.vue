@@ -1,94 +1,99 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[800px] p-0 gap-0 overflow-hidden">
-      <DialogHeader class="px-6 py-4 border-b">
+    <DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-[800px]">
+      <DialogHeader class="border-b px-6 py-4">
         <DialogTitle class="text-xl font-bold uppercase tracking-wide">
-          ERRORS & WARNINGS
+          Errors &amp; Warnings
         </DialogTitle>
       </DialogHeader>
 
-      <div class="p-6 max-h-[48vh] overflow-y-auto">
-        <Table>
-          <TableHeader class="bg-[#f8f9fd] dark:bg-muted/50 sticky top-0 z-10">
-            <TableRow>
-              <TableHead class="w-[80px]">
-                No <ChevronsUpDown class="w-3 h-3 inline-block ml-1 opacity-50" />
-              </TableHead>
-              <TableHead>
-                Events <ChevronsUpDown class="w-3 h-3 inline-block ml-1 opacity-50" />
-              </TableHead>
-              <TableHead>
-                Time <ChevronsUpDown class="w-3 h-3 inline-block ml-1 opacity-50" />
-              </TableHead>
-              <TableHead>
-                Error & Warnings <ChevronsUpDown class="w-3 h-3 inline-block ml-1 opacity-50" />
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow
+      <div class="max-h-[52vh] overflow-y-auto px-6">
+        <table class="w-full table-fixed border-collapse text-sm">
+          <thead class="sticky top-0 z-10 bg-[#f8f9fd] dark:bg-muted">
+            <tr class="border-b">
+              <th class="w-24 px-3 py-3 text-left text-xs font-medium text-muted-foreground">
+                Seq ID
+              </th>
+              <th class="w-44 px-3 py-3 text-left text-xs font-medium text-muted-foreground">
+                Event
+              </th>
+              <th class="w-36 px-3 py-3 text-left text-xs font-medium text-muted-foreground">
+                Time
+              </th>
+              <th class="w-28 px-3 py-3 text-left text-xs font-medium text-muted-foreground">
+                Type
+              </th>
+              <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
               v-for="(item, index) in rows"
-              :key="item.id ?? index"
-              class="hover:bg-muted/50 cursor-pointer"
+              :key="`${item.id}-${item.severity}-${index}`"
+              class="cursor-pointer border-b transition-colors"
+              :class="
+                item.severity === 'ERROR'
+                  ? 'bg-red-50/70 hover:bg-red-100/80 dark:bg-red-950/20 dark:hover:bg-red-950/35'
+                  : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/35'
+              "
               @click="$emit('row-click', item.id)"
             >
-              <TableCell class="font-medium">{{ item.no }}</TableCell>
-              <TableCell>
-                <div class="flex items-center gap-2">
-                  <span v-if="item.badge" :class="getBadgeClass(item.badge)">{{ item.badge }}</span>
-                  <span v-else>{{ item.event }}</span>
-                </div>
-              </TableCell>
-              <TableCell>{{ item.time }}</TableCell>
-              <TableCell>{{ item.error }}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+              <td class="px-3 py-3 font-medium">{{ item.no }}</td>
+              <td class="px-3 py-3">{{ item.event }}</td>
+              <td class="px-3 py-3">{{ item.time }}</td>
+              <td class="px-3 py-3">
+                <span
+                  class="inline-flex rounded px-2 py-0.5 text-[10px] font-semibold"
+                  :class="
+                    item.severity === 'ERROR'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                  "
+                >
+                  {{ item.severity === 'ERROR' ? 'Error' : 'Warning' }}
+                </span>
+              </td>
+              <td class="px-3 py-3 leading-5">{{ item.message }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <div class="px-6 py-4 border-t flex items-center justify-between bg-white dark:bg-card">
-        <div class="text-sm font-medium">All errors: {{ rows.length }}</div>
-        <Button variant="outline" @click="$emit('update:open', false)">Cancel</Button>
+      <div class="flex items-center justify-between border-t bg-white px-6 py-4 dark:bg-card">
+        <div class="flex items-center gap-4 text-xs font-medium">
+          <span class="text-red-600">Errors: {{ errorCount }}</span>
+          <span class="text-amber-600">Warnings: {{ warningCount }}</span>
+        </div>
+        <Button variant="outline" @click="$emit('update:open', false)">Close</Button>
       </div>
     </DialogContent>
   </Dialog>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { ChevronsUpDown } from 'lucide-vue-next'
 
-defineProps<{
+export interface BoostIssueRow {
+  id: string
+  no: string
+  event: string
+  time: string
+  severity: 'ERROR' | 'WARNING'
+  message: string
+}
+
+const props = defineProps<{
   open: boolean
-  rows: Array<{
-    id: string
-    no: number
-    event: string
-    time: string
-    error: string
-    badge?: string
-  }>
+  rows: BoostIssueRow[]
 }>()
 
 defineEmits<{
-  (e: 'update:open', value: boolean): void
-  (e: 'row-click', eventId: string): void
+  'update:open': [value: boolean]
+  'row-click': [eventId: string]
 }>()
 
-const getBadgeClass = (badge: string) => {
-  if (badge === 'Driving')
-    return 'bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium'
-  if (badge === 'Sleep')
-    return 'bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-medium'
-  return ''
-}
+const errorCount = computed(() => props.rows.filter((row) => row.severity === 'ERROR').length)
+const warningCount = computed(() => props.rows.filter((row) => row.severity === 'WARNING').length)
 </script>

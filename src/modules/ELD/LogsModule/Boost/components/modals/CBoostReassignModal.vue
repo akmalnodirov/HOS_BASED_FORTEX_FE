@@ -30,36 +30,17 @@
         </div>
 
         <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground">Company</label>
-          <Select v-model="selectedCompanyId" @update:model-value="onCompanyChange">
-            <SelectTrigger :disabled="isCompaniesLoading">
-              <SelectValue :placeholder="isCompaniesLoading ? 'Loading companies...' : 'Select company'" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="company in companies"
-                :key="company.id"
-                :value="company.id"
-              >
-                {{ company.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">To Driver</label>
-          <Select v-model="toDriverId" :disabled="!selectedCompanyId || isDriversLoading">
+          <Select v-model="toDriverId" :disabled="driversLoading">
             <SelectTrigger>
-              <SelectValue :placeholder="isDriversLoading ? 'Loading drivers...' : 'Select driver'" />
+              <SelectValue :placeholder="driversLoading ? 'Loading drivers...' : 'Select driver'" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem
-                v-for="driver in drivers"
-                :key="driver.id"
-                :value="driver.id"
-              >
-                {{ driver.name }}
+              <SelectItem v-for="driver in drivers" :key="driver.id" :value="driver.id">
+                <span>{{ driver.displayName }}</span>
+                <span class="ml-2 text-xs text-muted-foreground">
+                  {{ driver.externalCompanyName }}
+                </span>
               </SelectItem>
             </SelectContent>
           </Select>
@@ -73,7 +54,15 @@
           :disabled="loading || selectedCount === 0 || !toDriverId"
           @click="handleSubmit"
         >
-          {{ loading ? (actionType === 'reassign' ? 'Reassigning…' : 'Replicating…') : (actionType === 'reassign' ? 'Reassign' : 'Replicate') }}
+          {{
+            loading
+              ? actionType === 'reassign'
+                ? 'Reassigning…'
+                : 'Replicating…'
+              : actionType === 'reassign'
+                ? 'Reassign'
+                : 'Replicate'
+          }}
         </Button>
       </div>
     </DialogContent>
@@ -85,18 +74,25 @@ import { ref, watch } from 'vue'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
-import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
+import type { RouteEldDriverOption } from '../../types/boost'
 
 const props = withDefaults(
   defineProps<{
     open: boolean
     selectedCount: number
     loading?: boolean
+    drivers: RouteEldDriverOption[]
+    driversLoading?: boolean
   }>(),
   {
     loading: false,
+    driversLoading: false,
   }
 )
 
@@ -105,39 +101,17 @@ const emit = defineEmits<{
   (e: 'submit', payload: { toDriverId: string; actionType: 'reassign' | 'replicate' }): void
 }>()
 
-const { companies, drivers, fetchCompanies, fetchDrivers } = useCompaniesDrivers()
-
 const toDriverId = ref('')
-const selectedCompanyId = ref('')
 const actionType = ref<'reassign' | 'replicate'>('reassign')
-const isCompaniesLoading = ref(false)
-const isDriversLoading = ref(false)
 
 watch(
   () => props.open,
-  async (open) => {
+  (open) => {
     if (!open) return
     toDriverId.value = ''
-    selectedCompanyId.value = ''
     actionType.value = 'reassign'
-    isCompaniesLoading.value = true
-    try {
-      await fetchCompanies()
-    } finally {
-      isCompaniesLoading.value = false
-    }
   }
 )
-
-async function onCompanyChange(companyId: string) {
-  toDriverId.value = ''
-  isDriversLoading.value = true
-  try {
-    await fetchDrivers(companyId)
-  } finally {
-    isDriversLoading.value = false
-  }
-}
 
 const handleSubmit = () => {
   emit('submit', { toDriverId: toDriverId.value, actionType: actionType.value })

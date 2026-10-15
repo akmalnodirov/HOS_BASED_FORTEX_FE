@@ -14,33 +14,14 @@
     </Tabs>
 
     <div v-if="isBoostPage" class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 mb-1">
-      <div class="flex items-center bg-[#F0F0F0] dark:bg-muted rounded p-1 h-8 lg:h-9 2xl:h-10">
-        <button
-          v-for="b in ['booster 1', 'booster 2', 'booster 3']"
-          :key="b"
-          @click="selectedBooster = b"
-          :class="[
-            'px-2 lg:px-2.5 2xl:px-3 py-1 lg:py-1.5 2xl:py-2 text-[10px] lg:text-xs 2xl:text-sm font-medium rounded-sm transition-all capitalize cursor-pointer',
-            selectedBooster === b
-              ? 'bg-background shadow-sm text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          ]"
-        >
-          {{ b }}
-        </button>
-      </div>
-
-      <!-- Search -->
       <Button
-        variant="outline"
-        size="icon"
-        class="h-8 w-8 lg:h-9 lg:w-9 2xl:h-10 2xl:w-10"
-        @click="emit('search-click')"
+        class="h-8 lg:h-9 2xl:h-10 bg-[#111] dark:bg-foreground text-white dark:text-background hover:bg-[#111]/90 text-[10px] lg:text-xs 2xl:text-sm px-3 lg:px-4"
+        :disabled="boostStore.isMutating || !boostDateRange?.start || !boostDateRange?.end"
+        @click="handleBoostCreate"
       >
-        <Search class="w-3.5 h-3.5 lg:w-4 lg:h-4 2xl:w-5 2xl:h-5" />
+        {{ boostStore.isMutating ? 'Creating...' : 'Create' }}
       </Button>
 
-      <!-- Date Range Picker -->
       <Popover v-model:open="isBoostCalendarOpen">
         <PopoverTrigger as-child>
           <Button
@@ -58,7 +39,9 @@
                   : formatBoostDate(boostDateRange.start)
               }}
             </span>
-            <span v-else class="text-[10px] lg:text-xs 2xl:text-sm text-muted-foreground">Pick a date</span>
+            <span v-else class="text-[10px] lg:text-xs 2xl:text-sm text-muted-foreground">
+              Pick a date
+            </span>
             <CalendarIcon class="ml-auto w-3.5 h-3.5 lg:w-4 lg:h-4 2xl:w-5 2xl:h-5 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -72,13 +55,16 @@
         </PopoverContent>
       </Popover>
 
-      <!-- Create Button -->
-      <Button
-        class="h-8 lg:h-9 2xl:h-10 bg-[#111] dark:bg-foreground text-white dark:text-background hover:bg-[#111]/90 text-[10px] lg:text-xs 2xl:text-sm px-3 lg:px-4"
-        @click="handleBoostCreate"
-      >
-        Create
-      </Button>
+      <Select :model-value="activeSessionId" @update:model-value="handleSessionSelect">
+        <SelectTrigger class="h-8 min-w-52 lg:h-9 2xl:h-10">
+          <SelectValue placeholder="Sessions" />
+        </SelectTrigger>
+        <SelectContent class="max-h-72">
+          <SelectItem v-for="sessionItem in sessions" :key="sessionItem.id" :value="sessionItem.id">
+            {{ sessionLabel(sessionItem) }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <!-- Default Toolbar (for non-Boost pages) -->
@@ -143,17 +129,28 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import type { WeeklyViolationResponse } from '../../types/chart.ts'
 import type { DateValue } from 'reka-ui'
 import { CalendarDate } from '@internationalized/date'
+import { useBoostWorkspaceStore } from '../../../Boost/store/boostWorkspace'
+import type { RouteEldEventSessionListItem } from '../../../Boost/types/boost'
 
 // Define props
 interface Props {
@@ -179,6 +176,9 @@ const props = defineProps<Props>()
 
 const router = useRouter()
 const route = useRoute()
+const boostStore = useBoostWorkspaceStore()
+const { sessions, session: activeSession } = storeToRefs(boostStore)
+const activeSessionId = computed(() => activeSession.value?.id ?? '')
 
 const tabs = [
   'ALL',
@@ -295,7 +295,6 @@ watch(activeTab, (newTab, oldTab) => {
 
 const isCalendarOpen = ref(false)
 
-const selectedBooster = ref('booster 1')
 const isBoostCalendarOpen = ref(false)
 
 const getInitialBoostRange = () => {
@@ -308,9 +307,9 @@ const getInitialBoostRange = () => {
     }
   }
   const today = dayjs()
-  const tenDaysAgo = today.subtract(9, 'day')
+  const twoWeeksAgo = today.subtract(14, 'day')
   return {
-    start: new CalendarDate(tenDaysAgo.year(), tenDaysAgo.month() + 1, tenDaysAgo.date()),
+    start: new CalendarDate(twoWeeksAgo.year(), twoWeeksAgo.month() + 1, twoWeeksAgo.date()),
     end: new CalendarDate(today.year(), today.month() + 1, today.date()),
   }
 }
@@ -329,14 +328,147 @@ watch([() => route.query.fromDate, () => route.query.toDate], ([fromDate, toDate
   }
 })
 
-const handleBoostCreate = () => {
+const handleBoostCreate = async () => {
   if (!boostDateRange.value?.start || !boostDateRange.value?.end) return
-  emit(
-    'boost-create-click',
-    calendarDateToDayjs(boostDateRange.value.start),
-    calendarDateToDayjs(boostDateRange.value.end)
-  )
+  const fromDate = calendarDateToDayjs(boostDateRange.value.start)
+  const toDate = calendarDateToDayjs(boostDateRange.value.end)
+  try {
+    const workspace = await boostStore.createSession(
+      String(route.params.id),
+      fromDate.format('YYYY-MM-DD'),
+      toDate.format('YYYY-MM-DD')
+    )
+    await router.replace({
+      query: {
+        ...route.query,
+        fromDate: fromDate.format('YYYY-MM-DD'),
+        toDate: toDate.format('YYYY-MM-DD'),
+        sessionId: workspace.session.id,
+        tabId: workspace.tabId,
+      },
+    })
+    emit('boost-create-click', fromDate, toDate)
+    toast.success('Schedule session created')
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || 'Failed to create session')
+  }
 }
+
+const handleSessionSelect = async (value: unknown) => {
+  const sessionId = String(value || '')
+  if (!sessionId || sessionId === activeSessionId.value) return
+  try {
+    const workspace = await boostStore.loadSession(sessionId)
+    if (!workspace) return
+    boostDateRange.value = {
+      start: new CalendarDate(
+        dayjs(workspace.session.fromDate).year(),
+        dayjs(workspace.session.fromDate).month() + 1,
+        dayjs(workspace.session.fromDate).date()
+      ),
+      end: new CalendarDate(
+        dayjs(workspace.session.toDate).year(),
+        dayjs(workspace.session.toDate).month() + 1,
+        dayjs(workspace.session.toDate).date()
+      ),
+    }
+    await router.replace({
+      query: {
+        ...route.query,
+        fromDate: workspace.session.fromDate,
+        toDate: workspace.session.toDate,
+        sessionId: workspace.session.id,
+        tabId: workspace.tabId,
+      },
+    })
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || 'Failed to load session')
+  }
+}
+
+const sessionLabel = (item: RouteEldEventSessionListItem) =>
+  `${item.name} · ${dayjs(item.fromDate).format('MM/DD')} – ${dayjs(item.toDate).format('MM/DD')}`
+
+const automaticSessionAttemptKey = ref('')
+
+const applyBoostWorkspaceRoute = async (workspace: {
+  session: { id: string; fromDate: string; toDate: string }
+  tabId: string
+}) => {
+  boostDateRange.value = {
+    start: new CalendarDate(
+      dayjs(workspace.session.fromDate).year(),
+      dayjs(workspace.session.fromDate).month() + 1,
+      dayjs(workspace.session.fromDate).date()
+    ),
+    end: new CalendarDate(
+      dayjs(workspace.session.toDate).year(),
+      dayjs(workspace.session.toDate).month() + 1,
+      dayjs(workspace.session.toDate).date()
+    ),
+  }
+  await router.replace({
+    query: {
+      ...route.query,
+      fromDate: workspace.session.fromDate,
+      toDate: workspace.session.toDate,
+      sessionId: workspace.session.id,
+      tabId: workspace.tabId,
+    },
+  })
+}
+
+watch(
+  [isBoostPage, () => route.params.id, () => route.query.sessionId],
+  async ([boostPage, driverId, querySessionId]) => {
+    if (!boostPage || !driverId) {
+      automaticSessionAttemptKey.value = ''
+      return
+    }
+    try {
+      const normalizedDriverId = String(driverId)
+      if (
+        boostStore.session?.driverId &&
+        boostStore.session.driverId.toLowerCase() !== normalizedDriverId.toLowerCase()
+      ) {
+        boostStore.clear()
+      }
+      const items = await boostStore.fetchSessions(normalizedDriverId)
+      const requested = querySessionId ? String(querySessionId) : ''
+      if (requested) {
+        const selected = items.find((item) => item.id === requested)
+        if (selected && boostStore.session?.id !== selected.id) {
+          const workspace = await boostStore.loadSession(
+            selected.id,
+            String(route.query.tabId || '')
+          )
+          if (workspace) await applyBoostWorkspaceRoute(workspace)
+        }
+        return
+      }
+
+      const fromDate = calendarDateToDayjs(boostDateRange.value.start).format('YYYY-MM-DD')
+      const toDate = calendarDateToDayjs(boostDateRange.value.end).format('YYYY-MM-DD')
+      const attemptKey = `${normalizedDriverId}:${fromDate}:${toDate}`
+      if (automaticSessionAttemptKey.value === attemptKey) return
+      automaticSessionAttemptKey.value = attemptKey
+
+      try {
+        const workspace = await boostStore.createSession(normalizedDriverId, fromDate, toDate)
+        await applyBoostWorkspaceRoute(workspace)
+        emit('boost-create-click', dayjs(fromDate), dayjs(toDate))
+      } catch (creationError) {
+        const fallback = items[0]
+        if (!fallback) throw creationError
+        const workspace = await boostStore.loadSession(fallback.id)
+        if (workspace) await applyBoostWorkspaceRoute(workspace)
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to load sessions')
+    }
+  },
+  { immediate: true }
+)
 
 watch(boostDateRange, (newRange) => {
   if (newRange?.start && newRange?.end) {

@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="fixed bottom-0 right-0 bg-background border-t border-border shadow-lg z-50 transition-all duration-300"
-    :class="[sidebarStore.sidebar === 'open' ? 'left-62' : 'left-0']"
-  >
+  <div class="sticky bottom-0 z-50 !mt-0 border-t border-border bg-background shadow-lg">
     <div class="px-6 py-4">
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center gap-2"></div>
@@ -34,7 +31,7 @@
               />
             </svg>
 
-            <span>Delete</span>
+            <span>Delete{{ selectedSuffix }}</span>
           </Button>
 
           <Button
@@ -44,7 +41,7 @@
             :disabled="deleteDisabled"
             @click="$emit('multi-update-click')"
           >
-            <span>Multi Update</span>
+            <span>Multi Update{{ selectedSuffix }}</span>
           </Button>
 
           <Label
@@ -52,8 +49,8 @@
           >
             <Checkbox
               id="toggle-2"
-              :checked="dragDropEnabled"
-              @update:checked="(v: boolean) => $emit('dragdrop-change', v)"
+              :model-value="dragDropEnabled"
+              @update:model-value="(v: boolean) => $emit('dragdrop-change', v)"
               class="border-[#DBDBDB] data-[state=checked]:border-black data-[state=checked]:bg-black data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
             />
             <div class="grid gap-1.5 font-normal">
@@ -63,43 +60,30 @@
 
           <Button
             variant="outline"
-            size="icon"
-            class="h-9.5 w-9.5"
-            @click="$emit('fullscreen-click')"
+            size="sm"
+            class="h-9.5 px-4 text-sm"
+            :disabled="durationDisabled"
+            @click="$emit('duration-click')"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              class="text-foreground"
-            >
-              <g clip-path="url(#clip0_2908_56972)">
-                <path
-                  d="M14.6673 4.66699L9.42156 9.91275C9.15755 10.1768 9.02555 10.3088 8.87333 10.3582C8.73943 10.4017 8.5952 10.4017 8.46131 10.3582C8.30909 10.3088 8.17708 10.1768 7.91307 9.91274L6.08823 8.08791C5.82422 7.82389 5.69221 7.69189 5.54 7.64243C5.4061 7.59892 5.26187 7.59892 5.12797 7.64243C4.97575 7.69189 4.84375 7.82389 4.57974 8.08791L1.33398 11.3337M14.6673 4.66699H10.0007M14.6673 4.66699V9.33366"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </g>
-              <defs>
-                <clipPath id="clip0_2908_56972">
-                  <rect width="16" height="16" fill="currentColor" fill-opacity="0" />
-                </clipPath>
-              </defs>
-            </svg>
+            <span>Expand / Reduce{{ selectedSuffix }}</span>
           </Button>
 
           <Button
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="boostDisabled"
-            @click="$emit('boost-click')"
+            @click="$emit('normalize-click')"
           >
-            <span>Boost</span>
+            <span>Normalize</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-9.5 px-4 text-sm"
+            @click="$emit('certification-click')"
+          >
+            <span>Certification</span>
           </Button>
 
           <Button
@@ -109,7 +93,7 @@
             :disabled="reassignDisabled"
             @click="$emit('reassign-click')"
           >
-            <span>Reassign</span>
+            <span>Reassign / Replicate{{ selectedSuffix }}</span>
           </Button>
         </div>
       </div>
@@ -122,7 +106,8 @@
         <DialogTitle>Delete Events</DialogTitle>
       </DialogHeader>
       <p class="text-sm text-muted-foreground">
-        Are you sure you want to delete the selected events? This action cannot be undone.
+        Are you sure you want to delete {{ selectedCount }} selected
+        {{ selectedCount === 1 ? 'event' : 'events' }}?
       </p>
       <DialogFooter class="gap-2">
         <Button variant="outline" @click="showDeleteConfirm = false">Cancel</Button>
@@ -133,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -144,40 +129,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useSidebarStore } from '@/modules/ELD/LogsModule/[Id]/store/sidebar'
-
-const sidebarStore = useSidebarStore()
-
-let cleanupListener = () => {}
-onMounted(() => {
-  cleanupListener = sidebarStore.setupStorageListener()
-})
-onUnmounted(() => {
-  cleanupListener()
-})
-
-withDefaults(
+const props = withDefaults(
   defineProps<{
     dragDropEnabled?: boolean
     deleteDisabled?: boolean
-    boostDisabled?: boolean
     reassignDisabled?: boolean
+    durationDisabled?: boolean
+    selectedCount?: number
   }>(),
   {
     dragDropEnabled: false,
     deleteDisabled: false,
-    boostDisabled: false,
     reassignDisabled: false,
+    durationDisabled: false,
+    selectedCount: 0,
   }
 )
+
+const selectedSuffix = computed(() => (props.selectedCount > 0 ? ` (${props.selectedCount})` : ''))
 
 const emit = defineEmits<{
   (e: 'delete-click'): void
   (e: 'dragdrop-change', enabled: boolean): void
   (e: 'fullscreen-click'): void
-  (e: 'boost-click'): void
   (e: 'reassign-click'): void
   (e: 'multi-update-click'): void
+  (e: 'normalize-click'): void
+  (e: 'certification-click'): void
+  (e: 'duration-click'): void
 }>()
 
 const showDeleteConfirm = ref(false)

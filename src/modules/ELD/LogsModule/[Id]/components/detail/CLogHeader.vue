@@ -1,5 +1,9 @@
 <template>
-  <div class="flex items-start justify-between">
+  <div
+    :class="
+      isBoostLayout ? 'grid grid-cols-3 items-start gap-5' : 'flex items-start justify-between'
+    "
+  >
     <div class="space-y-4">
       <div>
         <div class="flex items-center gap-2 mb-1">
@@ -129,7 +133,11 @@
       v-if="
         route.name === 'ELDLogDetail' || route.name === 'ELDBoost' || route.name === 'ELDTracking'
       "
-      class="flex items-center gap-5 2xl:gap-6"
+      :class="
+        isBoostLayout
+          ? 'flex items-center justify-self-center gap-3 pt-1 2xl:gap-4'
+          : 'flex items-center gap-5 2xl:gap-6'
+      "
     >
       <div v-for="stat in stats" :key="stat.label" class="flex flex-col items-center">
         <span
@@ -154,6 +162,10 @@
           </span>
         </span>
       </div>
+    </div>
+
+    <div v-if="isBoostLayout" class="min-w-0 justify-self-stretch">
+      <slot name="boost-daily-log"></slot>
     </div>
   </div>
 </template>
@@ -201,6 +213,7 @@ const props = defineProps<{
 
 const { isDarkMode } = useDarkMode()
 const route = useRoute()
+const isBoostLayout = computed(() => route.name === 'ELDBoost')
 
 const connectionStatusLabel = computed(() => {
   if (props.driverInfo?.connectionStatus === 'CONNECTED') return 'Connected'

@@ -8,7 +8,7 @@
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-1">
           <label class="text-sm font-medium">Date</label>
-          <Input :value="form.date" disabled class="bg-muted" />
+          <Input :model-value="form.date" disabled class="bg-muted" />
         </div>
 
         <div class="space-y-1">
@@ -22,6 +22,15 @@
                 <SelectValue placeholder="Select Co-Driver" />
               </SelectTrigger>
               <SelectContent class="max-h-60">
+                <SelectItem
+                  v-if="
+                    form.coDriver &&
+                    !form.coDrivers.some((driver) => driver.driverId === form.coDriver)
+                  "
+                  :value="form.coDriver"
+                >
+                  {{ form.coDriverName || form.coDriver }}
+                </SelectItem>
                 <SelectItem
                   v-for="driver in form.coDrivers"
                   :key="driver.driverId"
@@ -44,11 +53,13 @@
           </div>
         </div>
 
+        <p v-if="cargoError" class="text-xs text-destructive">{{ cargoError }}</p>
+
         <div class="space-y-1">
           <label class="text-sm font-medium">Trailer</label>
           <Input
-            :value="form.trailer ?? ''"
-            @input="onStringInput('trailer', $event)"
+            :model-value="form.trailer ?? ''"
+            @update:model-value="(value) => patch({ trailer: String(value || '') || null })"
             placeholder="Trailer"
             maxlength="100"
           />
@@ -57,8 +68,8 @@
         <div class="space-y-1">
           <label class="text-sm font-medium">Shipping docs</label>
           <Input
-            :value="form.shippingDocs ?? ''"
-            @input="onStringInput('shippingDocs', $event)"
+            :model-value="form.shippingDocs ?? ''"
+            @update:model-value="(value) => patch({ shippingDocs: String(value || '') || null })"
             placeholder="Shipping docs"
             maxlength="100"
           />
@@ -68,8 +79,8 @@
           <label class="text-sm font-medium">Signature Path</label>
           <div class="relative">
             <Input
-              :value="form.signature ?? ''"
-              @input="onStringInput('signature', $event)"
+              :model-value="form.signature ?? ''"
+              @update:model-value="(value) => patch({ signature: String(value || '') || null })"
               placeholder="Signature Path"
               class="pr-8"
             />
@@ -84,23 +95,7 @@
               <X class="h-3.5 w-3.5" />
             </Button>
           </div>
-          <div v-if="form.signaturePaths.length" class="flex flex-wrap gap-1 mt-1">
-            <Button
-              v-for="path in form.signaturePaths"
-              :key="path"
-              type="button"
-              variant="outline"
-              size="sm"
-              class="text-xs h-7 max-w-[200px] truncate"
-              :class="form.signature === path ? 'border-primary text-primary' : ''"
-              @click="patch({ signature: path })"
-            >
-              {{ shortPath(path) }}
-            </Button>
-          </div>
         </div>
-
-        <Separator />
 
         <DialogFooter class="flex gap-2">
           <Button
@@ -116,7 +111,7 @@
             <Button type="button" variant="secondary" @click="$emit('update:open', false)">
               Cancel
             </Button>
-            <Button type="submit" :disabled="loading">
+            <Button type="submit" :disabled="loading || Boolean(cargoError)">
               {{ loading ? 'Saving...' : 'Save' }}
             </Button>
           </div>
@@ -127,15 +122,23 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { X } from 'lucide-vue-next'
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
 import type { BoostEventEditProfile } from '../../types/boost.ts'
 
@@ -151,22 +154,20 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   submit: [form: BoostEventEditProfile]
   revert: [form: BoostEventEditProfile]
-  'update:form': [form: BoostEventEditProfile]
+  'update:form': [form: Partial<BoostEventEditProfile>]
 }>()
 
 function patch(partial: Partial<BoostEventEditProfile>) {
-  emit('update:form', { ...props.form, ...partial })
+  emit('update:form', partial)
 }
 
-function onStringInput(field: keyof BoostEventEditProfile, e: Event) {
-  const val = (e.target as HTMLInputElement).value
-  patch({ [field]: val || null } as Partial<BoostEventEditProfile>)
-}
-
-function shortPath(path: string) {
-  const parts = path.split('/')
-  return parts.at(-1) ?? path
-}
+const cargoError = computed(() => {
+  const trailers = (props.form.trailer ?? '').split(/[,\s]+/).filter(Boolean)
+  const documents = (props.form.shippingDocs ?? '').split(/[,\s]+/).filter(Boolean)
+  return !trailers.length && documents.length
+    ? 'Shipping documents require at least one trailer.'
+    : ''
+})
 
 function handleSubmit() {
   emit('submit', props.form)

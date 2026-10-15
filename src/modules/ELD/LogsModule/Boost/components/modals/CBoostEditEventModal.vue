@@ -1,15 +1,33 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-162.5 max-h-[90vh] overflow-y-auto">
+    <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Edit Status</DialogTitle>
+        <DialogTitle>{{ form.eventId ? 'Edit HOS event' : 'Insert HOS event' }}</DialogTitle>
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
+        <div v-if="!form.eventId" class="space-y-1">
+          <label class="text-sm font-medium">Responsible user</label>
+          <Select
+            :model-value="form.responsibleUserId ?? ''"
+            @update:model-value="patch({ responsibleUserId: String($event) })"
+          >
+            <SelectTrigger><SelectValue placeholder="Select responsible user" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="user in users" :key="user.id" :value="user.id">
+                {{ user.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-3 space-y-1">
-            <label class="text-sm font-medium">Id</label>
-            <Input type="number" :model-value="form.id" disabled class="bg-muted" />
+            <label class="text-sm font-medium">Sequence ID</label>
+            <Input
+              :model-value="form.sequenceId ?? ''"
+              @input="onStringInput('sequenceId', $event)"
+              placeholder="Sequence ID"
+            />
           </div>
           <div class="col-span-9 space-y-1">
             <label class="text-sm font-medium">Events</label>
@@ -26,7 +44,12 @@
                 </SelectValue>
               </SelectTrigger>
               <SelectContent class="max-h-64">
-                <SelectItem v-for="ev in allEvents" :key="ev.key" :value="ev.key">
+                <SelectItem
+                  v-for="ev in editableEvents"
+                  :key="ev.id"
+                  :value="ev.id"
+                  :disabled="disableSleeperBerth && ev.id === 'DS_SB'"
+                >
                   <span class="flex items-center gap-2">
                     <span
                       class="inline-block w-2 h-2 rounded-full shrink-0"
@@ -37,92 +60,39 @@
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p
+              v-if="disableSleeperBerth && selectedEventKey === 'DS_SB' && !form.eventId"
+              class="mt-1 text-xs text-red-600"
+            >
+              Sleeper berth is disabled for this session.
+            </p>
           </div>
         </div>
 
-        <template v-if="isCertifiedVisible">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-sm font-medium">Certification date</label>
-              <Input type="date" :model-value="certifiedDateStr" @input="onCertifiedDateInput" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-sm font-medium">Certification time</label>
-              <div class="flex gap-1">
-                <Input
-                  type="number"
-                  min="0"
-                  max="23"
-                  :model-value="form.certifiedTime.hours"
-                  @input="onCertifiedTimeInput('hours', $event)"
-                  class="text-center"
-                  placeholder="HH"
-                />
-                <span class="flex items-center text-muted-foreground">:</span>
-                <Input
-                  type="number"
-                  min="0"
-                  max="59"
-                  :model-value="form.certifiedTime.minutes"
-                  @input="onCertifiedTimeInput('minutes', $event)"
-                  class="text-center"
-                  placeholder="MM"
-                />
-                <span class="flex items-center text-muted-foreground">:</span>
-                <Input
-                  type="number"
-                  min="0"
-                  max="59"
-                  :model-value="form.certifiedTime.seconds"
-                  @input="onCertifiedTimeInput('seconds', $event)"
-                  class="text-center"
-                  placeholder="SS"
-                />
-              </div>
-            </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="text-sm font-medium">Record status</label>
+            <Select
+              :model-value="form.recordStatus ?? ''"
+              @update:model-value="onRecordStatusChange"
+            >
+              <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-if="
+                    form.recordStatus &&
+                    !['ACTIVE', 'INACTIVE_CHANGED'].includes(form.recordStatus)
+                  "
+                  :value="form.recordStatus"
+                >
+                  {{ preservedStatusLabel }}
+                </SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE_CHANGED">Inactive · changed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </template>
-
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-4 space-y-1">
-            <label class="text-sm font-medium">Date</label>
-            <Input type="date" :model-value="form.startDate" @input="onStartDateInput" />
-          </div>
-          <div class="col-span-4 space-y-1">
-            <label class="text-sm font-medium">Time</label>
-            <div class="flex gap-1">
-              <Input
-                type="number"
-                min="0"
-                max="23"
-                :model-value="form.time.hours"
-                @input="onTimeInput('hours', $event)"
-                class="text-center px-1"
-                placeholder="HH"
-              />
-              <span class="flex items-center text-muted-foreground">:</span>
-              <Input
-                type="number"
-                min="0"
-                max="59"
-                :model-value="form.time.minutes"
-                @input="onTimeInput('minutes', $event)"
-                class="text-center px-1"
-                placeholder="MM"
-              />
-              <span class="flex items-center text-muted-foreground">:</span>
-              <Input
-                type="number"
-                min="0"
-                max="59"
-                :model-value="form.time.seconds"
-                @input="onTimeInput('seconds', $event)"
-                class="text-center px-1"
-                placeholder="SS"
-              />
-            </div>
-          </div>
-          <div class="col-span-4 space-y-1">
+          <div class="space-y-1">
             <label class="text-sm font-medium">Origin</label>
             <Select :model-value="String(form.origin ?? '')" @update:model-value="onOriginChange">
               <SelectTrigger>
@@ -132,6 +102,47 @@
                 <SelectItem value="1">ELD</SelectItem>
                 <SelectItem value="2">Driver</SelectItem>
                 <SelectItem value="3">User</SelectItem>
+                <SelectItem value="4">Unidentified driver</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <template v-if="isCertifiedVisible">
+          <div class="space-y-1">
+            <label class="text-sm font-medium">Date to certify</label>
+            <Input type="date" :model-value="certifiedDateStr" @input="onCertifiedDateInput" />
+          </div>
+        </template>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="text-sm font-medium">Date and time</label>
+            <Input
+              type="datetime-local"
+              step="1"
+              :model-value="eventDateTimeLocal"
+              @input="onDateTimeInput"
+            />
+            <p v-if="!dateWithinSession" class="text-xs text-red-600">
+              Event time must remain within the session period.
+            </p>
+          </div>
+          <div class="space-y-1">
+            <label class="text-sm font-medium">ELD</label>
+            <Select :model-value="form.eldId ?? '__none__'" @update:model-value="onEldChange">
+              <SelectTrigger><SelectValue placeholder="Select ELD" /></SelectTrigger>
+              <SelectContent class="max-h-64">
+                <SelectItem value="__none__">No ELD</SelectItem>
+                <SelectItem
+                  v-if="form.eldId && !editOptions.elds.some((eld) => eld.id === form.eldId)"
+                  :value="form.eldId"
+                >
+                  {{ form.eldId }}
+                </SelectItem>
+                <SelectItem v-for="eld in editOptions.elds" :key="eld.id" :value="eld.id">
+                  {{ eld.serialNumber || eld.sn || eld.id }}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -140,11 +151,31 @@
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-6 space-y-1">
             <label class="text-sm font-medium">Vehicle</label>
-            <Input
-              :model-value="form.vehicleUnit ?? form.vehicleId ?? ''"
-              disabled
-              class="bg-muted"
-            />
+            <Select
+              :model-value="form.vehicleId ?? '__none__'"
+              @update:model-value="onVehicleChange"
+            >
+              <SelectTrigger><SelectValue placeholder="Select vehicle" /></SelectTrigger>
+              <SelectContent class="max-h-64">
+                <SelectItem value="__none__">No vehicle</SelectItem>
+                <SelectItem
+                  v-if="
+                    form.vehicleId &&
+                    !editOptions.vehicles.some((vehicle) => vehicle.id === form.vehicleId)
+                  "
+                  :value="form.vehicleId"
+                >
+                  {{ form.vehicleUnit || form.vehicleId }}
+                </SelectItem>
+                <SelectItem
+                  v-for="vehicle in editOptions.vehicles"
+                  :key="vehicle.id"
+                  :value="vehicle.id"
+                >
+                  {{ vehicle.name }}<template v-if="vehicle.vin"> · {{ vehicle.vin }}</template>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div class="col-span-3 space-y-1">
             <label class="text-sm font-medium">Odometer</label>
@@ -167,7 +198,25 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="border-t pt-4">
+          <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Location
+          </p>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="space-y-1">
+              <label class="text-sm font-medium">Positioning</label>
+              <Select
+                :model-value="form.positioning ?? '__none__'"
+                @update:model-value="onPositioningChange"
+              >
+                <SelectTrigger><SelectValue placeholder="Select positioning" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Not specified</SelectItem>
+                  <SelectItem value="AUTOMATIC">Automatic</SelectItem>
+                  <SelectItem value="MANUAL">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           <div class="space-y-1">
             <label class="text-sm font-medium">Trailer</label>
             <Input
@@ -186,22 +235,7 @@
               maxlength="100"
             />
           </div>
-        </div>
-
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Location origin</label>
-          <Select
-            :model-value="String(form.locationOrigin ?? '')"
-            @update:model-value="onLocationOriginChange"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Location Origin" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Automatic</SelectItem>
-              <SelectItem value="2">Manual</SelectItem>
-            </SelectContent>
-          </Select>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -213,7 +247,7 @@
               :model-value="form.latitude ?? ''"
               @input="onNumberInput('latitude', $event)"
               placeholder="Latitude"
-              :disabled="form.locationOrigin === 2"
+              :disabled="form.positioning === 'MANUAL'"
             />
           </div>
           <div class="space-y-1">
@@ -224,7 +258,7 @@
               :model-value="form.longitude ?? ''"
               @input="onNumberInput('longitude', $event)"
               placeholder="Longitude"
-              :disabled="form.locationOrigin === 2"
+              :disabled="form.positioning === 'MANUAL'"
             />
           </div>
         </div>
@@ -258,7 +292,7 @@
             @input="onStringInput('locationNote', $event)"
             placeholder="Location note"
             maxlength="100"
-            :disabled="form.locationOrigin === 1"
+            :disabled="form.positioning === 'AUTOMATIC'"
           />
         </div>
 
@@ -285,14 +319,22 @@
           </div>
         </div>
 
-        <Separator />
-
         <DialogFooter>
+          <Button
+            v-if="form.eventId"
+            type="button"
+            variant="destructive"
+            class="mr-auto"
+            :disabled="loading"
+            @click="$emit('delete', form.eventId)"
+          >
+            <Trash2 class="mr-2 h-4 w-4" /> Delete event
+          </Button>
           <Button type="button" variant="secondary" @click="$emit('update:open', false)">
             Cancel
           </Button>
           <Button type="submit" :disabled="isSubmitDisabled || loading">
-            {{ loading ? 'Saving...' : 'Save' }}
+            {{ loading ? 'Saving...' : form.eventId ? 'Save event' : 'Insert event' }}
           </Button>
         </DialogFooter>
       </form>
@@ -302,7 +344,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Copy, ClipboardPaste, MapPin } from 'lucide-vue-next'
+import { Copy, ClipboardPaste, MapPin, Trash2 } from 'lucide-vue-next'
 import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations.ts'
 import {
   Dialog,
@@ -313,7 +355,6 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -322,22 +363,54 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { allEvents } from '@/utils/events.ts'
-import type { BoostEventStatusForm } from '../../types/boost.ts'
+import type {
+  BoostEventStatusForm,
+  RouteEldEventEditOptions,
+  RouteEldResponsibleUser,
+} from '../../types/boost.ts'
 import dayjs from 'dayjs'
 
-const NOTE_SHORTCUTS = ['PTI', 'Fuel', 'Pick up', 'Delivery', 'DOT', 'Break'] as const
+const NOTE_SHORTCUTS = [
+  'PTI',
+  'Scale',
+  'Hook',
+  'Delivery',
+  'Fuel',
+  'DOT',
+  'Repairs',
+  'Drop',
+  'Pick Up',
+  'Rest',
+  'Break',
+  'Loading',
+  'Unloading',
+  'Inspection',
+] as const
 
 interface Props {
   open: boolean
   form: BoostEventStatusForm
+  editOptions?: RouteEldEventEditOptions
+  users?: RouteEldResponsibleUser[]
+  disableSleeperBerth?: boolean
+  fromDate?: string
+  toDate?: string
   loading?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), { loading: false })
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  editOptions: () => ({ vehicles: [], elds: [] }),
+  users: () => [],
+  disableSleeperBerth: false,
+  fromDate: '',
+  toDate: '',
+})
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
   submit: [form: BoostEventStatusForm]
+  delete: [eventId: string]
   'update:form': [form: BoostEventStatusForm]
 }>()
 
@@ -351,7 +424,8 @@ let geocodeTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   () => [props.form.latitude, props.form.longitude],
   ([lat, lng]) => {
-    if (!lat || !lng || props.form.locationOrigin === 2) return
+    if (lat === null || lat === '' || lng === null || lng === '' || props.form.positioning === 'MANUAL')
+      return
     if (geocodeTimer) clearTimeout(geocodeTimer)
     geocodeTimer = setTimeout(async () => {
       const address = await geoStore.getCalculatedAddress({
@@ -364,47 +438,99 @@ watch(
 )
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
-
-const selectedEventKey = computed(
+const dateWithinSession = computed(
   () =>
-    allEvents.find(
-      (e) =>
-        e.eventType === props.form.event.eventType && e.eventCode === props.form.event.eventCode
-    )?.key ?? ''
+    (!props.fromDate || props.form.startDate >= props.fromDate) &&
+    (!props.toDate || props.form.startDate <= props.toDate)
+)
+const preservedStatusLabel = computed(() =>
+  String(props.form.recordStatus || '')
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/^./, (value) => value.toUpperCase())
 )
 
-const selectedEvent = computed(() => allEvents.find((e) => e.key === selectedEventKey.value))
+const editableEventIds = [
+  'DS_OFF', 'DS_WT', 'DS_SB', 'DS_D', 'DS_ON',
+  'LOG_NORMAL_PRECISION', 'LOG_REDUCED_PRECISION', 'DR_IND_PC', 'DR_IND_YM',
+  ...Array.from({ length: 9 }, (_, index) => `DR_CERT_${index + 1}`),
+  'DR_LOGIN', 'DR_LOGOUT', 'ENG_UP_NORMAL', 'ENG_UP_REDUCED', 'ENG_DOWN_NORMAL', 'ENG_DOWN_REDUCED',
+]
+const eventIdByNumeric: Record<string, string> = {
+  '1:1': 'DS_OFF', '1:2': 'DS_SB', '1:3': 'DS_D', '1:4': 'DS_ON',
+  '2:1': 'LOG_NORMAL_PRECISION', '2:2': 'LOG_REDUCED_PRECISION',
+  '3:1': 'DR_IND_PC', '3:2': 'DR_IND_YM',
+  '5:1': 'DR_LOGIN', '5:2': 'DR_LOGOUT',
+  '6:1': 'ENG_UP_NORMAL', '6:2': 'ENG_UP_REDUCED', '6:3': 'ENG_DOWN_NORMAL', '6:4': 'ENG_DOWN_REDUCED',
+}
+const eventLabelById: Record<string, string> = {
+  DS_OFF: 'Off Duty', DS_WT: 'Off Duty (Waiting Time)', DS_SB: 'Sleeper Berth', DS_D: 'Driving', DS_ON: 'On Duty',
+  LOG_NORMAL_PRECISION: 'Intermediate w/ CLP', LOG_REDUCED_PRECISION: 'Intermediate w/ RLP',
+  DR_IND_PC: 'Personal Conveyance', DR_IND_YM: 'Yard Move', DR_LOGIN: 'Login', DR_LOGOUT: 'Logout',
+  ENG_UP_NORMAL: 'Engine Power-up w/ CLP', ENG_UP_REDUCED: 'Engine Power-up w/ RLP',
+  ENG_DOWN_NORMAL: 'Engine Shut-down w/ CLP', ENG_DOWN_REDUCED: 'Engine Shut-down w/ RLP',
+}
+const numericByEventId: Record<string, [number, number]> = {
+  DS_OFF: [1, 1], DS_WT: [1, 1], DS_SB: [1, 2], DS_D: [1, 3], DS_ON: [1, 4],
+  LOG_NORMAL_PRECISION: [2, 1], LOG_REDUCED_PRECISION: [2, 2], DR_IND_PC: [3, 1], DR_IND_YM: [3, 2],
+  DR_LOGIN: [5, 1], DR_LOGOUT: [5, 2], ENG_UP_NORMAL: [6, 1], ENG_UP_REDUCED: [6, 2], ENG_DOWN_NORMAL: [6, 3], ENG_DOWN_REDUCED: [6, 4],
+}
+const editableEvents = editableEventIds.map((id) => {
+  const certification = /^DR_CERT_(\d+)$/.exec(id)
+  const numeric = certification ? [4, Number(certification[1])] as [number, number] : numericByEventId[id]
+  const definition = allEvents.find((item) => item.eventType === numeric[0] && item.eventCode === numeric[1])
+  return { id, label: eventLabelById[id] ?? `Certification (${numeric[1]})`, color: definition?.color ?? '#6366F1', eventType: numeric[0], eventCode: numeric[1] }
+})
+
+const selectedEventKey = computed(
+  () => props.form.eventCodeId ?? eventIdByNumeric[`${props.form.event.eventType}:${props.form.event.eventCode}`] ?? ''
+)
+
+const selectedEvent = computed(() => editableEvents.find((e) => e.id === selectedEventKey.value))
 
 function onEventChange(key: unknown) {
-  const ev = allEvents.find((e) => e.key === String(key))
+  const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
-  patch({ event: { eventType: ev.eventType, eventCode: ev.eventCode } })
+  patch({ event: { eventType: ev.eventType, eventCode: ev.eventCode }, eventCodeId: ev.id })
 }
 
 const certifiedDateStr = computed(() =>
   props.form.certifiedDate ? dayjs(props.form.certifiedDate).format('YYYY-MM-DD') : ''
 )
 
-function onStartDateInput(e: Event) {
-  patch({ startDate: (e.target as HTMLInputElement).value })
+const eventDateTimeLocal = computed(
+  () =>
+    `${props.form.startDate}T${String(props.form.time.hours).padStart(2, '0')}:${String(props.form.time.minutes).padStart(2, '0')}:${String(props.form.time.seconds).padStart(2, '0')}`
+)
+function onDateTimeInput(e: Event) {
+  const value = (e.target as HTMLInputElement).value
+  const [startDate, clock = '00:00:00'] = value.split('T')
+  const [hours = 0, minutes = 0, seconds = 0] = clock.split(':').map(Number)
+  patch({ startDate, time: { hours, minutes, seconds } })
 }
 function onCertifiedDateInput(e: Event) {
   patch({ certifiedDate: (e.target as HTMLInputElement).value })
 }
-function onTimeInput(field: 'hours' | 'minutes' | 'seconds', e: Event) {
-  const val = parseInt((e.target as HTMLInputElement).value) || 0
-  patch({ time: { ...props.form.time, [field]: val } })
-}
-function onCertifiedTimeInput(field: 'hours' | 'minutes' | 'seconds', e: Event) {
-  const val = parseInt((e.target as HTMLInputElement).value) || 0
-  patch({ certifiedTime: { ...props.form.certifiedTime, [field]: val } })
-}
-
 function onOriginChange(v: unknown) {
   patch({ origin: Number(v) })
 }
-function onLocationOriginChange(v: unknown) {
-  patch({ locationOrigin: Number(v) })
+function onRecordStatusChange(v: unknown) {
+  patch({ recordStatus: String(v) })
+}
+function onVehicleChange(v: unknown) {
+  const id = String(v)
+  const vehicle = props.editOptions.vehicles.find((item) => item.id === id)
+  patch({ vehicleId: id === '__none__' ? null : id, vehicleUnit: vehicle?.name ?? null })
+}
+function onEldChange(v: unknown) {
+  const id = String(v)
+  patch({ eldId: id === '__none__' ? null : id })
+}
+function onPositioningChange(v: unknown) {
+  const value = String(v)
+  patch({
+    positioning: value === 'MANUAL' || value === 'AUTOMATIC' ? value : null,
+  })
 }
 
 function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
@@ -416,9 +542,16 @@ function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
 }
 
 const isSubmitDisabled = computed(() => {
-  const { locationOrigin, latitude, longitude, locationNote } = props.form
-  if (locationOrigin === 1 && (!latitude || !longitude)) return true
-  return locationOrigin === 2 && !locationNote
+  if (!props.form.eventId && !props.form.responsibleUserId) return true
+  if (!dateWithinSession.value) return true
+  if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB') return true
+  const { positioning, latitude, longitude, locationNote } = props.form
+  if (
+    positioning === 'AUTOMATIC' &&
+    (latitude === null || latitude === '' || longitude === null || longitude === '')
+  )
+    return true
+  return positioning === 'MANUAL' && !locationNote
 })
 
 async function copyCoords() {
@@ -436,6 +569,7 @@ async function pasteCoords() {
       patch({ latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) })
     }
   } catch {
+    return
   }
 }
 

@@ -39,6 +39,7 @@ export function useELDLogDetail() {
   const route = useRoute()
   const router = useRouter()
   const api = useApi()
+  const isBoostPage = computed(() => route.name === 'ELDBoost')
 
   // Helpers
   const { getStartOf, getEndOf, formatToUTC, convertToTimeZone, acceptAsTimeZone } =
@@ -206,6 +207,7 @@ export function useELDLogDetail() {
   }
 
   async function fetchWeeklyViolations(startDate?: string, endDate?: string): Promise<void> {
+    if (isBoostPage.value) return
     try {
       const params = {
         startDate: startDate || apiModels.modelWeeklyViolations.startDate,
@@ -283,6 +285,10 @@ export function useELDLogDetail() {
   }
 
   async function fetchAllData(signal?: AbortSignal): Promise<void> {
+    if (isBoostPage.value) {
+      cleanupController()
+      return
+    }
     console.log('[fetchAllData] called - this fetches LOGS data')
     console.log('[fetchAllData] current tab:', route.query?.tab)
     await Promise.allSettled([
@@ -513,6 +519,10 @@ export function useELDLogDetail() {
 
   // Handle history mode activation
   async function handleHistoryTab(tab: string | null, signal?: AbortSignal): Promise<void> {
+    if (isBoostPage.value) {
+      cleanupController()
+      return
+    }
     console.log('[handleHistoryTab] called with tab:', tab)
 
     if (tab === 'history') {
@@ -559,8 +569,12 @@ export function useELDLogDetail() {
 
   // Watchers
   watch(
-    () => route.query.tab,
-    async (newTab) => {
+    [() => route.query.tab, () => route.name],
+    async ([newTab]) => {
+      if (isBoostPage.value) {
+        cleanupController()
+        return
+      }
       const signal = createNewController()
       await handleHistoryTab(newTab as string, signal)
     },
@@ -568,6 +582,7 @@ export function useELDLogDetail() {
   )
 
   watch(headerDate, async (newValue) => {
+    if (isBoostPage.value) return
     updateApiModels(newValue)
 
     // Stay in history mode - create new session with new date
@@ -602,6 +617,8 @@ export function useELDLogDetail() {
   // Lifecycle
   onMounted(async () => {
     cleanupSidebarListener = sidebarStore.setupStorageListener()
+
+    if (isBoostPage.value) return
 
     if (typeof window !== 'undefined') {
       const sidebarWidth = sidebar.value === 'open' ? 248 : 0

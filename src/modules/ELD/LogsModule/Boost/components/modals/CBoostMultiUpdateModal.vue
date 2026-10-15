@@ -20,27 +20,6 @@
             <Input v-model="form.doc" placeholder="Shipping Doc" maxlength="100" />
           </div>
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium">
-            Co-Driver <span class="text-muted-foreground font-normal">(optional)</span>
-          </label>
-          <Select v-model="form.coDriverId">
-            <SelectTrigger :disabled="isDriversLoading">
-              <SelectValue :placeholder="isDriversLoading ? 'Loading drivers...' : 'Select co-driver'" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">None</SelectItem>
-              <SelectItem
-                v-for="driver in filteredDrivers"
-                :key="driver.id"
-                :value="driver.id"
-              >
-                {{ driver.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div class="rounded-xl border bg-muted/30 p-4 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-sm font-semibold">Shift Timeline</span>
@@ -49,7 +28,8 @@
               :class="shiftForm.direction === 'up' ? 'text-amber-600' : 'text-primary'"
               class="text-xs font-mono font-medium"
             >
-              {{ shiftForm.direction === 'up' ? '−' : '+' }} {{ formatShiftDuration(Math.abs(computedShiftedTimes)) }}
+              {{ shiftForm.direction === 'up' ? '−' : '+' }}
+              {{ formatShiftDuration(Math.abs(computedShiftedTimes)) }}
             </span>
             <span v-else class="text-xs text-muted-foreground italic">No shift applied</span>
           </div>
@@ -58,9 +38,11 @@
             <button
               type="button"
               class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium border transition-colors"
-              :class="shiftForm.direction === 'up'
-                ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
-                : 'bg-background text-muted-foreground border-border hover:bg-muted'"
+              :class="
+                shiftForm.direction === 'up'
+                  ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
+                  : 'bg-background text-muted-foreground border-border hover:bg-muted'
+              "
               @click="shiftForm.direction = 'up'"
             >
               ↑ Earlier
@@ -68,9 +50,11 @@
             <button
               type="button"
               class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium border transition-colors"
-              :class="shiftForm.direction === 'down'
-                ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800'
-                : 'bg-background text-muted-foreground border-border hover:bg-muted'"
+              :class="
+                shiftForm.direction === 'down'
+                  ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800'
+                  : 'bg-background text-muted-foreground border-border hover:bg-muted'
+              "
               @click="shiftForm.direction = 'down'"
             >
               ↓ Later
@@ -78,7 +62,11 @@
           </div>
 
           <div class="flex items-center gap-3 justify-center">
-            <div v-for="field in SHIFT_FIELDS" :key="field.key" class="flex flex-col items-center gap-1">
+            <div
+              v-for="field in SHIFT_FIELDS"
+              :key="field.key"
+              class="flex flex-col items-center gap-1"
+            >
               <Input
                 type="number"
                 :min="0"
@@ -95,8 +83,13 @@
           </div>
         </div>
 
-        <div v-if="events.length" class="border rounded-lg overflow-hidden max-h-44 overflow-y-auto">
-          <div class="bg-muted/50 grid grid-cols-[40px_1fr_1fr_1fr] gap-2 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase sticky top-0">
+        <div
+          v-if="events.length"
+          class="border rounded-lg overflow-hidden max-h-44 overflow-y-auto"
+        >
+          <div
+            class="bg-muted/50 grid grid-cols-[40px_1fr_1fr_1fr] gap-2 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase sticky top-0"
+          >
             <span>#</span>
             <span>Time</span>
             <span>Trailer</span>
@@ -117,7 +110,9 @@
         <Separator />
 
         <DialogFooter>
-          <Button type="button" variant="secondary" @click="$emit('update:open', false)">Cancel</Button>
+          <Button type="button" variant="secondary" @click="$emit('update:open', false)"
+            >Cancel</Button
+          >
           <Button type="submit" :disabled="isDisabled || loading">
             {{ loading ? 'Updating...' : 'Update' }}
           </Button>
@@ -128,19 +123,19 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch, ref } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import dayjs from 'dayjs'
-import type { BoostUiEventRow } from '../../composables/useBoost.ts'
-import { useCompaniesDrivers } from '@/composables/useCompaniesDrivers'
+import type { BoostUiEventRow } from '../../composables/useScheduleBoost'
 
 const SHIFT_FIELDS = [
   { key: 'days' as const, label: 'Day', placeholder: '00', max: undefined },
@@ -153,29 +148,25 @@ interface Props {
   open: boolean
   events?: BoostUiEventRow[]
   loading?: boolean
-  currentDriverId?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   events: () => [],
   loading: false,
-  currentDriverId: null,
 })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  submit: [payload: {
-    trailer: string | null
-    doc: string | null
-    coDriverId: string | null
-    shiftedTimes: number | null
-  }]
+  submit: [
+    payload: {
+      trailer: string | null
+      doc: string | null
+      shiftedTimes: number | null
+    },
+  ]
 }>()
 
-const { drivers, fetchDrivers } = useCompaniesDrivers()
-const isDriversLoading = ref(false)
-
-const form = reactive({ trailer: '', doc: '', coDriverId: '' })
+const form = reactive({ trailer: '', doc: '' })
 
 const shiftForm = reactive({
   days: null as number | null,
@@ -184,10 +175,6 @@ const shiftForm = reactive({
   seconds: null as number | null,
   direction: 'up' as 'up' | 'down',
 })
-
-const filteredDrivers = computed(() =>
-  drivers.value.filter((d) => d.id !== props.currentDriverId)
-)
 
 const computedShiftedTimes = computed(() => {
   const total =
@@ -199,26 +186,21 @@ const computedShiftedTimes = computed(() => {
   return shiftForm.direction === 'up' ? -total : total
 })
 
-const isDisabled = computed(
-  () => !form.trailer && !form.doc && !form.coDriverId && computedShiftedTimes.value === null
-)
+const isDisabled = computed(() => !form.trailer && !form.doc && computedShiftedTimes.value === null)
 
 watch(
   () => props.open,
-  async (val) => {
+  (val) => {
     if (!val) return
     form.trailer = ''
     form.doc = ''
-    form.coDriverId = ''
-    Object.assign(shiftForm, { days: null, hours: null, minutes: null, seconds: null, direction: 'up' })
-    if (!drivers.value.length) {
-      isDriversLoading.value = true
-      try {
-        await fetchDrivers()
-      } finally {
-        isDriversLoading.value = false
-      }
-    }
+    Object.assign(shiftForm, {
+      days: null,
+      hours: null,
+      minutes: null,
+      seconds: null,
+      direction: 'up',
+    })
   }
 )
 
@@ -226,7 +208,11 @@ function onShiftInput(field: keyof typeof shiftForm, e: Event) {
   const raw = parseInt((e.target as HTMLInputElement).value)
   const fieldDef = SHIFT_FIELDS.find((f) => f.key === field)
   const max = fieldDef?.max
-  const val = isNaN(raw) ? null : max !== undefined ? Math.min(max, Math.max(0, raw)) : Math.max(0, raw)
+  const val = isNaN(raw)
+    ? null
+    : max !== undefined
+      ? Math.min(max, Math.max(0, raw))
+      : Math.max(0, raw)
   ;(shiftForm as any)[field] = val
 }
 
@@ -247,7 +233,6 @@ function handleSubmit() {
   emit('submit', {
     trailer: form.trailer.trim() || null,
     doc: form.doc.trim() || null,
-    coDriverId: form.coDriverId || null,
     shiftedTimes: computedShiftedTimes.value,
   })
 }

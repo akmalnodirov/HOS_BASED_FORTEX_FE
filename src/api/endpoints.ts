@@ -204,7 +204,12 @@ export class ApiEndpoints {
   static readonly DRIVERS_LOGOUT = `${this.DRIVERS_URL}/logout`
   static readonly DRIVERS_LOGOUT_BY_ID = (id: string) => `${ApiEndpoints.DRIVERS_URL}/logout/${id}`
   static readonly ROUTE_ELD_DRIVERS = `${this.BASE_URL}/route-eld/drivers`
+  static readonly ROUTE_ELD_SOURCE_DRIVERS = `${this.BASE_URL}/route-eld/source-drivers`
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
+  static readonly ROUTE_ELD_DRIVER_SCHEDULE = (id: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${id}/schedule`
+  static readonly ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS = (id: string) =>
+    `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/options`
   static readonly ROUTE_ELD_DRIVER_MONITORING = (id: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${id}/monitoring`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
@@ -219,10 +224,66 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
+  static readonly ROUTE_ELD_DRIVER_EVENT_SESSIONS = (driverId: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${driverId}/event-sessions`
+  static readonly ROUTE_ELD_EVENT_SESSION_TABS = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/tabs`
+  static readonly ROUTE_ELD_EVENT_SESSION_TAB = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TABS(sessionId)}/${tabId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_EVENTS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/events`
+  static readonly ROUTE_ELD_EVENT_SESSION_EVENT = (
+    sessionId: string,
+    tabId: string,
+    eventId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/${eventId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_DELETE_EVENTS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/delete`
+  static readonly ROUTE_ELD_EVENT_SESSION_DELETE_EVENT = (
+    sessionId: string,
+    tabId: string,
+    eventId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENT(sessionId, tabId, eventId)}/delete`
+  static readonly ROUTE_ELD_EVENT_SESSION_INSERT_EVENT = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/insert`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVERT_EVENT = (
+    sessionId: string,
+    tabId: string,
+    eventId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENT(sessionId, tabId, eventId)}/revert`
+  static readonly ROUTE_ELD_EVENT_SESSION_LOCATION_FINDER = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/location-finder`
+  static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/ai-advice`
+  static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE_HISTORY = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/ai-advice`
+  static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
+  static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/fix/certification`
+  static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_REPORT = (
+    sessionId: string,
+    tabId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/certification-report`
+  static readonly ROUTE_ELD_EVENT_SESSION_BOOST = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/boost`
+  static readonly ROUTE_ELD_EVENT_SESSION_DURATION_BOOST = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
+  static readonly ROUTE_ELD_EVENT_SESSION_REASSIGN = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
+  static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/submit`
+  static readonly ROUTE_ELD_EVENT_SESSION_START_SUBMIT = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/submit`
   static readonly ROUTE_ELD_EVENT_SESSION_START_ROLLBACK = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
   static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
+  static readonly ROUTE_ELD_DRIVER_RESPONSIBLE_USERS = (driverId: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${driverId}/responsible-users`
+  static readonly ROUTE_ELD_DRIVER_CO_DRIVERS = (driverId: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${driverId}/co-drivers`
+  static readonly ROUTE_ELD_NORMALIZE = `${this.BASE_URL}/route-eld/normalize`
   static readonly ROUTE_ELD_DRIVER_SIGNATURE = (id: string, file: string) =>
     `${this.BASE_URL}/route-eld/drivers/${id}/signature?file=${encodeURIComponent(file)}`
   static readonly ROUTE_ELD_SELECT_COMPANY = (id: string) =>
@@ -246,8 +307,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_WEIGHT_STATIONS = `${this.BASE_URL}/route-eld/weigh-stations`
   static readonly ROUTE_ELD_WEIGHT_STATION_CLUSTERS = `${this.ROUTE_ELD_WEIGHT_STATIONS}/clusters`
   static readonly ROUTE_ELD_DISPATCHERS = `${this.BASE_URL}/route-eld/dispatchers`
-  static readonly ROUTE_ELD_DISPATCHER = (id: string) =>
-    `${this.ROUTE_ELD_DISPATCHERS}/${id}`
+  static readonly ROUTE_ELD_DISPATCHER = (id: string) => `${this.ROUTE_ELD_DISPATCHERS}/${id}`
   static readonly ROUTE_ELD_DISPATCHER_COMPANIES = `${this.ROUTE_ELD_DISPATCHERS}/companies`
   static readonly ROUTE_ELD_DISPATCHER_ROLES = `${this.ROUTE_ELD_DISPATCHERS}/roles`
 

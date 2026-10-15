@@ -109,10 +109,10 @@
                   font-weight="500"
                   v-if="
                     canBeDisplayed(item.x1, item.x2, item.duration) &&
-                      (!props.edit || !props.add) &&
-                      item.speedMph &&
-                      item.speedMph > 0 &&
-                      item.eventCode == 3
+                    (!props.edit || !props.add) &&
+                    item.speedMph &&
+                    item.speedMph > 0 &&
+                    item.eventCode == 3
                   "
                 >
                   {{ item.speedMph + 'm/h' }}
@@ -126,9 +126,9 @@
                   font-weight="500"
                   v-if="
                     canBeDisplayed(item.x1, item.x2, item.duration) &&
-                      (!props.edit || !props.add) &&
-                      item.distanceMiles &&
-                      item.distanceMiles > 0
+                    (!props.edit || !props.add) &&
+                    item.distanceMiles &&
+                    item.distanceMiles > 0
                   "
                 >
                   {{ formatMiles(item.distanceMiles) + 'mi' }}
@@ -172,10 +172,10 @@
                   font-weight="500"
                   v-if="
                     canBeDisplayed(item.x1, item.x2, item.duration) &&
-                      (!props.edit || !props.add) &&
-                      item.speedMph &&
-                      item.speedMph > 0 &&
-                      item.eventCode == 3
+                    (!props.edit || !props.add) &&
+                    item.speedMph &&
+                    item.speedMph > 0 &&
+                    item.eventCode == 3
                   "
                 >
                   {{ item.speedMph + 'm/h' }}
@@ -189,9 +189,9 @@
                   font-weight="500"
                   v-if="
                     canBeDisplayed(item.x1, item.x2, item.duration) &&
-                      (!props.edit || !props.add) &&
-                      item.distanceMiles &&
-                      item.distanceMiles > 0
+                    (!props.edit || !props.add) &&
+                    item.distanceMiles &&
+                    item.distanceMiles > 0
                   "
                 >
                   {{ formatMiles(item.distanceMiles) + 'mi' }}
@@ -450,10 +450,12 @@
       </p>
       <div class="space-y-2 mt-5 font-bold">
         <p class="flex gap-x-10 justify-between">
-          <span class="uppercase">STATUS</span><span
+          <span class="uppercase">STATUS</span
+          ><span
             class="uppercase"
             :style="{ color: events.find((n) => n.key === lineToolTipStatus)?.color }"
-          >{{ events.find((n) => n.key === lineToolTipStatus)?.label }}</span>
+            >{{ events.find((n) => n.key === lineToolTipStatus)?.label }}</span
+          >
         </p>
         <p class="flex gap-x-10 justify-between whitespace-nowrap">
           <span class="uppercase">EVENT TIME</span><span>{{ lineToolTipEventTime }}</span>
@@ -540,7 +542,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch, nextTick } from 'vue'
+import { ref, computed, reactive, watch, nextTick, onBeforeUnmount } from 'vue'
 
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-vue-next'
 
@@ -1254,8 +1256,7 @@ const handleChartClick = (event: MouseEvent) => {
 
     editMovingController.value = false
     editControllerEnd.value = false
-  }
-  else if (clickX < leftButtonX) {
+  } else if (clickX < leftButtonX) {
     editMovingController.value = true
     editControllerStart.value = true
 
@@ -1270,8 +1271,7 @@ const handleChartClick = (event: MouseEvent) => {
 
     editMovingController.value = false
     editControllerStart.value = false
-  }
-  else {
+  } else {
     const midpoint = (leftButtonX + rightButtonX) / 2
     const containerRect = svgContainer.value.getBoundingClientRect()
 
@@ -1289,8 +1289,7 @@ const handleChartClick = (event: MouseEvent) => {
 
       editMovingController.value = false
       editControllerEnd.value = false
-    }
-    else {
+    } else {
       editMovingController.value = true
       editControllerStart.value = true
 
@@ -1813,15 +1812,30 @@ watch(sidebar, async () => {
   }, 300)
 })
 
+let chartResizeObserver: ResizeObserver | null = null
+
 watch(
   () => svgContainer.value,
-  async (newValue: HTMLElement | null) => {
-    if (newValue) {
-      secondInPixel.value = newValue.clientWidth / (24 * 3600)
-      emits('container:update', newValue.clientWidth)
+  (newValue: HTMLElement | null) => {
+    chartResizeObserver?.disconnect()
+    chartResizeObserver = null
+    if (!newValue) return
+
+    const updateContainerWidth = () => {
+      const width = newValue.clientWidth
+      if (width <= 0) return
+      secondInPixel.value = width / (24 * 3600)
+      emits('container:update', width)
     }
-  }
+
+    updateContainerWidth()
+    chartResizeObserver = new ResizeObserver(updateContainerWidth)
+    chartResizeObserver.observe(newValue)
+  },
+  { immediate: true }
 )
+
+onBeforeUnmount(() => chartResizeObserver?.disconnect())
 
 watch(
   () => [props.x1, props.x2],

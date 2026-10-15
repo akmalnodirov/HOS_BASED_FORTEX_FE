@@ -33,7 +33,11 @@ export function useRouteEldLogDetail() {
   const api = useApi()
   const timeZoneHelper = useTimeZoneHelper()
   const driverId = computed(() => String(route.params.id ?? ''))
+  const isBoostPage = computed(() => route.name === 'ELDBoost')
   const headerDate = ref(resolveDate(route.query.date))
+  const detailDate = computed(() =>
+    isBoostPage.value ? dayjs().startOf('day') : headerDate.value.startOf('day')
+  )
   const detail = ref<RouteEldLogDetail | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -47,10 +51,10 @@ export function useRouteEldLogDetail() {
 
   const events = computed(() => [...(detail.value?.events ?? [])].sort(compareEvents))
   const visualRange = computed(() =>
-    dayRange(headerDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
+    dayRange(detailDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
   )
-  const dayEvents = computed(() =>
-    events.value
+  const dayEvents = computed(
+    () => events.value
     // events.value.filter(
     //   (event) =>
     //     event.timestamp >= visualRange.value.start && event.timestamp < visualRange.value.end
@@ -64,7 +68,7 @@ export function useRouteEldLogDetail() {
       ? buildGraph(
           graphSegments.value,
           screenResolution.value,
-          headerDate.value,
+          detailDate.value,
           visualRange.value.start,
           visualRange.value.end
         )
@@ -77,7 +81,7 @@ export function useRouteEldLogDetail() {
       totals[segment.category] += Math.max(0, (segment.end - segment.start) / 1000)
     })
     return {
-      summaryDate: headerDate.value.format('YYYY-MM-DD'),
+      summaryDate: detailDate.value.format('YYYY-MM-DD'),
       dailyOffDuty: totals.OFF,
       dailySleeperBerth: totals.SB,
       dailyDriving: totals.D,
@@ -171,7 +175,7 @@ export function useRouteEldLogDetail() {
       const response = await api.get<{ successResult: RouteEldLogDetail }>(
         ApiEndpoints.ROUTE_ELD_LOG_DETAIL(driverId.value),
         {
-          params: { date: headerDate.value.format('YYYY-MM-DD') },
+          params: { date: detailDate.value.format('YYYY-MM-DD') },
           signal: requestController.signal,
         }
       )
@@ -246,7 +250,7 @@ export function useRouteEldLogDetail() {
         headerDate.value = next
     }
   )
-  watch([driverId, () => headerDate.value.format('YYYY-MM-DD')], fetchDetail, {
+  watch([driverId, () => detailDate.value.format('YYYY-MM-DD'), () => route.name], fetchDetail, {
     immediate: true,
   })
   watch(

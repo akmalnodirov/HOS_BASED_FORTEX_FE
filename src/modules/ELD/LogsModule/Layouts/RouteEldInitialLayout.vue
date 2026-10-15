@@ -1,20 +1,30 @@
 <template>
   <div
     :class="
-      isTrackingPage
-        ? 'flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden'
-        : 'space-y-6'
+      isTrackingPage ? 'flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden' : 'space-y-6'
     "
   >
     <div class="mb-1 flex-none bg-white p-[16px_24px_0_24px] dark:bg-card">
       <CLogHeader
-        :driver-info="
-          driverInfo ? { ...driverInfo, signaturePath: driverDailyForm?.signaturePath } : undefined
-        "
-        :daily-summary="dailySummary"
-        :daily-time-remainder="dailyTimeRemainder"
+        :driver-info="headerDriverInfo"
+        :daily-summary="isBoostPage ? null : dailySummary"
+        :daily-time-remainder="headerTimeRemainder"
         class="mb-4"
-      />
+      >
+        <template v-if="isBoostPage" #boost-daily-log>
+          <CBoostDailyLogCard
+            embedded
+            :forms="boostProfileForms"
+            :daily-logs="boostSchedule?.dailyLogs"
+            :driver-name="boostWorkspace?.session.driverName"
+            :external-driver-id="boostSchedule?.externalDriverId"
+            :company-name="boostWorkspace?.session.companyName"
+            :can-edit="boostWorkspace?.canEdit"
+            :time-zone="boostWorkspace?.events[0]?.event.timeZone ?? 'CT'"
+            @edit="boostWorkspaceStore.requestProfileFormEdit"
+          />
+        </template>
+      </CLogHeader>
       <CLogTabs
         :weekly-violations="weeklyViolations"
         :header-date="headerDate"
@@ -35,9 +45,9 @@
     <div :class="isTrackingPage ? 'min-h-0 flex-1 overflow-hidden' : ''">
       <RouterView v-slot="{ Component }">
         <KeepAlive>
-        <component :is="Component" />
+          <component :is="Component" />
         </KeepAlive>
-    </RouterView>
+      </RouterView>
     </div>
   </div>
 </template>
@@ -45,14 +55,24 @@
 <script setup lang="ts">
 import { computed, provide, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import type { Dayjs } from 'dayjs'
 import CLogHeader from '../[Id]/components/detail/CLogHeader.vue'
 import CLogTabs from '../[Id]/components/detail/CLogTabs.vue'
 import { useRouteEldLogDetail } from '../[Id]/composables/useRouteEldLogDetail'
+import CBoostDailyLogCard from '../Boost/components/CBoostDailyLogCard.vue'
+import { useBoostWorkspaceStore } from '../Boost/store/boostWorkspace'
 
 const logDetail = useRouteEldLogDetail()
 const route = useRoute()
 const isTrackingPage = computed(() => route.name === 'ELDTracking')
+const isBoostPage = computed(() => route.name === 'ELDBoost')
+const boostWorkspaceStore = useBoostWorkspaceStore()
+const {
+  workspace: boostWorkspace,
+  profileForms: boostProfileForms,
+  schedule: boostSchedule,
+} = storeToRefs(boostWorkspaceStore)
 const {
   dailySummary,
   weeklyViolations,
@@ -71,6 +91,26 @@ const {
   subtract,
   add,
 } = logDetail
+
+const headerTimeRemainder = computed(() => {
+  const hos = boostWorkspace.value?.calculations?.hos
+  if (!isBoostPage.value || !hos) return dailyTimeRemainder.value
+  return {
+    breakDuration: Math.max(0, Math.floor(hos.break.remainingMs / 1000)),
+    drivingDuration: Math.max(0, Math.floor(hos.drive.remainingMs / 1000)),
+    shiftDuration: Math.max(0, Math.floor(hos.shift.remainingMs / 1000)),
+    cycleDuration: Math.max(0, Math.floor(hos.cycle.remainingMs / 1000)),
+  }
+})
+
+const headerDriverInfo = computed(() => {
+  return driverInfo.value
+    ? {
+        ...driverInfo.value,
+        signaturePath: driverDailyForm.value?.signaturePath ?? undefined,
+      }
+    : undefined
+})
 
 const showBoostSearchModal = ref(false)
 const boostTrigger = ref<{ fromDate: Dayjs; toDate: Dayjs } | null>(null)

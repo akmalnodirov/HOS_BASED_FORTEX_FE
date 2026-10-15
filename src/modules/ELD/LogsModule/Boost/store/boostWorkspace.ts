@@ -1,0 +1,518 @@
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import { useApi } from '@/composables/useAxiosService'
+import { ApiEndpoints } from '@/api/endpoints'
+import type {
+  RouteEldAiAdvice,
+  RouteEldDriverOption,
+  RouteEldEventSession,
+  RouteEldEventSessionListItem,
+  RouteEldEventSessionPage,
+  RouteEldProfileForm,
+  RouteEldSchedule,
+  RouteEldEventEditOptions,
+  RouteEldResponsibleUser,
+  RouteEldWorkspace,
+} from '../types/boost'
+
+interface ApiEnvelope<T> {
+  successResult: T
+}
+
+function unwrap<T>(value: T | ApiEnvelope<T>): T {
+  if (value && typeof value === 'object' && 'successResult' in value) {
+    return value.successResult
+  }
+  return value
+}
+
+export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () => {
+  const api = useApi()
+  const sessions = ref<RouteEldEventSessionListItem[]>([])
+  const session = ref<RouteEldEventSession | null>(null)
+  const workspace = ref<RouteEldWorkspace | null>(null)
+  const profileForms = ref<RouteEldProfileForm[]>([])
+  const schedule = ref<RouteEldSchedule | null>(null)
+  const eventEditOptions = ref<RouteEldEventEditOptions>({ vehicles: [], elds: [] })
+  const responsibleUsers = ref<RouteEldResponsibleUser[]>([])
+  const coDrivers = ref<RouteEldResponsibleUser[]>([])
+  const reassignTargets = ref<RouteEldDriverOption[]>([])
+  const profileFormEditRequest = ref<string | null>(null)
+  const isLoading = ref(false)
+  const isMutating = ref(false)
+  const activeTabId = ref<string | null>(null)
+  const workspaceCache = new Map<string, RouteEldWorkspace>()
+  const profileFormsCache = new Map<string, RouteEldProfileForm[]>()
+
+  const tabCacheKey = (sessionId: string, tabId: string) => `${sessionId}:${tabId}`
+
+  function cacheWorkspace(value: RouteEldWorkspace) {
+    workspaceCache.set(tabCacheKey(value.session.id, value.tabId), value)
+  }
+
+  const activeTab = computed(
+    () => session.value?.tabs.find((tab) => tab.id === activeTabId.value) ?? null
+  )
+
+  async function fetchSessions(driverId: string) {
+    const response = await api.get<
+      RouteEldEventSessionPage | ApiEnvelope<RouteEldEventSessionPage>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSIONS, {
+      params: {
+        driverId,
+        pageNumber: 1,
+        pageSize: 100,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      },
+    })
+    sessions.value = unwrap(response.data).data ?? []
+    return sessions.value
+  }
+
+  async function fetchProfileForms(sessionId: string, tabId?: string | null) {
+    const response = await api.get<RouteEldProfileForm[] | ApiEnvelope<RouteEldProfileForm[]>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS(sessionId),
+      { params: tabId ? { tabId } : undefined }
+    )
+    profileForms.value = unwrap(response.data) ?? []
+    if (tabId) profileFormsCache.set(tabCacheKey(sessionId, tabId), profileForms.value)
+    return profileForms.value
+  }
+
+  async function fetchSchedule(driverId: string, fromDate: string, toDate: string) {
+    const response = await api.get<RouteEldSchedule | ApiEnvelope<RouteEldSchedule>>(
+      ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE(driverId),
+      { params: { fromDate, toDate } }
+    )
+    schedule.value = unwrap(response.data)
+    eventEditOptions.value = schedule.value.editOptions ?? { vehicles: [], elds: [] }
+    return schedule.value
+  }
+
+  async function fetchEventEditOptions(driverId: string) {
+    const response = await api.get<
+      RouteEldEventEditOptions | ApiEnvelope<RouteEldEventEditOptions>
+    >(ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS(driverId))
+    eventEditOptions.value = unwrap(response.data) ?? { vehicles: [], elds: [] }
+    return eventEditOptions.value
+  }
+
+  async function loadWorkspace(sessionId: string, tabId: string) {
+    const response = await api.get<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)
+    )
+    const result = unwrap(response.data)
+    workspace.value = result
+    session.value = result.session
+    activeTabId.value = result.tabId
+    cacheWorkspace(result)
+    return result
+  }
+
+  async function loadSession(sessionId: string, preferredTabId?: string | null) {
+    isLoading.value = true
+    try {
+      const response = await api.get<RouteEldEventSession | ApiEnvelope<RouteEldEventSession>>(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION(sessionId)
+      )
+      session.value = unwrap(response.data)
+      const tab =
+        session.value.tabs.find((item) => item.id === preferredTabId) ??
+        session.value.tabs.find((item) => item.kind === 'WORKING') ??
+        session.value.tabs[0]
+      if (!tab) {
+        workspace.value = null
+        profileForms.value = []
+        activeTabId.value = null
+        return null
+      }
+      await Promise.all([loadWorkspace(sessionId, tab.id), fetchProfileForms(sessionId, tab.id)])
+      await fetchSchedule(session.value.driverId, session.value.fromDate, session.value.toDate)
+      return workspace.value
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function createSession(driverId: string, fromDate: string, toDate: string) {
+    isMutating.value = true
+    try {
+      const response = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_EVENT_SESSIONS(driverId),
+        { fromDate, toDate }
+      )
+      const result = unwrap(response.data)
+      workspace.value = result
+      session.value = result.session
+      activeTabId.value = result.tabId
+      cacheWorkspace(result)
+      await Promise.all([
+        fetchSessions(driverId),
+        fetchProfileForms(result.session.id, result.tabId),
+        fetchSchedule(driverId, result.session.fromDate, result.session.toDate),
+      ])
+      return result
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function selectTab(tabId: string) {
+    if (!session.value) return null
+    if (activeTabId.value === tabId && workspace.value) return workspace.value
+    const currentSession = session.value
+    const key = tabCacheKey(currentSession.id, tabId)
+    const cachedWorkspace = workspaceCache.get(key)
+    const cachedProfileForms = profileFormsCache.get(key)
+    if (cachedWorkspace && cachedProfileForms) {
+      workspace.value = { ...cachedWorkspace, session: currentSession }
+      profileForms.value = cachedProfileForms
+      activeTabId.value = tabId
+      return workspace.value
+    }
+    isLoading.value = true
+    try {
+      await Promise.all([
+        loadWorkspace(currentSession.id, tabId),
+        fetchProfileForms(currentSession.id, tabId),
+      ])
+      return workspace.value
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function createTab() {
+    if (!session.value) return null
+    isMutating.value = true
+    try {
+      const response = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_TABS(session.value.id),
+        null
+      )
+      const result = unwrap(response.data)
+      workspace.value = result
+      session.value = result.session
+      activeTabId.value = result.tabId
+      cacheWorkspace(result)
+      await fetchProfileForms(result.session.id, result.tabId)
+      return result
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function deleteTab(tabId: string) {
+    if (!session.value) return null
+    const deletedKey = tabCacheKey(session.value.id, tabId)
+    isMutating.value = true
+    try {
+      const response = await api.delete<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_TAB(session.value.id, tabId)
+      )
+      const result = unwrap(response.data)
+      workspace.value = result
+      session.value = result.session
+      activeTabId.value = result.tabId
+      workspaceCache.delete(deletedKey)
+      profileFormsCache.delete(deletedKey)
+      cacheWorkspace(result)
+      await fetchProfileForms(result.session.id, result.tabId)
+      return result
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function refreshWorkspace() {
+    if (!session.value || !activeTabId.value) return null
+    return loadWorkspace(session.value.id, activeTabId.value)
+  }
+
+  async function mutateWorkspace(
+    method: 'post' | 'patch',
+    url: string,
+    body?: Record<string, unknown> | null
+  ) {
+    isMutating.value = true
+    try {
+      const response = await api[method]<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+        url,
+        body ?? null
+      )
+      const result = unwrap(response.data)
+      workspace.value = result
+      session.value = result.session
+      activeTabId.value = result.tabId
+      cacheWorkspace(result)
+      return result
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function deleteEvents(eventIds: string[]) {
+    if (!session.value || !activeTabId.value) return null
+    return mutateWorkspace(
+      'post',
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_DELETE_EVENTS(session.value.id, activeTabId.value),
+      { eventIds }
+    )
+  }
+
+  async function updateEvents(body: Record<string, unknown>) {
+    if (!session.value || !activeTabId.value) return null
+    return mutateWorkspace(
+      'patch',
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_EVENTS(session.value.id, activeTabId.value),
+      body
+    )
+  }
+
+  async function updateEvent(eventId: string, body: Record<string, unknown>) {
+    if (!session.value || !activeTabId.value) return null
+    isMutating.value = true
+    try {
+      await api.put(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_EVENT(session.value.id, activeTabId.value, eventId),
+        body
+      )
+      return await refreshWorkspace()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function insertEvent(body: Record<string, unknown>) {
+    if (!session.value || !activeTabId.value) return null
+    isMutating.value = true
+    try {
+      await api.post(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_INSERT_EVENT(session.value.id, activeTabId.value),
+        body
+      )
+      return await refreshWorkspace()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function revertEvent(eventId: string) {
+    if (!session.value || !activeTabId.value) return null
+    isMutating.value = true
+    try {
+      await api.post(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVERT_EVENT(
+          session.value.id,
+          activeTabId.value,
+          eventId
+        ),
+        null
+      )
+      return await refreshWorkspace()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function boostEvents(eventIds: string[], deltaSeconds: number) {
+    if (!session.value || !activeTabId.value) return null
+    return mutateWorkspace(
+      'post',
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_BOOST(session.value.id, activeTabId.value),
+      { eventIds, deltaSeconds }
+    )
+  }
+
+  async function boostEventDuration(
+    eventId: string,
+    durationSeconds: number,
+    mode: 'expand' | 'reduce',
+    ensurePti: boolean
+  ) {
+    if (!session.value || !activeTabId.value) return null
+    return mutateWorkspace(
+      'post',
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_DURATION_BOOST(session.value.id, activeTabId.value),
+      { eventId, durationSeconds, mode, ensurePti }
+    )
+  }
+
+  async function reassignEvents(eventIds: string[], toDriverId: string, type: string) {
+    if (!session.value || !activeTabId.value) return null
+    return mutateWorkspace(
+      'post',
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REASSIGN(session.value.id, activeTabId.value),
+      { eventIds, toDriverId, type }
+    )
+  }
+
+  async function updateProfileForm(form: RouteEldProfileForm) {
+    if (!session.value || !activeTabId.value) return null
+    isMutating.value = true
+    try {
+      const response = await api.put<RouteEldProfileForm | ApiEnvelope<RouteEldProfileForm>>(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS(session.value.id),
+        {
+          logDate: form.logDate,
+          coDriverId: form.coDriverId || null,
+          coDriverName: form.coDriverName || null,
+          trailers: form.trailers,
+          shippingDocuments: form.shippingDocuments,
+          signatureFileName: form.signatureFileName || null,
+        },
+        { params: { tabId: activeTabId.value } }
+      )
+      const result = unwrap(response.data)
+      await fetchProfileForms(session.value.id, activeTabId.value)
+      return result
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function fetchDriverOptions(driverId: string) {
+    const [usersResponse, coDriversResponse] = await Promise.all([
+      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_RESPONSIBLE_USERS(driverId)
+      ),
+      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId)
+      ),
+    ])
+    responsibleUsers.value = unwrap(usersResponse.data) ?? []
+    coDrivers.value = unwrap(coDriversResponse.data) ?? []
+  }
+
+  async function fetchReassignTargets(driverId: string) {
+    const response = await api.get<RouteEldDriverOption[] | ApiEnvelope<RouteEldDriverOption[]>>(
+      ApiEndpoints.ROUTE_ELD_SOURCE_DRIVERS
+    )
+    reassignTargets.value = (unwrap(response.data) ?? [])
+      .filter((driver) => driver.id !== driverId && driver.isActive)
+      .sort((first, second) => first.displayName.localeCompare(second.displayName))
+    return reassignTargets.value
+  }
+
+  async function analyzeAiAdvice(adviceType: string) {
+    if (!session.value || !activeTabId.value) return null
+    const response = await api.post<RouteEldAiAdvice | ApiEnvelope<RouteEldAiAdvice>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_AI_ADVICE(session.value.id, activeTabId.value),
+      { adviceType }
+    )
+    return unwrap(response.data)
+  }
+
+  async function normalize(normalizeList: string[], applyCertificationFix: boolean) {
+    if (!session.value || !activeTabId.value) return null
+    isMutating.value = true
+    try {
+      const response = await api.post(ApiEndpoints.ROUTE_ELD_NORMALIZE, {
+        sessionId: session.value.id,
+        tabId: activeTabId.value,
+        normalizeList,
+        applyCertificationFix,
+      })
+      await refreshWorkspace()
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function submitOrRollback() {
+    if (!session.value) return null
+    isMutating.value = true
+    try {
+      const url =
+        session.value.status === 'SUBMITTED'
+          ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(session.value.id)
+          : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(session.value.id)
+      let operation = unwrap((await api.post<any>(url, null)).data)
+      while (operation.status === 'QUEUED' || operation.status === 'RUNNING') {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        operation = unwrap(
+          (
+            await api.get<any>(
+              ApiEndpoints.ROUTE_ELD_EVENT_SESSION_OPERATION(session.value.id, operation.id)
+            )
+          ).data
+        )
+      }
+      if (operation.status === 'FAILED') throw new Error(operation.error || 'Operation failed')
+      await loadSession(session.value.id, activeTabId.value)
+      return operation
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  function requestProfileFormEdit(logDate: string) {
+    profileFormEditRequest.value = logDate
+  }
+
+  function clearProfileFormEditRequest() {
+    profileFormEditRequest.value = null
+  }
+
+  function clear() {
+    sessions.value = []
+    session.value = null
+    workspace.value = null
+    profileForms.value = []
+    schedule.value = null
+    eventEditOptions.value = { vehicles: [], elds: [] }
+    responsibleUsers.value = []
+    coDrivers.value = []
+    reassignTargets.value = []
+    profileFormEditRequest.value = null
+    activeTabId.value = null
+    workspaceCache.clear()
+    profileFormsCache.clear()
+  }
+
+  return {
+    sessions,
+    session,
+    workspace,
+    profileForms,
+    schedule,
+    eventEditOptions,
+    responsibleUsers,
+    coDrivers,
+    reassignTargets,
+    profileFormEditRequest,
+    activeTabId,
+    activeTab,
+    isLoading,
+    isMutating,
+    fetchSessions,
+    fetchProfileForms,
+    fetchSchedule,
+    fetchEventEditOptions,
+    loadSession,
+    selectTab,
+    createSession,
+    createTab,
+    deleteTab,
+    refreshWorkspace,
+    deleteEvents,
+    updateEvents,
+    updateEvent,
+    insertEvent,
+    revertEvent,
+    boostEvents,
+    boostEventDuration,
+    reassignEvents,
+    updateProfileForm,
+    fetchDriverOptions,
+    fetchReassignTargets,
+    analyzeAiAdvice,
+    normalize,
+    submitOrRollback,
+    requestProfileFormEdit,
+    clearProfileFormEditRequest,
+    clear,
+  }
+})

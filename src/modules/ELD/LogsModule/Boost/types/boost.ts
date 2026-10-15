@@ -79,7 +79,7 @@ export interface BoostEventResponse {
   vehicleId?: string
   annotation?: string
   actionState: number
-  locationOrigin?: number | null
+  locationOrigin: number | null
   latitude: number | null
   longitude: number | null
   driverId: string
@@ -185,7 +185,7 @@ export interface HosTimeRemainder {
 }
 
 export interface BoostViolationResponse {
-  type: number
+  type: string | number
   startedAt: string
   violationDateTime: string
   violationEventId: string
@@ -202,16 +202,23 @@ export interface BoostViolationRequest {
 }
 
 export interface BoostEventStatusForm {
+  responsibleUserId?: string
   id: number
   eventId: string
+  sequenceId: string | null
   event: { eventCode: number | null; eventType: number | null }
+  eventCodeId?: string | null
   origin: number | null
+  recordStatus: string | null
   vehicleId: string | null
   vehicleUnit: string | null
+  eldId: string | null
+  positioning: 'MANUAL' | 'AUTOMATIC' | null
   odometer: number | null
   engineHours: number | null
   trailer: string | null
   doc: string | null
+  /** Legacy API compatibility only. The Boost editor exposes `positioning` as the single control. */
   locationOrigin: number | null
   latitude: number | string | null
   longitude: number | string | null
@@ -222,6 +229,64 @@ export interface BoostEventStatusForm {
   time: { hours: number; minutes: number; seconds: number }
   certifiedDate: string | null
   certifiedTime: { hours: number; minutes: number; seconds: number }
+}
+
+export interface RouteEldDailyLogDetail {
+  id: string
+  logDate: string
+  timeZone: string | null
+  driverName: string
+  driverEmail: string | null
+  driverLicense: string | null
+  driverLicenseState: string | null
+  isExempt: boolean
+  coDriverName: string | null
+  coDriverEmail: string | null
+  coDriverId: string | null
+  trailers: string[]
+  shippingDocuments: string[]
+  carrierName: string | null
+  mainOffice: string | null
+  homeTerminal: string | null
+  dotNumber: string | null
+  eldSerialNumber: string | null
+  eldMacAddress: string | null
+  eldRegistrationId: string | null
+  eldIdentifier: string | null
+  hasDiagnosticIndicator: boolean
+  hasMalfunctionIndicator: boolean
+  signature: string | null
+}
+
+export interface RouteEldVehicleOption {
+  id: string
+  name: string
+  vin: string | null
+  isActive: boolean
+}
+
+export interface RouteEldEldOption {
+  id: string
+  serialNumber: string | null
+  sn: string | null
+  isActive: boolean
+}
+
+export interface RouteEldEventEditOptions {
+  vehicles: RouteEldVehicleOption[]
+  elds: RouteEldEldOption[]
+}
+
+export interface RouteEldSchedule {
+  driverId: string
+  driverName: string
+  externalDriverId: string
+  companyName: string
+  fromDate: string
+  toDate: string
+  disableSleeperBerth: boolean
+  dailyLogs: RouteEldDailyLogDetail[]
+  editOptions: RouteEldEventEditOptions
 }
 
 export interface BoostEventsReplicateRequest {
@@ -296,6 +361,7 @@ export interface BoostEventEditProfile {
   date: string
   dailyFormId: string | null
   coDriver: string | null
+  coDriverName: string | null
   coDrivers: DriverInfoResponse[]
   trailer: string | null
   shippingDocs: string | null
@@ -304,3 +370,269 @@ export interface BoostEventEditProfile {
   assignedVehicleIds: string[]
 }
 
+export interface RouteEldEventSessionListItem {
+  id: string
+  driverId: string
+  driverName: string
+  companyName: string
+  dispatcherId?: string | null
+  dispatcherName?: string | null
+  name: string
+  fromDate: string
+  toDate: string
+  status: 'DRAFT' | 'SUBMITTED' | 'ROLLED_BACK' | string
+  tabCount: number
+  changedEventCount: number
+  createdAt: string
+  submittedAt?: string | null
+  rolledBackAt?: string | null
+  isRollbackBlocked: boolean
+}
+
+export interface RouteEldEventSessionPage {
+  data: RouteEldEventSessionListItem[]
+  pagination: {
+    pageNumber: number
+    pageSize: number
+    totalCount: number
+    totalPages: number
+  }
+  draftCount: number
+  submittedCount: number
+  rolledBackCount: number
+}
+
+export interface RouteEldEventTab {
+  id: string
+  name: string
+  kind: 'INITIAL' | 'WORKING' | 'FINAL' | 'ROLLBACK' | string
+  position: number
+  changedEventCount: number
+  createdAt: string
+}
+
+export interface RouteEldEventSession {
+  id: string
+  driverId: string
+  driverName: string
+  companyName: string
+  name: string
+  fromDate: string
+  toDate: string
+  disableSleeperBerth: boolean
+  status: 'DRAFT' | 'SUBMITTED' | 'ROLLED_BACK' | string
+  createdAt: string
+  submittedAt?: string | null
+  rolledBackAt?: string | null
+  changes: Array<{
+    historyId: string
+    eventId: string
+    version: number
+    changeType: string
+    isSubmitted: boolean
+    isRolledBack: boolean
+  }>
+  tabs: RouteEldEventTab[]
+  isRollbackBlocked: boolean
+  pendingSubmissionCount: number
+  pendingRollbackCount: number
+}
+
+export interface RouteEldCertificationDay {
+  logDate: string
+  isCertified: boolean
+  isSigned: boolean | null
+  certifications: RouteEldCertificationEvent[]
+}
+
+export interface RouteEldCertificationEvent {
+  certifiedLogDate: string | null
+  eventLogDate: string
+  eventId: string
+  sequenceId: string | null
+  eventCode: string
+  timestamp: number
+  positioning: 'MANUAL' | 'AUTOMATIC' | null
+  latitude: number | null
+  longitude: number | null
+  location: string | null
+  driverLocationDescription: string | null
+  odometerMiles: number | null
+  engineHours: number | null
+  isCertificationDateValid: boolean
+  hasProhibitedData: boolean
+  requiresFix: boolean
+}
+
+export interface RouteEldCertificationReport {
+  companyName: string
+  driverName: string
+  certifiedDays: number
+  totalDays: number
+  days: RouteEldCertificationDay[]
+  invalidDateCertifications: RouteEldCertificationEvent[]
+}
+
+export interface RouteEldHosEvent {
+  id: string
+  revision?: string | null
+  sequenceId?: string | null
+  eventCode: string
+  eventName: string
+  eventCategory: string
+  timestamp: number
+  logCreationTime?: number | null
+  logDate: string
+  timeZone?: string | null
+  recordOrigin?: string | null
+  recordStatus: string
+  vehicleId?: string | null
+  vehicleName?: string | null
+  vehicleVin?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  location?: string | null
+  odometerMiles?: number | null
+  engineHours?: number | null
+  notes?: string | null
+  eldId?: string | null
+  eldSerialNumber?: string | null
+  eldMacAddress?: string | null
+  positioning?: string | null
+  driverLocationDescription?: string | null
+  isEditable: boolean
+  dateToCertify?: string | null
+  isFrozen?: boolean
+  freezeSource?: string | null
+  trailers: string[]
+  documents: string[]
+}
+
+export interface RouteEldWorkspaceEvent {
+  event: RouteEldHosEvent
+  trailers: string[]
+  documents: string[]
+  changeStatus: string
+  historyId?: string | null
+  version: number
+  isSubmitted: boolean
+  isRolledBack: boolean
+  isDeleted: boolean
+  isInserted: boolean
+}
+
+export interface RouteEldCalculatedClock {
+  remainingMs: number
+  limitMs: number
+  accumulatedMs: number
+}
+
+export interface RouteEldScheduleCalculations {
+  hos: {
+    currentStatus: string
+    break: RouteEldCalculatedClock
+    drive: RouteEldCalculatedClock
+    shift: RouteEldCalculatedClock
+    cycle: RouteEldCalculatedClock
+  }
+  freeTimes: Array<{
+    eventId: string
+    eventCode: string
+    eventTimestamp: number
+    startedAt: number
+    endedAt: number
+    freeDurationMs: number
+    eventDurationMs: number
+  }>
+  violations: Array<{
+    eventId: string
+    type: string
+    title: string
+    startedAt: number
+    endedAt: number
+  }>
+  eventIssues: Array<{
+    eventId: string
+    severity: string
+    code: string
+    title: string
+    timestamp: number
+  }>
+}
+
+export interface RouteEldWorkspace {
+  session: RouteEldEventSession
+  tabId: string
+  canEdit: boolean
+  events: RouteEldWorkspaceEvent[]
+  calculations: RouteEldScheduleCalculations
+  reassignedEvents: Array<{
+    event: RouteEldHosEvent
+    type: string
+    toDriverName: string
+  }>
+  freezePeriods: Array<Record<string, unknown>>
+}
+
+export interface RouteEldProfileForm {
+  logDate: string
+  coDriverId?: string | null
+  coDriverName?: string | null
+  trailers: string[]
+  shippingDocuments: string[]
+  signatureFileName?: string | null
+  signatureUrl?: string | null
+  isModified: boolean
+  isSubmitted: boolean
+  isRolledBack: boolean
+}
+
+export interface RouteEldResponsibleUser {
+  id: string
+  name: string
+  active: boolean
+}
+
+export interface RouteEldDriverOption {
+  id: string
+  externalCompanyId: string
+  externalCompanyName: string
+  externalDriverId: string
+  displayName: string
+  isActive: boolean
+  isMonitoringEnabled: boolean
+}
+
+export interface RouteEldAiAdvice {
+  id?: string | null
+  sessionId?: string | null
+  tabId?: string | null
+  adviceType: string
+  title: string
+  analysis: string
+  metrics: {
+    eventCount: number
+    violationCount: number
+    errorCount: number
+    warningCount: number
+    breakRemainingHours: number
+    driveRemainingHours: number
+    shiftRemainingHours: number
+    cycleRemainingHours: number
+    immediatelyAvailableDrivingHours: number
+  }
+  steps: Array<{
+    order: number
+    priority: string
+    title: string
+    detail: string
+    expectedOutcome: string
+    eventId?: string | null
+    eventTimestamp?: number | null
+    affectedEventCount: number
+    recommendedAction?: string | null
+    actionReason?: string | null
+    instructions?: string[] | null
+  }>
+  generatedAt: string
+}

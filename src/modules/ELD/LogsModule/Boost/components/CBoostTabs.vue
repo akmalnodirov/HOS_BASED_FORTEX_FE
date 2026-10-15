@@ -14,22 +14,6 @@
     </Tabs>
 
     <div class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 mb-1">
-      <div class="flex items-center bg-[#F0F0F0] dark:bg-muted rounded p-1 h-8 lg:h-9 2xl:h-10">
-        <button
-          v-for="b in ['booster 1', 'booster 2', 'booster 3']"
-          :key="b"
-          @click="selectedBooster = b"
-          :class="[
-            'px-2 lg:px-2.5 2xl:px-3 py-1 lg:py-1.5 2xl:py-2 text-[10px] lg:text-xs 2xl:text-sm font-medium rounded-sm transition-all capitalize cursor-pointer',
-            selectedBooster === b
-              ? 'bg-background shadow-sm text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          ]"
-        >
-          {{ b }}
-        </button>
-      </div>
-
       <Button
         variant="outline"
         size="icon"
