@@ -28,7 +28,11 @@
             <Pencil class="h-4 w-4" />
             <span class="sr-only">Edit form</span>
           </Button>
-          <Select v-model="selectedDate">
+          <div class="flex items-center gap-1">
+            <Button type="button" variant="outline" size="icon" class="h-8 w-8" :disabled="selectedDateIndex <= 0" title="Previous date" @click="moveDate(-1)">
+              <ChevronLeft class="h-4 w-4" />
+            </Button>
+            <Select v-model="selectedDate">
             <SelectTrigger class="h-8 w-39 text-xs">
               <SelectValue placeholder="Select date" />
             </SelectTrigger>
@@ -37,7 +41,11 @@
                 {{ formatDate(form.logDate) }} · {{ timeZone || 'CT' }}
               </SelectItem>
             </SelectContent>
-          </Select>
+            </Select>
+            <Button type="button" variant="outline" size="icon" class="h-8 w-8" :disabled="selectedDateIndex < 0 || selectedDateIndex >= displayForms.length - 1" title="Next date" @click="moveDate(1)">
+              <ChevronRight class="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -220,7 +228,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { Eye, Pencil } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Eye, Pencil } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -316,6 +324,13 @@ const selectedForm = computed(
     displayForms.value.at(-1) ??
     null
 )
+const selectedDateIndex = computed(() =>
+  displayForms.value.findIndex((form) => form.logDate === selectedForm.value?.logDate)
+)
+const moveDate = (offset: number) => {
+  const target = displayForms.value[selectedDateIndex.value + offset]
+  if (target) selectedDate.value = target.logDate
+}
 const selectedLog = computed(
   () =>
     props.dailyLogs.find(

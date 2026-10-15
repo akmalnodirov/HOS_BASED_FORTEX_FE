@@ -1,12 +1,15 @@
 <template>
   <div class="rounded-md border border-border bg-white dark:bg-card">
-    <div class="flex items-center justify-between gap-3 border-b px-3 py-2">
-      <div class="flex min-w-0 items-center gap-2">
+    <div class="grid grid-cols-[1fr_minmax(0,2fr)_1fr] items-center gap-3 border-b px-3 py-2">
+      <div class="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
+        <slot name="graph-actions" />
+      </div>
+      <div class="flex min-w-0 items-center justify-center gap-2">
         <slot name="toolbar">
-          <span class="text-xs text-muted-foreground">Scroll to move through days</span>
+          <span />
         </slot>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center justify-end gap-1">
         <Button
           variant="outline"
           size="icon"
@@ -47,7 +50,7 @@
         <Loader2 class="h-4 w-4 animate-spin" /> Loading session event graph
       </div>
 
-      <svg viewBox="0 0 52 190" class="h-[190px] w-[52px] bg-white dark:bg-card">
+      <svg :viewBox="`0 0 52 ${chartHeight}`" :style="{ height: `${chartHeight}px` }" class="w-[52px] bg-white dark:bg-card">
         <text
           v-for="(label, index) in statusLabels"
           :key="label"
@@ -58,6 +61,14 @@
         >
           {{ label }}
         </text>
+        <text
+          v-for="series in secondarySeries"
+          :key="`label-${series.key}`"
+          x="46"
+          :y="series.baseY + 25"
+          text-anchor="end"
+          class="fill-muted-foreground text-[8px] font-semibold"
+        >{{ series.shortLabel }}</text>
       </svg>
 
       <div
@@ -67,11 +78,12 @@
         @wheel="panWithWheel"
       >
         <svg
-          :viewBox="`0 0 ${plotWidth} 190`"
+          :viewBox="`0 0 ${plotWidth} ${chartHeight}`"
           :style="{ width: `${plotWidth}px`, minWidth: `${plotWidth}px` }"
-          class="h-[190px] select-none"
+          class="select-none"
+          :height="chartHeight"
         >
-          <rect :width="plotWidth" height="190" class="fill-white dark:fill-card" />
+          <rect :width="plotWidth" :height="chartHeight" class="fill-white dark:fill-card" />
 
           <g v-for="(label, index) in statusLabels" :key="label">
             <line
@@ -143,6 +155,22 @@
             </text>
             <title>{{ violation.title }}</title>
           </g>
+
+          <rect
+            v-for="segment in dutySegments"
+            :key="`column-${segment.eventId}`"
+            :x="segment.startX"
+            :width="Math.max(1, segment.endX - segment.startX)"
+            y="40"
+            height="130"
+            fill="transparent"
+            class="cursor-pointer"
+            pointer-events="all"
+            @click="selectEvent(segment.eventId)"
+            @contextmenu.prevent.stop="boostSelect(segment.eventId)"
+          >
+            <title>{{ segment.title }}</title>
+          </rect>
 
           <g
             v-for="marker in graphMarkers"
@@ -259,9 +287,9 @@
             <text
               v-if="segment.showLabels && segment.speedLabel"
               :x="segment.labelX"
-              :y="segment.y + 9"
+              :y="segment.y + 15"
               text-anchor="middle"
-              class="fill-[#465A95] text-[9px] font-medium dark:fill-[#9BA9D2]"
+              class="fill-[#465A95] text-[10px] font-semibold dark:fill-[#9BA9D2]"
               style="
                 paint-order: stroke;
                 stroke: hsl(var(--background));
@@ -274,9 +302,9 @@
             <text
               v-if="segment.showLabels && segment.milesLabel"
               :x="segment.labelX"
-              :y="segment.y + 20"
+              :y="segment.y + 26"
               text-anchor="middle"
-              class="fill-[#465A95] text-[9px] font-medium dark:fill-[#9BA9D2]"
+              class="fill-[#465A95] text-[10px] font-semibold dark:fill-[#9BA9D2]"
               style="paint-order: stroke; stroke: hsl(var(--background)); stroke-width: 3px"
             >
               {{ segment.milesLabel }}
@@ -305,6 +333,16 @@
           >
             <title>{{ point.title }}</title>
           </circle>
+
+          <g v-for="series in secondarySeries" :key="series.key">
+            <line x1="0" :x2="plotWidth" :y1="series.baseY" :y2="series.baseY" class="stroke-border" />
+            <text x="8" :y="series.baseY + 12" class="fill-muted-foreground text-[8px] font-semibold">{{ series.label }}</text>
+            <path v-if="series.path" :d="series.path" fill="none" :stroke="series.color" stroke-width="2" stroke-linejoin="round" />
+            <g v-for="segment in series.segments" :key="`${series.key}-${segment.eventId}`" class="cursor-pointer" @click="selectEvent(segment.eventId)">
+              <rect :x="segment.startX" :y="series.baseY + 5" :width="Math.max(2, segment.endX - segment.startX)" height="42" fill="transparent" pointer-events="all" />
+              <title>{{ segment.title }}</title>
+            </g>
+          </g>
           <text
             v-if="!dutyPath"
             :x="plotWidth / 2"
@@ -317,7 +355,7 @@
         </svg>
       </div>
 
-      <svg viewBox="0 0 62 190" class="h-[190px] w-[62px] bg-white dark:bg-card">
+      <svg :viewBox="`0 0 62 ${chartHeight}`" :style="{ height: `${chartHeight}px` }" class="w-[62px] bg-white dark:bg-card">
         <text x="31" y="18" text-anchor="middle" class="fill-foreground text-[10px] font-semibold">
           {{ visibleDayLabel }}
         </text>
@@ -362,6 +400,9 @@ const props = withDefaults(
     freeTimes?: RouteEldScheduleCalculations['freeTimes']
     violations?: RouteEldScheduleCalculations['violations']
     eventIssues?: RouteEldScheduleCalculations['eventIssues']
+    reassignedEvents?: RouteEldHosEvent[]
+    coDriverEvents?: RouteEldHosEvent[]
+    coDriverName?: string | null
     isGraphLoading?: boolean
   }>(),
   {
@@ -373,6 +414,9 @@ const props = withDefaults(
     freeTimes: () => [],
     violations: () => [],
     eventIssues: () => [],
+    reassignedEvents: () => [],
+    coDriverEvents: () => [],
+    coDriverName: null,
     isGraphLoading: false,
   }
 )
@@ -407,15 +451,18 @@ const dayWidth = computed(() => Math.max(baseDayWidth, viewportWidth.value) * zo
 const plotWidth = computed(() => Math.max(days.value.length, 1) * dayWidth.value)
 const totalHours = computed(() => days.value.length * 24)
 const graphTimeZone = computed(() => props.timeZone || props.events[0]?.timeZone || 'CT')
+const chartHeight = computed(() => 190 + secondarySeries.value.length * 52)
 const periodEndTimestamp = computed(() => {
   if (!props.toDate) return Date.now()
   return zonedTimestamp(`${nextDate(props.toDate)}T00:00:00`, graphTimeZone.value)
 })
 const graphEndTimestamp = computed(() => {
   const created = props.sessionCreatedAt ? Date.parse(props.sessionCreatedAt) : Number.NaN
-  return Number.isFinite(created)
-    ? Math.min(created, periodEndTimestamp.value)
-    : periodEndTimestamp.value
+  return Math.min(
+    Date.now(),
+    Number.isFinite(created) ? created : Number.POSITIVE_INFINITY,
+    periodEndTimestamp.value
+  )
 })
 const hourTicks = computed(() =>
   Array.from({ length: totalHours.value + 1 }, (_, hour) => {
@@ -510,6 +557,30 @@ const dutyPoints = computed(() =>
     title: `${event.eventName} · ${formatEventTime(event)}`,
   }))
 )
+const secondarySeries = computed(() => {
+  const definitions = [
+    { key: 'reassigned', label: 'Reassigned events', shortLabel: 'REASSIGNED', color: '#DC2626', events: props.reassignedEvents },
+    { key: 'co-driver', label: props.coDriverName ? `Co-driver · ${props.coDriverName}` : 'Co-driver', shortLabel: 'CO-DRIVER', color: '#7C3AED', events: props.coDriverEvents },
+  ].filter((series) => series.events.length)
+  return definitions.map((series, seriesIndex) => {
+    const baseY = 190 + seriesIndex * 52
+    const points = series.events
+      .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
+      .map((event) => ({ event, x: eventX(event), y: baseY + 12 + Math.max(0, statusLabels.indexOf(event.eventCategory as (typeof statusLabels)[number])) * 9 }))
+      .filter((point) => point.x >= 0 && point.x <= plotWidth.value)
+      .sort((first, second) => first.event.timestamp - second.event.timestamp)
+    let path = points.length ? `M ${points[0].x} ${points[0].y}` : ''
+    for (let index = 1; index < points.length; index += 1) path += ` H ${points[index].x} V ${points[index].y}`
+    if (points.length) path += ` H ${Math.min(plotWidth.value, timeX(graphEndTimestamp.value, graphTimeZone.value))}`
+    const segments = points.map((point, index) => ({
+      eventId: point.event.id,
+      startX: point.x,
+      endX: points[index + 1]?.x ?? Math.min(plotWidth.value, timeX(graphEndTimestamp.value, graphTimeZone.value)),
+      title: `${point.event.eventName} · ${formatEventTime(point.event)}`,
+    }))
+    return { ...series, baseY, path, segments }
+  })
+})
 const specialDutySegments = computed(() =>
   dutySegments.value.filter((segment) => segment.specialKind)
 )

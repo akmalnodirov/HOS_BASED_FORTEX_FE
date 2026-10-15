@@ -210,6 +210,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_DRIVERS}/${id}/schedule`
   static readonly ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS = (id: string) =>
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/options`
+  static readonly ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE = (id: string) =>
+    `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/co-driver`
   static readonly ROUTE_ELD_DRIVER_MONITORING = (id: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${id}/monitoring`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
@@ -253,6 +255,8 @@ export class ApiEndpoints {
   ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENT(sessionId, tabId, eventId)}/revert`
   static readonly ROUTE_ELD_EVENT_SESSION_LOCATION_FINDER = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/location-finder`
+  static readonly ROUTE_ELD_EVENT_SESSION_CAMERAS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/cameras`
   static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/ai-advice`
   static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE_HISTORY = (sessionId: string) =>

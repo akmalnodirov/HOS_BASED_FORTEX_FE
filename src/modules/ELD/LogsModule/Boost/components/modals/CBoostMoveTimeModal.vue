@@ -13,7 +13,8 @@
           />
           <div class="flex items-center">
             <Button type="button" variant="outline" size="icon" title="Switch source and target" @click="$emit('switch')">
-              <ArrowRightLeft class="h-4 w-4" />
+              <ArrowRight v-if="sourceIndex === 0" class="h-4 w-4" />
+              <ArrowLeft v-else class="h-4 w-4" />
             </Button>
           </div>
           <EventCard
@@ -62,7 +63,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch, type PropType } from 'vue'
-import { ArrowRightLeft } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'

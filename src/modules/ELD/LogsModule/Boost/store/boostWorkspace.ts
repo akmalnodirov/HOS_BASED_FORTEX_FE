@@ -13,6 +13,9 @@ import type {
   RouteEldEventEditOptions,
   RouteEldResponsibleUser,
   RouteEldWorkspace,
+  RouteEldWorkspaceEvent,
+  RouteEldSessionOperation,
+  RouteEldCoDriverSchedule,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -37,6 +40,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const responsibleUsers = ref<RouteEldResponsibleUser[]>([])
   const coDrivers = ref<RouteEldResponsibleUser[]>([])
   const reassignTargets = ref<RouteEldDriverOption[]>([])
+  const coDriverSchedule = ref<RouteEldCoDriverSchedule | null>(null)
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
   const isMutating = ref(false)
@@ -300,17 +304,32 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function revertEvent(eventId: string) {
     if (!session.value || !activeTabId.value) return null
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
     isMutating.value = true
     try {
-      await api.post(
+      const response = await api.post<
+        RouteEldWorkspaceEvent | ApiEnvelope<RouteEldWorkspaceEvent>
+      >(
         ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVERT_EVENT(
-          session.value.id,
-          activeTabId.value,
+          sessionId,
+          tabId,
           eventId
         ),
         null
       )
-      return await refreshWorkspace()
+      const updated = unwrap(response.data)
+      if (workspace.value) {
+        workspace.value = {
+          ...workspace.value,
+          events: workspace.value.events.map((item) =>
+            item.event.id === updated.event.id ? updated : item
+          ),
+        }
+        cacheWorkspace(workspace.value)
+      }
+      await fetchProfileForms(sessionId, tabId)
+      return updated
     } finally {
       isMutating.value = false
     }
@@ -385,6 +404,20 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     coDrivers.value = unwrap(coDriversResponse.data) ?? []
   }
 
+  async function fetchCoDriverSchedule(
+    driverId: string,
+    coDriverId: string,
+    fromDate: string,
+    toDate: string
+  ) {
+    const response = await api.get<RouteEldCoDriverSchedule | ApiEnvelope<RouteEldCoDriverSchedule>>(
+      ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE(driverId),
+      { params: { coDriverId, fromDate, toDate } }
+    )
+    coDriverSchedule.value = unwrap(response.data)
+    return coDriverSchedule.value
+  }
+
   async function fetchReassignTargets(driverId: string) {
     const response = await api.get<RouteEldDriverOption[] | ApiEnvelope<RouteEldDriverOption[]>>(
       ApiEndpoints.ROUTE_ELD_SOURCE_DRIVERS
@@ -421,24 +454,30 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
   }
 
-  async function submitOrRollback() {
+  async function runSessionOperation(
+    type: 'submit' | 'rollback',
+    onProgress?: (operation: RouteEldSessionOperation) => void
+  ) {
     if (!session.value) return null
     isMutating.value = true
     try {
-      const url =
-        session.value.status === 'SUBMITTED'
-          ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(session.value.id)
-          : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(session.value.id)
-      let operation = unwrap((await api.post<any>(url, null)).data)
+      const url = type === 'rollback'
+        ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(session.value.id)
+        : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(session.value.id)
+      let operation = unwrap(
+        (await api.post<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(url, null)).data
+      )
+      onProgress?.(operation)
       while (operation.status === 'QUEUED' || operation.status === 'RUNNING') {
         await new Promise((resolve) => setTimeout(resolve, 500))
         operation = unwrap(
           (
-            await api.get<any>(
+            await api.get<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(
               ApiEndpoints.ROUTE_ELD_EVENT_SESSION_OPERATION(session.value.id, operation.id)
             )
           ).data
         )
+        onProgress?.(operation)
       }
       if (operation.status === 'FAILED') throw new Error(operation.error || 'Operation failed')
       await loadSession(session.value.id, activeTabId.value)
@@ -446,6 +485,11 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     } finally {
       isMutating.value = false
     }
+  }
+
+  async function submitOrRollback() {
+    const type = session.value?.status === 'SUBMITTED' ? 'rollback' : 'submit'
+    return runSessionOperation(type)
   }
 
   function requestProfileFormEdit(logDate: string) {
@@ -466,6 +510,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     responsibleUsers.value = []
     coDrivers.value = []
     reassignTargets.value = []
+    coDriverSchedule.value = null
     profileFormEditRequest.value = null
     activeTabId.value = null
     workspaceCache.clear()
@@ -482,6 +527,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     responsibleUsers,
     coDrivers,
     reassignTargets,
+    coDriverSchedule,
     profileFormEditRequest,
     activeTabId,
     activeTab,
@@ -507,10 +553,12 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     reassignEvents,
     updateProfileForm,
     fetchDriverOptions,
+    fetchCoDriverSchedule,
     fetchReassignTargets,
     analyzeAiAdvice,
     normalize,
     submitOrRollback,
+    runSessionOperation,
     requestProfileFormEdit,
     clearProfileFormEditRequest,
     clear,

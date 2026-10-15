@@ -11,6 +11,7 @@ interface Props {
   placeholder?: string
   class?: HTMLAttributes['class']
   disabled?: boolean
+  includeSeconds?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,15 +25,17 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const hours = ref('00')
 const minutes = ref('00')
+const seconds = ref('00')
 const hoursInput = ref<HTMLInputElement | null>(null)
 const minutesInput = ref<HTMLInputElement | null>(null)
+const secondsInput = ref<HTMLInputElement | null>(null)
 
 // Parse initial value
 watch(
   () => props.modelValue,
   (value) => {
     if (value && value.includes(':')) {
-      const [h, m] = value.split(':')
+      const [h, m, s = '00'] = value.split(':')
       
       // Update hours only if it differs numerically or if current local value is empty (and strictly different)
       // This prevents overwriting "1" with "01" while typing, which blocks "12"
@@ -44,6 +47,10 @@ watch(
       if (minutes.value === '' || parseInt(minutes.value) !== parseInt(m)) {
          minutes.value = m.padStart(2, '0')
       }
+
+      if (seconds.value === '' || parseInt(seconds.value) !== parseInt(s)) {
+        seconds.value = s.padStart(2, '0')
+      }
     }
   },
   { immediate: true }
@@ -52,7 +59,9 @@ watch(
 // Format time for display
 const formattedTime = computed(() => {
   if (!props.modelValue) return props.placeholder
-  return `${hours.value}:${minutes.value}`
+  return props.includeSeconds
+    ? `${hours.value}:${minutes.value}:${seconds.value}`
+    : `${hours.value}:${minutes.value}`
 })
 
 // Update hours
@@ -134,15 +143,37 @@ const updateMinutes = (event: Event) => {
   // Store as string without padding during typing (padding will be done on blur)
   minutes.value = num.toString()
   emitValue()
+
+  if (props.includeSeconds && numericValue.length >= 2 && secondsInput.value) {
+    secondsInput.value.focus()
+    secondsInput.value.setSelectionRange(0, secondsInput.value.value.length)
+  }
+}
+
+const updateSeconds = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const numericValue = target.value.replace(/\D/g, '')
+  if (numericValue === '') {
+    seconds.value = ''
+    return
+  }
+  const num = Math.min(59, Math.max(0, parseInt(numericValue.substring(0, 2), 10)))
+  seconds.value = num.toString()
+  emitValue()
 }
 
 // Emit updated value
 const emitValue = () => {
   // Only emit if both values are valid (not empty)
-  if (hours.value !== '' && minutes.value !== '') {
+  if (
+    hours.value !== '' &&
+    minutes.value !== '' &&
+    (!props.includeSeconds || seconds.value !== '')
+  ) {
     const h = hours.value.padStart(2, '0')
     const m = minutes.value.padStart(2, '0')
-    emit('update:modelValue', `${h}:${m}`)
+    const s = seconds.value.padStart(2, '0')
+    emit('update:modelValue', props.includeSeconds ? `${h}:${m}:${s}` : `${h}:${m}`)
   }
 }
 
@@ -171,6 +202,30 @@ const decrementMinutes = () => {
   emitValue()
 }
 
+const incrementSeconds = () => {
+  const num = (parseInt(seconds.value || '0') + 1) % 60
+  seconds.value = num.toString().padStart(2, '0')
+  emitValue()
+}
+
+const decrementSeconds = () => {
+  const num = (parseInt(seconds.value || '0') - 1 + 60) % 60
+  seconds.value = num.toString().padStart(2, '0')
+  emitValue()
+}
+
+const adjustWithWheel = (unit: 'hours' | 'minutes' | 'seconds', event: WheelEvent) => {
+  const increment = event.deltaY < 0
+  if (unit === 'hours') {
+    if (increment) incrementHours()
+    else decrementHours()
+  } else if (unit === 'minutes') {
+    if (increment) incrementMinutes()
+    else decrementMinutes()
+  } else if (increment) incrementSeconds()
+  else decrementSeconds()
+}
+
 // Handle numeric input only
 const handleNumericInput = (event: KeyboardEvent) => {
   const allowedKeys = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete']
@@ -193,6 +248,11 @@ const handleMinutesFocus = (event: FocusEvent) => {
   target.setSelectionRange(0, target.value.length)
 }
 
+const handleSecondsFocus = (event: FocusEvent) => {
+  const target = event.target as HTMLInputElement
+  target.setSelectionRange(0, target.value.length)
+}
+
 // Handle input blur to format
 const handleHoursBlur = () => {
   if (hours.value === '' || hours.value === '0' || isNaN(parseInt(hours.value))) {
@@ -212,11 +272,21 @@ const handleMinutesBlur = () => {
   emitValue()
 }
 
+const handleSecondsBlur = () => {
+  if (seconds.value === '' || seconds.value === '0' || isNaN(parseInt(seconds.value))) {
+    seconds.value = '00'
+  } else {
+    seconds.value = seconds.value.padStart(2, '0')
+  }
+  emitValue()
+}
+
 // Set current time
 const setCurrentTime = () => {
   const now = new Date()
   hours.value = now.getHours().toString().padStart(2, '0')
   minutes.value = now.getMinutes().toString().padStart(2, '0')
+  seconds.value = now.getSeconds().toString().padStart(2, '0')
   emitValue()
 }
 </script>
@@ -276,6 +346,7 @@ const setCurrentTime = () => {
               @focus="handleHoursFocus"
               @blur="handleHoursBlur"
               @keydown="handleNumericInput"
+              @wheel.prevent="adjustWithWheel('hours', $event)"
             />
             <button
               type="button"
@@ -334,6 +405,7 @@ const setCurrentTime = () => {
               @focus="handleMinutesFocus"
               @blur="handleMinutesBlur"
               @keydown="handleNumericInput"
+              @wheel.prevent="adjustWithWheel('minutes', $event)"
             />
             <button
               type="button"
@@ -356,6 +428,47 @@ const setCurrentTime = () => {
               </svg>
             </button>
           </div>
+
+          <template v-if="includeSeconds">
+            <span class="text-muted-foreground">:</span>
+
+            <div class="flex flex-col items-center">
+              <button
+                type="button"
+                class="p-1 hover:bg-accent rounded"
+                :disabled="disabled"
+                @click="incrementSeconds"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <input
+                ref="secondsInput"
+                :value="seconds"
+                type="text"
+                inputmode="numeric"
+                maxlength="2"
+                class="w-16 text-center text-2xl h-12 p-0 rounded-md border border-input bg-background shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="disabled"
+                @input="updateSeconds"
+                @focus="handleSecondsFocus"
+                @blur="handleSecondsBlur"
+                @keydown="handleNumericInput"
+                @wheel.prevent="adjustWithWheel('seconds', $event)"
+              />
+              <button
+                type="button"
+                class="p-1 hover:bg-accent rounded"
+                :disabled="disabled"
+                @click="decrementSeconds"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </template>
         </div>
 
         <!-- Actions -->

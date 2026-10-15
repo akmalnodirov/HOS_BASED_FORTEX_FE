@@ -87,7 +87,8 @@
             No session events with valid coordinates were found near this location.
           </p>
         </div>
-        <table v-else class="w-full table-fixed text-left text-xs">
+        <div v-else class="mx-4 my-3 overflow-hidden rounded-md border">
+        <table class="w-full table-fixed text-left text-xs">
           <thead class="sticky top-0 z-10 bg-muted/95 text-muted-foreground backdrop-blur">
             <tr>
               <th class="w-12 px-3 py-2.5 text-center">#</th>
@@ -127,6 +128,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <DialogFooter class="shrink-0 border-t px-5 py-3 sm:justify-between">
@@ -149,6 +151,7 @@ import {
   Search,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { copyCoordinates, readCoordinates } from '../../utils/coordinateClipboard'
 import {
   Dialog,
   DialogContent,
@@ -250,20 +253,18 @@ async function doSearch() {
 }
 async function copyCoords() {
   if (!coordinatesComplete.value) return
-  await navigator.clipboard.writeText(`${parsedLatitude.value}, ${parsedLongitude.value}`)
+  await copyCoordinates(parsedLatitude.value, parsedLongitude.value)
   toast.success('Coordinates copied')
 }
 async function pasteCoords() {
-  try {
-    const text = await navigator.clipboard.readText()
-    const match = text.match(/^([+-]?\d*\.?\d+)\s*[^0-9+-]*\s*([+-]?\d*\.?\d+)/)
-    if (!match) throw new Error('Clipboard does not contain coordinates')
-    latitude.value = match[1]
-    longitude.value = match[2]
-    clearResults()
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Coordinates could not be pasted')
+  const coordinates = await readCoordinates()
+  if (!coordinates) {
+    toast.error('Clipboard does not contain coordinates')
+    return
   }
+  latitude.value = String(coordinates.latitude)
+  longitude.value = String(coordinates.longitude)
+  clearResults()
 }
 function formatTime(timestamp: number, timeZone?: string | null) {
   return new Intl.DateTimeFormat('en-US', {

@@ -7,6 +7,7 @@
     <div class="mb-1 flex-none bg-white p-[16px_24px_0_24px] dark:bg-card">
       <CLogHeader
         :driver-info="headerDriverInfo"
+        :co-driver-name="headerCoDriverName"
         :daily-summary="isBoostPage ? null : dailySummary"
         :daily-time-remainder="headerTimeRemainder"
         class="mb-4"
@@ -110,6 +111,28 @@ const headerDriverInfo = computed(() => {
         signaturePath: driverDailyForm.value?.signaturePath ?? undefined,
       }
     : undefined
+})
+
+const headerCoDriverName = computed(() => {
+  if (isBoostPage.value) {
+    const from = boostWorkspace.value?.session.fromDate ?? ''
+    const to = boostWorkspace.value?.session.toDate ?? ''
+    const names = [
+      ...(boostSchedule.value?.dailyLogs ?? []).map((log) => ({
+        date: log.logDate.replaceAll('/', '-').slice(0, 10),
+        name: log.coDriverName?.trim() || '',
+      })),
+      ...(boostProfileForms.value ?? []).map((form) => ({
+        date: form.logDate.replaceAll('/', '-').slice(0, 10),
+        name: form.coDriverName?.trim() || '',
+      })),
+    ]
+      .filter((item) => item.name && item.date >= from && item.date <= to)
+      .sort((first, second) => first.date.localeCompare(second.date))
+    return Array.from(new Set(names.map((item) => item.name))).join(', ') || null
+  }
+  const coDriver = driverDailyForm.value?.coDriver?.user
+  return coDriver ? `${coDriver.firstName} ${coDriver.lastName}`.trim() : null
 })
 
 const showBoostSearchModal = ref(false)

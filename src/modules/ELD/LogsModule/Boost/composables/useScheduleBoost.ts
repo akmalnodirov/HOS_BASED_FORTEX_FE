@@ -254,6 +254,7 @@ export function useScheduleBoost() {
     workspace,
     profileForms,
     schedule,
+    coDriverSchedule,
     responsibleUsers,
     coDrivers,
     activeTabId,
@@ -289,6 +290,29 @@ export function useScheduleBoost() {
   const rawEvents = computed(() =>
     [...(workspace.value?.events ?? [])].sort((a, b) => a.event.timestamp - b.event.timestamp)
   )
+  const latestPeriodCoDriver = computed(() => {
+    if (!session.value) return null
+    return [
+      ...(schedule.value?.dailyLogs ?? []).map((log) => ({
+        id: log.coDriverId?.trim() || log.coDriverEmail?.trim() || log.coDriverName?.trim() || '',
+        name: log.coDriverName?.trim() || log.coDriverEmail?.trim() || 'Co-driver',
+        date: normalizeDateKey(log.logDate),
+        priority: 0,
+      })),
+      ...profileForms.value.map((form) => ({
+        id: form.coDriverId?.trim() || form.coDriverName?.trim() || '',
+        name: form.coDriverName?.trim() || 'Co-driver',
+        date: normalizeDateKey(form.logDate),
+        priority: 1,
+      })),
+    ]
+      .filter((item) => item.id && item.date >= session.value!.fromDate && item.date <= session.value!.toDate)
+      .sort((first, second) => first.date.localeCompare(second.date) || first.priority - second.priority)
+      .at(-1) ?? null
+  })
+  const coDriverGraphEvents = computed(() =>
+    [...(coDriverSchedule.value?.events ?? [])].sort((first, second) => first.timestamp - second.timestamp)
+  )
   const workspaceTimeZone = computed(() => rawEvents.value[0]?.event.timeZone ?? 'CT')
   const periodStartMs = computed(() =>
     session.value
@@ -307,32 +331,42 @@ export function useScheduleBoost() {
       : 0
   )
 
+  const timelineCutoffMs = computed(() => {
+    const createdAt = session.value?.createdAt ? Date.parse(session.value.createdAt) : Number.NaN
+    return Math.min(
+      Date.now(),
+      Number.isFinite(createdAt) ? createdAt : Number.POSITIVE_INFINITY,
+      periodEndMs.value
+    )
+  })
+
   const graphEventDurationById = computed(() => {
     const result = new Map<string, number>()
     const eligible = rawEvents.value
       .filter((item) => !item.isDeleted)
       .filter((item) => normalizedStatus(item.event.recordStatus) === 'ACTIVE')
-      .filter((item) => Boolean(CATEGORY_TO_CODE[item.event.eventCategory]))
+      .filter((item) => item.event.eventCategory !== 'OTHER')
       .filter(
         (item) =>
           item.event.timestamp >= periodStartMs.value && item.event.timestamp < periodEndMs.value
       )
-    const today = zonedDateTime(Date.now(), workspaceTimeZone.value).slice(0, 10)
-    const periodIncludesToday = Boolean(
-      session.value && session.value.fromDate <= today && session.value.toDate >= today
-    )
-    const sessionCutoff = session.value?.createdAt
-      ? Date.parse(session.value.createdAt)
-      : Number.POSITIVE_INFINITY
-    const finalCutoff = Math.min(
-      periodIncludesToday ? Date.now() : periodEndMs.value,
-      Number.isFinite(sessionCutoff) ? sessionCutoff : Number.POSITIVE_INFINITY,
-      periodEndMs.value
-    )
-
     eligible.forEach((item, index) => {
-      const nextTimestamp = eligible[index + 1]?.event.timestamp ?? finalCutoff
+      const nextTimestamp = eligible[index + 1]?.event.timestamp ?? timelineCutoffMs.value
       result.set(item.event.id, Math.max(0, nextTimestamp - item.event.timestamp))
+    })
+    return result
+  })
+
+  const coDriverDurationById = computed(() => {
+    const result = new Map<string, number>()
+    const eligible = coDriverGraphEvents.value.filter(
+      (event) => normalizedStatus(event.recordStatus) === 'ACTIVE' && event.eventCategory !== 'OTHER'
+    )
+    eligible.forEach((event, index) => {
+      result.set(
+        event.id,
+        Math.max(0, (eligible[index + 1]?.timestamp ?? timelineCutoffMs.value) - event.timestamp)
+      )
     })
     return result
   })
@@ -395,11 +429,51 @@ export function useScheduleBoost() {
     })
   )
 
+  const coDriverRows = computed<BoostUiEventRow[]>(() =>
+    coDriverGraphEvents.value.map((event) => {
+      const [eventType, eventCode] = numericEvent(event)
+      return {
+        eventId: event.id,
+        sequenceId: sequenceIdHexToDecimal(event.sequenceId),
+        driverFullName: latestPeriodCoDriver.value?.name ?? 'Co-driver',
+        startTime: asDateTime(event.timestamp, event.timeZone),
+        duration: coDriverDurationById.value.has(event.id)
+          ? Math.floor(coDriverDurationById.value.get(event.id)! / 1000)
+          : null,
+        eventType,
+        eventCode,
+        eventName: event.eventName,
+        calculatedLocation: event.location || undefined,
+        manualLocation: event.driverLocationDescription || undefined,
+        locationOrigin: event.driverLocationDescription ? 2 : 1,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        eventRecordOrigin: asOrigin(event.recordOrigin),
+        vehicleMiles: event.odometerMiles ?? undefined,
+        engineHours: event.engineHours ?? undefined,
+        annotation: event.notes ?? undefined,
+        eventRecordStatus: normalizedStatus(event.recordStatus),
+        trailerNumber: event.trailers.join(', ') || undefined,
+        shippingDocument: event.documents.join(', ') || undefined,
+        actionState: 8,
+        changeStatus: 'CO_DRIVER',
+        errorTitles: [],
+        warningTitles: [],
+      }
+    })
+  )
+
   const dailyEvents = computed<BoostUiEventGroup[]>(() => {
-    const rows = eventRows.value.map((row, index) => ({
-      row,
-      date: normalizeDateKey(rawEvents.value[index].event.logDate),
-    }))
+    const rows = [
+      ...eventRows.value.map((row, index) => ({
+        row,
+        date: normalizeDateKey(rawEvents.value[index].event.logDate),
+      })),
+      ...coDriverRows.value.map((row, index) => ({
+        row,
+        date: normalizeDateKey(coDriverGraphEvents.value[index].logDate),
+      })),
+    ]
     const grouped = groupByDate(rows)
     const dates: string[] = []
     if (session.value) {
@@ -457,7 +531,7 @@ export function useScheduleBoost() {
       const event = item.event
       const next = dutyEvents[index + 1]?.event
       const duty = CATEGORY_TO_CODE[event.eventCategory]
-      const nextTimestamp = Math.min(next?.timestamp ?? to, to)
+      const nextTimestamp = Math.min(next?.timestamp ?? timelineCutoffMs.value, to)
       const startSeconds = Math.max(0, (event.timestamp - from) / 1000)
       const endSeconds = Math.max(startSeconds, (nextTimestamp - from) / 1000)
       const x1 = (startSeconds / 86400) * pixelsPerDay
@@ -544,7 +618,7 @@ export function useScheduleBoost() {
         if (!duty) return
         const segmentStart = Math.max(item.event.timestamp, dayStart, periodStartMs.value)
         const segmentEnd = Math.min(
-          dutyEvents[index + 1]?.event.timestamp ?? periodEndMs.value,
+          dutyEvents[index + 1]?.event.timestamp ?? timelineCutoffMs.value,
           dayEnd,
           periodEndMs.value
         )
@@ -1208,12 +1282,16 @@ export function useScheduleBoost() {
       return
     }
     if (column === 'location' && typeof data === 'object' && data) {
+      const manual = data.positioning === 'MANUAL' || Boolean(data.manualLocation?.trim())
       await store.updateEvent(targetEventId, {
         ...currentEventPayload(source),
-        latitude: data.latitude ?? null,
-        longitude: data.longitude ?? null,
-        location: data.calculatedLocation ?? null,
-        driverLocationDescription: data.manualLocation ?? null,
+        positioning: manual ? 'MANUAL' : 'AUTOMATIC',
+        latitude: manual ? source.event.latitude ?? null : data.latitude ?? null,
+        longitude: manual ? source.event.longitude ?? null : data.longitude ?? null,
+        location: manual ? source.event.location ?? null : data.calculatedLocation ?? null,
+        driverLocationDescription: manual
+          ? data.manualLocation?.trim() || data.calculatedLocation?.trim() || null
+          : null,
       })
     }
   }
@@ -1251,12 +1329,35 @@ export function useScheduleBoost() {
     { immediate: true }
   )
 
+  watch(
+    () => [
+      session.value?.id,
+      schedule.value?.driverId,
+      latestPeriodCoDriver.value?.id,
+      session.value?.fromDate,
+      session.value?.toDate,
+    ] as const,
+    async ([sessionId, scheduleDriverId, coDriverId, fromDate, toDate]) => {
+      if (!sessionId || !scheduleDriverId || !coDriverId || !fromDate || !toDate) {
+        store.coDriverSchedule = null
+        return
+      }
+      try {
+        await store.fetchCoDriverSchedule(scheduleDriverId, coDriverId, fromDate, toDate)
+      } catch {
+        store.coDriverSchedule = null
+      }
+    },
+    { immediate: true }
+  )
+
   return {
     store,
     sessions,
     session,
     workspace,
     profileForms,
+    schedule,
     responsibleUsers,
     coDrivers,
     workspaceTimeZone,
@@ -1269,6 +1370,8 @@ export function useScheduleBoost() {
     dailyTimeRemainder,
     chartData,
     dailyEvents,
+    coDriverGraphEvents,
+    latestPeriodCoDriver,
     graphEventDurationById,
     dailyPixelViolations,
     pinTimes,

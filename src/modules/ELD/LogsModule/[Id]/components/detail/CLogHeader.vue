@@ -10,6 +10,9 @@
           <h1 class="lg:text-sm 2xl:text-base font-semibold text-foreground uppercase">
             {{ driverInfo?.name || 'N/A' }}
           </h1>
+          <span v-if="coDriverName" class="max-w-52 truncate text-xs font-medium text-muted-foreground" :title="coDriverName">
+            (Co-driver: {{ coDriverName }})
+          </span>
           <CEventBadge
             v-if="driverInfo?.lastEventType != null"
             :event-code="driverInfo.lastEventCode ?? 0"
@@ -207,6 +210,7 @@ interface DailyTimeRemainder {
 
 const props = defineProps<{
   driverInfo?: DriverInfo
+  coDriverName?: string | null
   dailySummary?: DailySummaryResponse | null
   dailyTimeRemainder?: DailyTimeRemainder | null
 }>()

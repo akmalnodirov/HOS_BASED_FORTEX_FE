@@ -118,12 +118,20 @@
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1">
             <label class="text-sm font-medium">Date and time</label>
-            <Input
-              type="datetime-local"
-              step="1"
-              :model-value="eventDateTimeLocal"
-              @input="onDateTimeInput"
-            />
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button type="button" variant="outline" class="w-full justify-start font-normal">
+                  <CalendarIcon class="mr-2 h-4 w-4 text-muted-foreground" />
+                  {{ formattedDateTime }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="start">
+                <Calendar v-model="eventCalendarDate" initial-focus />
+                <div class="border-t p-3">
+                  <TimePicker v-model="eventClock" include-seconds />
+                </div>
+              </PopoverContent>
+            </Popover>
             <p v-if="!dateWithinSession" class="text-xs text-red-600">
               Event time must remain within the session period.
             </p>
@@ -269,8 +277,9 @@
             :model-value="form.location ?? ''"
             disabled
             class="bg-muted"
-            placeholder="Location"
+            :placeholder="isReverseGeocoding ? 'Calculating location…' : 'Calculated location'"
           />
+          <p v-if="geocodeError" class="text-xs text-red-600">{{ geocodeError }}</p>
         </div>
 
         <div class="grid grid-cols-3 gap-2">
@@ -343,9 +352,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import { Copy, ClipboardPaste, MapPin, Trash2 } from 'lucide-vue-next'
-import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations.ts'
+import { computed, ref, watch } from 'vue'
+import { Calendar as CalendarIcon, Copy, ClipboardPaste, MapPin, Trash2 } from 'lucide-vue-next'
+import { CalendarDate } from '@internationalized/date'
+import { useApi } from '@/composables/useAxiosService'
+import { ApiEndpoints } from '@/api/endpoints'
 import {
   Dialog,
   DialogContent,
@@ -355,6 +366,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
 import {
   Select,
   SelectContent,
@@ -369,6 +383,7 @@ import type {
   RouteEldResponsibleUser,
 } from '../../types/boost.ts'
 import dayjs from 'dayjs'
+import { copyCoordinates, readCoordinates } from '../../utils/coordinateClipboard'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -414,13 +429,16 @@ const emit = defineEmits<{
   'update:form': [form: BoostEventStatusForm]
 }>()
 
-const geoStore = useGeoLocationsStore()
+const api = useApi()
 
 function patch(partial: Partial<BoostEventStatusForm>) {
   emit('update:form', { ...props.form, ...partial })
 }
 
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null
+let geocodeVersion = 0
+const isReverseGeocoding = ref(false)
+const geocodeError = ref('')
 watch(
   () => [props.form.latitude, props.form.longitude],
   ([lat, lng]) => {
@@ -428,12 +446,29 @@ watch(
       return
     if (geocodeTimer) clearTimeout(geocodeTimer)
     geocodeTimer = setTimeout(async () => {
-      const address = await geoStore.getCalculatedAddress({
-        latitude: lat as number,
-        longitude: lng as number,
-      })
-      if (address) patch({ location: address })
-    }, 600)
+      const latitude = Number(lat)
+      const longitude = Number(lng)
+      const version = ++geocodeVersion
+      isReverseGeocoding.value = true
+      geocodeError.value = ''
+      try {
+        const response = await api.get<{ label?: string | null }>(ApiEndpoints.ALPR_GEOCODE_REVERSE, {
+          params: { latitude, longitude, relative: true },
+        })
+        if (version !== geocodeVersion) return
+        const address = response.data?.label?.trim().replace(/, United States$/i, '')
+        if (!address) throw new Error('Location was not resolved')
+        patch({
+          positioning: 'AUTOMATIC',
+          location: address,
+          locationNote: null,
+        })
+      } catch {
+        if (version === geocodeVersion) geocodeError.value = 'The coordinates could not be reverse geocoded.'
+      } finally {
+        if (version === geocodeVersion) isReverseGeocoding.value = false
+      }
+    }, 450)
   }
 )
 
@@ -498,16 +533,26 @@ const certifiedDateStr = computed(() =>
   props.form.certifiedDate ? dayjs(props.form.certifiedDate).format('YYYY-MM-DD') : ''
 )
 
-const eventDateTimeLocal = computed(
-  () =>
-    `${props.form.startDate}T${String(props.form.time.hours).padStart(2, '0')}:${String(props.form.time.minutes).padStart(2, '0')}:${String(props.form.time.seconds).padStart(2, '0')}`
+const eventCalendarDate = computed({
+  get: () => {
+    const [year, month, day] = props.form.startDate.split('-').map(Number)
+    return new CalendarDate(year, month, day)
+  },
+  set: (value: CalendarDate) => patch({ startDate: value.toString() }),
+})
+const formattedDateTime = computed(() =>
+  dayjs(`${props.form.startDate}T${clockPart('hours')}:${clockPart('minutes')}:${clockPart('seconds')}`).format('MMM D, YYYY · HH:mm:ss')
 )
-function onDateTimeInput(e: Event) {
-  const value = (e.target as HTMLInputElement).value
-  const [startDate, clock = '00:00:00'] = value.split('T')
-  const [hours = 0, minutes = 0, seconds = 0] = clock.split(':').map(Number)
-  patch({ startDate, time: { hours, minutes, seconds } })
+function clockPart(part: 'hours' | 'minutes' | 'seconds') {
+  return String(props.form.time[part]).padStart(2, '0')
 }
+const eventClock = computed({
+  get: () => `${clockPart('hours')}:${clockPart('minutes')}:${clockPart('seconds')}`,
+  set: (value: string) => {
+    const [hours = 0, minutes = 0, seconds = 0] = value.split(':').map(Number)
+    patch({ time: { hours, minutes, seconds } })
+  },
+})
 function onCertifiedDateInput(e: Event) {
   patch({ certifiedDate: (e.target as HTMLInputElement).value })
 }
@@ -535,7 +580,12 @@ function onPositioningChange(v: unknown) {
 
 function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
   const raw = (e.target as HTMLInputElement).value
-  patch({ [field]: raw === '' ? null : parseFloat(raw) } as Partial<BoostEventStatusForm>)
+  const value = raw === '' ? null : parseFloat(raw)
+  if ((field === 'latitude' || field === 'longitude') && props.form.positioning !== 'MANUAL') {
+    patch({ [field]: value, positioning: 'AUTOMATIC' } as Partial<BoostEventStatusForm>)
+    return
+  }
+  patch({ [field]: value } as Partial<BoostEventStatusForm>)
 }
 function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
   patch({ [field]: (e.target as HTMLInputElement).value || null } as Partial<BoostEventStatusForm>)
@@ -557,20 +607,13 @@ const isSubmitDisabled = computed(() => {
 async function copyCoords() {
   const { latitude, longitude } = props.form
   if (latitude != null && longitude != null) {
-    await navigator.clipboard.writeText(`${latitude} ${longitude}`)
+    await copyCoordinates(Number(latitude), Number(longitude))
   }
 }
 
 async function pasteCoords() {
-  try {
-    const text = await navigator.clipboard.readText()
-    const match = text.match(/^([+-]?\d*\.?\d+)\s*[^0-9+-]*\s*([+-]?\d*\.?\d+)/)
-    if (match) {
-      patch({ latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) })
-    }
-  } catch {
-    return
-  }
+  const coordinates = await readCoordinates()
+  if (coordinates) patch(coordinates)
 }
 
 function openMap() {

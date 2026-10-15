@@ -50,7 +50,7 @@
             <Checkbox
               id="toggle-2"
               :model-value="dragDropEnabled"
-              @update:model-value="(v: boolean) => $emit('dragdrop-change', v)"
+              @update:model-value="$emit('dragdrop-change', $event === true)"
               class="border-[#DBDBDB] data-[state=checked]:border-black data-[state=checked]:bg-black data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
             />
             <div class="grid gap-1.5 font-normal">

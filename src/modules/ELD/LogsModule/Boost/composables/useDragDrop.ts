@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 export interface LocationTransfer {
+  positioning?: string | null
   locationOrigin?: number | null
   calculatedLocation?: string | null
   manualLocation?: string | null
@@ -107,7 +108,9 @@ export function useDragDrop(
     try {
       const raw = event.dataTransfer!.getData('application/json')
       if (raw) payload = JSON.parse(raw)
-    } catch {}
+    } catch {
+      // Keep the in-memory drag payload when the browser transfer value is unavailable.
+    }
 
     onDropCallback(payload.column, targetEventId, payload.data)
   }

@@ -206,6 +206,7 @@ export const useBoost = () => {
     try {
       ev = await eventsStore.getBoostEvent(eventId)
     } catch {
+      // Fall back to the already loaded workspace rows below.
     } finally {
       isEditEventLoading.value = false
     }

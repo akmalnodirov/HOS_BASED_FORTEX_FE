@@ -438,6 +438,21 @@ export interface RouteEldEventSession {
   pendingRollbackCount: number
 }
 
+export interface RouteEldSessionOperationFailure {
+  label: string
+  message: string
+}
+
+export interface RouteEldSessionOperation {
+  id: string
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | string
+  total: number
+  completed: number
+  failed: number
+  failures: RouteEldSessionOperationFailure[]
+  error?: string | null
+}
+
 export interface RouteEldCertificationDay {
   logDate: string
   isCertified: boolean
@@ -572,6 +587,48 @@ export interface RouteEldWorkspace {
     toDriverName: string
   }>
   freezePeriods: Array<Record<string, unknown>>
+}
+
+export interface RouteEldCoDriverSchedule {
+  externalDriverId: string
+  fromDate: string
+  toDate: string
+  events: RouteEldHosEvent[]
+}
+
+export interface RouteEldMatchedCamera {
+  id: number
+  displayName: string
+  latitude: number
+  longitude: number
+  distanceMetres: number
+  routePositionMetres: number
+  bearings: number[]
+  bearingConfidence?: string | null
+  brand?: string | null
+  operator?: string | null
+}
+
+export interface RouteEldEventCameraMatch {
+  eventId: string
+  eventTimestamp: number
+  eventLatitude: number
+  eventLongitude: number
+  eventLocation?: string | null
+  route: Array<{ longitude: number; latitude: number }>
+  routeEventIds: string[]
+  cameras: RouteEldMatchedCamera[]
+}
+
+export interface RouteEldEventCameraAnalysis {
+  driverId: string
+  fromDate: string
+  toDate: string
+  radiusMetres: number
+  locatedEventCount: number
+  routedIntervalCount: number
+  routedDistanceMetres: number
+  matches: RouteEldEventCameraMatch[]
 }
 
 export interface RouteEldProfileForm {

@@ -44,24 +44,25 @@
           <Sparkles class="mr-2 h-4 w-4" /> AI Advice
         </Button>
         <Button
+          v-if="primarySessionAction"
           variant="outline"
           size="sm"
           :class="[
             'h-9 px-6 text-xs',
-            isSubmitted
+            primarySessionAction === 'rollback'
               ? 'border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30'
               : 'bg-background',
           ]"
-          :disabled="submitDisabled || submitLoading"
-          @click="$emit('submit-click')"
+          :disabled="submitDisabled || submitLoading || (primarySessionAction === 'rollback' && rollbackBlocked)"
+          @click="$emit('session-action', primarySessionAction)"
         >
           <span v-if="submitLoading" class="flex items-center gap-1.5">
             <span
               class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
             />
-            {{ isSubmitted ? 'Rolling back...' : 'Submitting...' }}
+            {{ primarySessionAction === 'rollback' ? 'Rolling back...' : 'Submitting...' }}
           </span>
-          <span v-else>{{ isSubmitted ? 'Rollback' : 'Submit' }}</span>
+          <span v-else>{{ primarySessionActionLabel }}</span>
         </Button>
       </div>
     </div>
@@ -95,7 +96,7 @@
             :style="{ transform: `translateX(-${scrollOffset}px)` }"
           >
             <button
-              v-for="(freeTime, index) in freeTimes.filter((e) => e.eventDurationInSeconds > 3600)"
+              v-for="(freeTime, index) in (freeTimes.filter((e) => e.freeDurationInSeconds >= 3600))"
               :key="freeTime.eventId || index"
               class="shrink-0 px-4 py-1.5 bg-[#f8f9fd] dark:bg-muted border-[#d6e1ff] dark:border-border border rounded-md text-xs font-medium text-[#090909] dark:text-foreground hover:bg-[#e8ecfa] dark:hover:bg-muted/80 hover:border-[#b8c8ff] dark:hover:border-border transition-colors cursor-pointer"
               @click="handleFreeTimeClick(freeTime)"
@@ -138,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Plus, ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
@@ -156,7 +157,10 @@ const props = withDefaults(
   defineProps<{
     submitDisabled?: boolean
     submitLoading?: boolean
-    isSubmitted?: boolean
+    sessionStatus?: string
+    pendingSubmissionCount?: number
+    pendingRollbackCount?: number
+    rollbackBlocked?: boolean
     freeTimes?: BoostFreeTime[]
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
@@ -166,7 +170,10 @@ const props = withDefaults(
   {
     submitDisabled: false,
     submitLoading: false,
-    isSubmitted: false,
+    sessionStatus: 'DRAFT',
+    pendingSubmissionCount: 0,
+    pendingRollbackCount: 0,
+    rollbackBlocked: false,
     freeTimes: () => [],
     tabs: () => [],
     selectedTab: null,
@@ -178,7 +185,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'initial-click'): void
   (e: 'new-click'): void
-  (e: 'submit-click'): void
+  (e: 'session-action', action: 'submit' | 'rollback'): void
   (e: 'error-warning-click'): void
   (e: 'violation-click'): void
   (e: 'free-time-click', freeTime: BoostFreeTime): void
@@ -186,6 +193,22 @@ const emit = defineEmits<{
   (e: 'remove-tab', tabId: string): void
   (e: 'ai-advice-click'): void
 }>()
+
+const primarySessionAction = computed<'submit' | 'rollback' | null>(() => {
+  const status = String(props.sessionStatus || 'DRAFT').toUpperCase()
+  if (status === 'DRAFT') return 'submit'
+  if (status === 'SUBMITTED') return props.pendingSubmissionCount > 0 ? 'submit' : 'rollback'
+  if (status === 'ROLLED_BACK' && props.pendingRollbackCount > 0) return 'rollback'
+  return null
+})
+
+const primarySessionActionLabel = computed(() => {
+  const status = String(props.sessionStatus || 'DRAFT').toUpperCase()
+  if (primarySessionAction.value === 'submit') return status === 'SUBMITTED' ? 'Re-Submit' : 'Submit'
+  if (primarySessionAction.value === 'rollback')
+    return status === 'ROLLED_BACK' ? 'Re-Rollback' : 'Rollback'
+  return ''
+})
 
 const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   emit('free-time-click', freeTime)
