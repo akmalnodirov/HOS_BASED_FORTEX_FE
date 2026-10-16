@@ -428,7 +428,10 @@ import type {
   RouteEldEventIssue,
 } from '../../[Id]/types/routeEldDetail'
 import type { RouteEldHosEvent, RouteEldScheduleCalculations } from '../types/boost'
-import { resolveRouteEldScheduleTimeZone } from '../composables/useScheduleBoost'
+import {
+  resolveRouteEldScheduleTimeZone,
+  routeEldSessionTimelineCutoff,
+} from '../composables/useScheduleBoost'
 
 const props = withDefaults(
   defineProps<{
@@ -501,10 +504,8 @@ const periodEndTimestamp = computed(() => {
   return zonedTimestamp(`${nextDate(props.toDate)}T00:00:00`, graphTimeZone.value)
 })
 const graphEndTimestamp = computed(() => {
-  const created = props.sessionCreatedAt ? Date.parse(props.sessionCreatedAt) : Number.NaN
   return Math.min(
-    Date.now(),
-    Number.isFinite(created) ? created : Number.POSITIVE_INFINITY,
+    routeEldSessionTimelineCutoff(props.sessionCreatedAt),
     periodEndTimestamp.value
   )
 })

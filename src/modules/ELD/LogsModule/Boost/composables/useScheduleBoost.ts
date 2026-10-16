@@ -3,7 +3,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { useApi } from '@/composables/useAxiosService'
+import { getApiErrorMessage, useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import type {
   BoostFreeTime,
@@ -16,6 +16,7 @@ import type {
   BoostEventEditProfile,
   BoostEventStatusForm,
   DailyFormListResponse,
+  RouteEldEventSession,
   RouteEldEventTab,
   RouteEldHosEvent,
   RouteEldProfileForm,
@@ -117,6 +118,107 @@ export function resolveRouteEldScheduleTimeZone(value?: string | null) {
         .trim()
         .toUpperCase()
     ] ?? ROUTE_ELD_TIME_ZONES.CT
+  )
+}
+
+export function routeEldSessionTimelineCutoff(
+  sessionCreatedAt: string | null | undefined,
+  currentTimestamp = Date.now()
+) {
+  if (!sessionCreatedAt) return currentTimestamp
+
+  const value = sessionCreatedAt.trim()
+  const absoluteValue = /(?:z|[+-]\d{2}:\d{2})$/i.test(value) ? value : `${value}Z`
+  const sessionCreatedAtTimestamp = Date.parse(absoluteValue)
+  return Number.isFinite(sessionCreatedAtTimestamp)
+    ? Math.min(currentTimestamp, sessionCreatedAtTimestamp)
+    : currentTimestamp
+}
+
+const ROUTE_ELD_DUTY_CATEGORIES = new Set(['OFF', 'SB', 'D', 'ON'])
+const ROUTE_ELD_REST_CATEGORIES = new Set(['OFF', 'SB'])
+
+export interface RouteEldRestCongestion {
+  eventIds: string[]
+  firstEventId: string
+  lastEventId: string
+  startedAt: number
+  endedAt: number
+  durationMs: number
+}
+
+export function isRouteEldTimestampWithinSession(
+  timestamp: number,
+  timeZone: string | null | undefined,
+  session: RouteEldEventSession
+) {
+  if (!Number.isFinite(timestamp)) return false
+  const date = zonedDateTime(timestamp, timeZone).slice(0, 10)
+  return (
+    date >= session.fromDate.replaceAll('/', '-') &&
+    date <= session.toDate.replaceAll('/', '-')
+  )
+}
+
+export function isRouteEldEventWithinSession(
+  event: RouteEldHosEvent,
+  session: RouteEldEventSession
+) {
+  return isRouteEldTimestampWithinSession(event.timestamp, event.timeZone, session)
+}
+
+export function buildRouteEldRestCongestions(
+  events: RouteEldHosEvent[],
+  eventDurationById: Map<string, number>
+) {
+  const dutyEvents = events
+    .filter(
+      (event) =>
+        event.recordStatus.toUpperCase() === 'ACTIVE' &&
+        ROUTE_ELD_DUTY_CATEGORIES.has(event.eventCategory)
+    )
+    .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id))
+  const congestions: RouteEldRestCongestion[] = []
+
+  for (let index = 0; index < dutyEvents.length; index += 1) {
+    if (!ROUTE_ELD_REST_CATEGORIES.has(dutyEvents[index].eventCategory)) continue
+
+    const firstIndex = index
+    while (
+      index + 1 < dutyEvents.length &&
+      ROUTE_ELD_REST_CATEGORIES.has(dutyEvents[index + 1].eventCategory)
+    ) {
+      index += 1
+    }
+
+    const congestionEvents = dutyEvents.slice(firstIndex, index + 1)
+    const firstEvent = congestionEvents[0]
+    const lastEvent = congestionEvents[congestionEvents.length - 1]
+    const endedAt =
+      dutyEvents[index + 1]?.timestamp ??
+      lastEvent.timestamp + (eventDurationById.get(lastEvent.id) ?? 0)
+    congestions.push({
+      eventIds: congestionEvents.map((event) => event.id),
+      firstEventId: firstEvent.id,
+      lastEventId: lastEvent.id,
+      startedAt: firstEvent.timestamp,
+      endedAt: Math.max(firstEvent.timestamp, endedAt),
+      durationMs: Math.max(0, endedAt - firstEvent.timestamp),
+    })
+  }
+
+  return congestions
+}
+
+export function findRouteEldRestCongestion(
+  events: RouteEldHosEvent[],
+  eventDurationById: Map<string, number>,
+  eventId: string
+) {
+  return (
+    buildRouteEldRestCongestions(events, eventDurationById).find((congestion) =>
+      congestion.eventIds.includes(eventId)
+    ) ?? null
   )
 }
 
@@ -367,10 +469,8 @@ export function useScheduleBoost() {
   )
 
   const timelineCutoffMs = computed(() => {
-    const createdAt = session.value?.createdAt ? Date.parse(session.value.createdAt) : Number.NaN
     return Math.min(
-      Date.now(),
-      Number.isFinite(createdAt) ? createdAt : Number.POSITIVE_INFINITY,
+      routeEldSessionTimelineCutoff(session.value?.createdAt),
       periodEndMs.value
     )
   })
@@ -710,10 +810,16 @@ export function useScheduleBoost() {
     }))
   })
 
+  const displayedFreeTimes = computed(() =>
+    (workspace.value?.calculations.freeTimes ?? []).filter(
+      (value) => value.freeDurationMs >= 60 * 60_000
+    )
+  )
+
   const boostFreeTimes = computed<BoostFreeTime[]>(() => {
     if (!session.value) return []
     const from = periodStartMs.value
-    return (workspace.value?.calculations.freeTimes ?? []).map((value) => {
+    return displayedFreeTimes.value.map((value) => {
       const row = eventRows.value.find((event) => event.eventId === value.eventId)
       return {
         eventId: value.eventId,
@@ -1266,9 +1372,7 @@ export function useScheduleBoost() {
       )
       toast.success('Event duration updated')
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message || error?.message || 'Failed to update event duration'
-      )
+      toast.error(getApiErrorMessage(error, 'Failed to update event duration'))
       throw error
     }
   }
@@ -1436,6 +1540,7 @@ export function useScheduleBoost() {
     graphEventDurationById,
     dailyPixelViolations,
     pinTimes,
+    displayedFreeTimes,
     boostFreeTimes,
     violations,
     errorWarningRows,

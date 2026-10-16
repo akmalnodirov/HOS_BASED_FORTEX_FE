@@ -16,6 +16,30 @@ interface ApiError {
   statusCode?: number
 }
 
+function extractErrorMessage(data: unknown): string | undefined {
+  if (typeof data === 'string') {
+    const value = data.trim()
+    return value || undefined
+  }
+  if (!data || typeof data !== 'object') return undefined
+
+  const value = data as { message?: unknown; detail?: unknown; title?: unknown }
+  if (typeof value.message === 'string' && value.message.trim()) return value.message.trim()
+  if (typeof value.detail === 'string' && value.detail.trim()) return value.detail.trim()
+  if (typeof value.title === 'string' && value.title.trim()) return value.title.trim()
+  return undefined
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!error || typeof error !== 'object') return fallback
+
+  const value = error as { response?: { data?: unknown }; message?: unknown }
+  return (
+    extractErrorMessage(value.response?.data) ||
+    (typeof value.message === 'string' && value.message.trim() ? value.message.trim() : fallback)
+  )
+}
+
 interface RequestConfig extends AxiosRequestConfig {
   _retry?: boolean
   _skipErrorHandling?: boolean
@@ -237,7 +261,7 @@ class ApiService {
     }
 
     // Handle other errors
-    const message = data?.message || ERROR_MESSAGES[status] || 'An error occurred'
+    const message = extractErrorMessage(data) || ERROR_MESSAGES[status] || 'An error occurred'
     toast.error(message)
   }
 

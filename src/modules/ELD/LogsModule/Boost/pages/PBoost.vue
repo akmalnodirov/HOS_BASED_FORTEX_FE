@@ -47,7 +47,7 @@
         :session-created-at="session?.createdAt"
         :selected-event-id="selectedEventId"
         :boost-selected-ids="rangeBoostSelectedIds"
-        :free-times="workspace?.calculations.freeTimes ?? []"
+        :free-times="displayedFreeTimes"
         :violations="workspace?.calculations.violations ?? []"
         :event-issues="workspace?.calculations.eventIssues ?? []"
         :reassigned-events="workspace?.reassignedEvents.map((item) => item.event) ?? []"
@@ -232,16 +232,19 @@
       :drag-drop-enabled="dragDropEnabled && canEditSession"
       :can-edit="canEditSession"
       :delete-disabled="!selectedRowIds.length || !canEditSession"
-      :duration-disabled="selectedRowIds.length !== 1 || !canEditSession"
+      :duration-disabled="
+        selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
+      "
+      :duration-title="durationSelectionError"
       :reassign-disabled="!selectedRowIds.length || !canEditSession"
       :normalize-disabled="!canEditSession"
       :selected-count="selectedRowIds.length"
       @dragdrop-change="dragDropEnabled = $event"
       @delete-click="deleteSelectedBoostEvents"
-      @duration-click="durationOpen = true"
+      @duration-click="openDurationModal"
       @reassign-click="openReassignModal"
       @multi-update-click="multiUpdateModalOpen = true"
-      @normalize-click="normalizeOpen = true"
+      @normalize-click="openNormalize"
       @certification-click="openCertification"
     />
 
@@ -264,9 +267,14 @@
       :target-duration-ms="rangeBoostTargetDurationMs"
       :affected-count="rangeBoostAffectedCount"
       :selection-error="rangeBoostSelectionError"
+      :external-error="rangeBoostFailureReason"
       :time-zone="workspaceTimeZone"
       :loading="store.isMutating"
-      @switch="rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0"
+      @reset-error="rangeBoostFailureReason = ''"
+      @switch="
+        rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0;
+        rangeBoostFailureReason = ''
+      "
       @submit="confirmRangeBoost"
     />
     <CBoostReassignModal
@@ -318,11 +326,22 @@
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
       :loading="store.isMutating"
+      :result="normalizeResult"
+      @reset-result="normalizeResult = null"
       @submit="runNormalize"
     />
     <CBoostDurationModal
       v-model:open="durationOpen"
       :loading="store.isMutating"
+      :selected-event="durationSelectedEvent"
+      :selected-duration-ms="durationSelectedDurationMs"
+      :available-expand-ms="durationAvailableExpandMs"
+      :available-reduce-ms="durationAvailableReduceMs"
+      :selected-rest-duration-ms="selectedRestCongestion?.durationMs ?? null"
+      :has-reduce-receiver="Boolean(eligibleDurationReceiver)"
+      :selection-error="durationSelectionError"
+      :external-error="durationFailureReason"
+      @reset-error="durationFailureReason = ''"
       @submit="runDurationBoost"
     />
 
@@ -442,7 +461,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useApi } from '@/composables/useAxiosService'
+import { getApiErrorMessage, useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart'
 import type {
@@ -450,6 +469,8 @@ import type {
   RouteEldCertificationReport,
   RouteEldEventCameraAnalysis,
   RouteEldHosEvent,
+  RouteEldNormalizeResponse,
+  RouteEldNormalizeType,
   RouteEldSessionOperation,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
@@ -474,7 +495,14 @@ import {
   boostEventTableColumnOptions,
   useBoostEventTableColumns,
 } from '../composables/useBoostEventTableColumns'
-import { resolveRouteEldScheduleTimeZone, useScheduleBoost } from '../composables/useScheduleBoost'
+import {
+  buildRouteEldRestCongestions,
+  findRouteEldRestCongestion,
+  isRouteEldEventWithinSession,
+  isRouteEldTimestampWithinSession,
+  resolveRouteEldScheduleTimeZone,
+  useScheduleBoost,
+} from '../composables/useScheduleBoost'
 
 const api = useApi()
 const boost = useScheduleBoost()
@@ -499,6 +527,7 @@ const {
   graphEventDurationById,
   dailyPixelViolations,
   pinTimes,
+  displayedFreeTimes,
   boostFreeTimes,
   violations,
   errorWarningRows,
@@ -558,6 +587,7 @@ const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
 const normalizeOpen = ref(false)
+const normalizeResult = ref<RouteEldNormalizeResponse | null>(null)
 const certificationOpen = ref(false)
 const certificationLoading = ref(false)
 const certificationFixing = ref(false)
@@ -568,6 +598,7 @@ interface ApiEnvelope<T> {
 
 const certificationReport = ref<RouteEldCertificationReport | null>(null)
 const durationOpen = ref(false)
+const durationFailureReason = ref('')
 const reassignTargetsLoading = ref(false)
 const eventEditorReadonly = ref(false)
 const alprLoading = ref(false)
@@ -619,6 +650,7 @@ const graphEvents = computed(() =>
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
 const rangeBoostModalOpen = ref(false)
+const rangeBoostFailureReason = ref('')
 const rangeBoostSelectedEvents = computed(() =>
   rangeBoostSelectedIds.value
     .map((id) => graphEvents.value.find((event) => event.id === id))
@@ -655,22 +687,281 @@ const rangeBoostAffectedEvents = computed(() => {
 })
 const rangeBoostAffectedCount = computed(() => rangeBoostAffectedEvents.value.length)
 const rangeBoostSelectionError = computed(() => {
-  const left = rangeBoostLeftEvent.value
-  const right = rangeBoostRightEvent.value
-  if (!left || !right) return ''
-  if (left.timestamp === right.timestamp) return 'Boost boundary events must have different times.'
+  const currentSession = session.value
+  const source = rangeBoostSourceEvent.value
+  const target = rangeBoostTargetEvent.value
+  if (!currentSession || !source || !target) return ''
+  if (source.timestamp === target.timestamp)
+    return 'Boost boundary events must have different times.'
   if (
-    [left, right].some(
+    [source, target].some(
       (event) =>
         event.recordStatus.toUpperCase() !== 'ACTIVE' ||
         !['OFF', 'SB', 'D', 'ON'].includes(event.eventCategory)
     )
   )
     return 'Boost boundaries must be active duty events.'
+  if (
+    !isRouteEldEventWithinSession(source, currentSession) ||
+    !isRouteEldEventWithinSession(target, currentSession)
+  )
+    return 'Events outside the session period cannot participate in Boost.'
+  if (
+    rangeBoostAffectedEvents.value.some(
+      (event) => !isRouteEldEventWithinSession(event, currentSession)
+    )
+  )
+    return 'Boost cannot move a range containing events outside the session period.'
   if (rangeBoostAffectedEvents.value.some((event) => event.isFrozen))
     return 'Boost cannot move a range containing DOT-inspected events.'
   return ''
 })
+
+const dutyCategories = new Set(['OFF', 'SB', 'D', 'ON'])
+const restCategories = new Set(['OFF', 'SB'])
+const minimumVisibleDutyDurationMs = 15 * 60_000
+const minimumReceiverDurationMs = 10 * 60 * 60_000
+const durationSelectedEvent = computed(() => {
+  const eventId = selectedRowIds.value[0]
+  return eventId ? (graphEvents.value.find((event) => event.id === eventId) ?? null) : null
+})
+const durationSelectedDurationMs = computed(() =>
+  durationSelectedEvent.value
+    ? (graphEventDurationById.value.get(durationSelectedEvent.value.id) ?? 0)
+    : 0
+)
+const restCongestions = computed(() =>
+  buildRouteEldRestCongestions(graphEvents.value, graphEventDurationById.value)
+)
+const selectedRestCongestion = computed(() => {
+  const selected = durationSelectedEvent.value
+  if (!selected || !restCategories.has(selected.eventCategory)) return null
+  return findRouteEldRestCongestion(
+    graphEvents.value,
+    graphEventDurationById.value,
+    selected.id
+  )
+})
+const availableDurationDonors = computed(() => {
+  const donors = new Map<
+    string,
+    {
+      freeDurationMs: number
+      congestion: (typeof restCongestions.value)[number]
+    }
+  >()
+  for (const freeTime of workspace.value?.calculations.freeTimes ?? []) {
+    if (selectedRestCongestion.value?.eventIds.includes(freeTime.eventId)) continue
+    const congestion = restCongestions.value.find((item) =>
+      item.eventIds.includes(freeTime.eventId)
+    )
+    if (!congestion) continue
+
+    const existing = donors.get(congestion.firstEventId)
+    if (!existing || existing.freeDurationMs < freeTime.freeDurationMs) {
+      donors.set(congestion.firstEventId, {
+        freeDurationMs: freeTime.freeDurationMs,
+        congestion,
+      })
+    }
+  }
+  return [...donors.values()]
+})
+const durationAvailableExpandMs = computed(() =>
+  availableDurationDonors.value.reduce((total, donor) => total + donor.freeDurationMs, 0)
+)
+const durationAvailableReduceMs = computed(() => {
+  const selected = durationSelectedEvent.value
+  if (!selected) return 0
+  if (restCategories.has(selected.eventCategory)) {
+    return Math.max(
+      0,
+      (selectedRestCongestion.value?.durationMs ?? 0) - minimumVisibleDutyDurationMs
+    )
+  }
+  return Math.max(0, durationSelectedDurationMs.value - minimumVisibleDutyDurationMs)
+})
+function congestionCanReceive(eventIds: string[]) {
+  const currentSession = session.value
+  if (!currentSession) return false
+  return eventIds.every((eventId) => {
+    const event = graphEvents.value.find((item) => item.id === eventId)
+    return !!event && !event.isFrozen && isRouteEldEventWithinSession(event, currentSession)
+  })
+}
+const eligibleDurationReceiver = computed(() => {
+  const selected = durationSelectedEvent.value
+  if (!selected) return null
+  return (
+    restCongestions.value
+      .filter(
+        (congestion) =>
+          !congestion.eventIds.includes(selected.id) &&
+          congestion.durationMs >= minimumReceiverDurationMs &&
+          congestionCanReceive(congestion.eventIds)
+      )
+      .sort((left, right) => {
+        const leftDistance = Math.min(
+          Math.abs(selected.timestamp - left.startedAt),
+          Math.abs(selected.timestamp - left.endedAt)
+        )
+        const rightDistance = Math.min(
+          Math.abs(selected.timestamp - right.startedAt),
+          Math.abs(selected.timestamp - right.endedAt)
+        )
+        return leftDistance - rightDistance || left.startedAt - right.startedAt
+      })[0] ?? null
+  )
+})
+const durationSelectionError = computed(() => {
+  if (selectedRowIds.value.length !== 1) return 'Select one event to use Expand/Reduce.'
+  const selected = durationSelectedEvent.value
+  const currentSession = session.value
+  if (!selected || !currentSession)
+    return 'The selected event is not available in the active schedule.'
+  if (!isRouteEldEventWithinSession(selected, currentSession))
+    return 'Events outside the session period cannot participate in Boost.'
+  if (selected.isFrozen) return 'DOT-inspected events cannot participate in Boost.'
+  if (
+    selected.recordStatus.toUpperCase() !== 'ACTIVE' ||
+    !dutyCategories.has(selected.eventCategory)
+  )
+    return 'Only an active duty event can be expanded or reduced.'
+  return ''
+})
+
+function findDurationExpandDonors(requestedMilliseconds: number) {
+  const selected = durationSelectedEvent.value
+  if (!selected) return []
+  const indexes = new Map(
+    [...graphEvents.value]
+      .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id))
+      .map((event, index) => [event.id, index] as const)
+  )
+  const selectedIndex = indexes.get(selected.id)
+  if (selectedIndex === undefined) return []
+
+  const donors = [...availableDurationDonors.value].sort((left, right) => {
+    const leftIndex = indexes.get(left.congestion.firstEventId) ?? Number.MAX_SAFE_INTEGER
+    const rightIndex = indexes.get(right.congestion.firstEventId) ?? Number.MAX_SAFE_INTEGER
+    return (
+      Math.abs(leftIndex - selectedIndex) - Math.abs(rightIndex - selectedIndex) ||
+      left.congestion.startedAt - right.congestion.startedAt
+    )
+  })
+  let remaining = requestedMilliseconds
+  const result: Array<(typeof donors)[number] & { transferDurationMs: number }> = []
+  for (const donor of donors) {
+    const transferDurationMs = Math.min(donor.freeDurationMs, remaining)
+    if (transferDurationMs <= 0) continue
+    result.push({ ...donor, transferDurationMs })
+    remaining -= transferDurationMs
+    if (remaining === 0) break
+  }
+  return result
+}
+
+function durationTransferRangeError(
+  mode: 'expand' | 'reduce',
+  requestedMilliseconds: number
+) {
+  const currentSession = session.value
+  const selected = durationSelectedEvent.value
+  if (!currentSession || !selected) return ''
+
+  const receiver = mode === 'reduce' ? eligibleDurationReceiver.value : null
+  const transfers =
+    mode === 'expand'
+      ? findDurationExpandDonors(requestedMilliseconds).map((donor) => ({
+          donorEventId: donor.congestion.firstEventId,
+          receiverEventId: selected.id,
+          durationMs: donor.transferDurationMs,
+        }))
+      : receiver
+        ? [
+            {
+              donorEventId: selectedRestCongestion.value?.firstEventId ?? selected.id,
+              receiverEventId:
+                receiver.endedAt <= selected.timestamp
+                  ? receiver.lastEventId
+                  : receiver.firstEventId,
+              durationMs: requestedMilliseconds,
+            },
+          ]
+        : []
+  const timestamps = new Map(graphEvents.value.map((event) => [event.id, event.timestamp]))
+
+  for (const transfer of transfers) {
+    const ordered = [...graphEvents.value].sort((left, right) => {
+      const difference =
+        (timestamps.get(left.id) ?? left.timestamp) -
+        (timestamps.get(right.id) ?? right.timestamp)
+      return difference || left.id.localeCompare(right.id)
+    })
+    const donorIndex = ordered.findIndex((event) => event.id === transfer.donorEventId)
+    const receiverIndex = ordered.findIndex((event) => event.id === transfer.receiverEventId)
+    if (donorIndex < 0 || receiverIndex < 0 || donorIndex === receiverIndex) continue
+
+    const donorBeforeReceiver = donorIndex < receiverIndex
+    const affected = ordered.slice(
+      Math.min(donorIndex, receiverIndex) + 1,
+      Math.max(donorIndex, receiverIndex) + 1
+    )
+    if (
+      affected.some((event) =>
+        !isRouteEldTimestampWithinSession(
+          timestamps.get(event.id) ?? event.timestamp,
+          event.timeZone,
+          currentSession
+        )
+      )
+    )
+      return 'Boost cannot move a range containing events outside the session period.'
+    if (affected.some((event) => event.isFrozen))
+      return 'Boost cannot move a range containing DOT-inspected events.'
+
+    const offset = donorBeforeReceiver ? -transfer.durationMs : transfer.durationMs
+    for (const event of affected) {
+      const timestamp = (timestamps.get(event.id) ?? event.timestamp) + offset
+      if (!isRouteEldTimestampWithinSession(timestamp, event.timeZone, currentSession))
+        return 'The adjusted event times must remain within the session period.'
+      timestamps.set(event.id, timestamp)
+    }
+  }
+  return ''
+}
+
+function durationRequestError(payload: {
+  durationSeconds: number
+  mode: 'expand' | 'reduce'
+  ensurePti: boolean
+}) {
+  if (durationSelectionError.value) return durationSelectionError.value
+  if (!Number.isInteger(payload.durationSeconds) || payload.durationSeconds < 1)
+    return 'Boost duration must be greater than zero.'
+
+  const requestedMilliseconds = payload.durationSeconds * 1_000
+  if (
+    payload.mode === 'expand' &&
+    payload.ensurePti &&
+    (!selectedRestCongestion.value ||
+      selectedRestCongestion.value.durationMs + requestedMilliseconds < minimumReceiverDurationMs)
+  )
+    return 'PTI requires the expanded Off Duty or Sleeper congestion to last at least 10 hours.'
+  if (
+    payload.mode === 'expand' &&
+    requestedMilliseconds > durationAvailableExpandMs.value
+  )
+    return `Expanding requires ${payload.durationSeconds} seconds, but only ${Math.floor(durationAvailableExpandMs.value / 1_000)} seconds of transferable Off Duty and Sleeper time are available.`
+  if (
+    payload.mode === 'reduce' &&
+    requestedMilliseconds > durationAvailableReduceMs.value
+  )
+    return 'Reducing exceeds the selected event’s available donor duration.'
+  if (payload.mode === 'reduce' && !eligibleDurationReceiver.value)
+    return 'No other Off Duty or Sleeper congestion lasting at least 10 hours can receive the removed duration.'
+  return durationTransferRangeError(payload.mode, requestedMilliseconds)
+}
 const changeFilterOptions = computed(() =>
   Array.from(
     new Set(
@@ -803,21 +1094,28 @@ const onGraphBoostSelect = (eventId: string) => {
     toast.error('Boost boundaries must be active duty events')
     return
   }
+  if (session.value && !isRouteEldEventWithinSession(event, session.value)) {
+    toast.error('Events outside the session period cannot participate in Boost')
+    return
+  }
   if (event.isFrozen) {
     toast.error('DOT-inspected events cannot participate in Boost')
     return
   }
   if (rangeBoostSelectedIds.value.includes(eventId)) {
+    rangeBoostFailureReason.value = ''
     rangeBoostSelectedIds.value = rangeBoostSelectedIds.value.filter((id) => id !== eventId)
     return
   }
   const next = [...rangeBoostSelectedIds.value, eventId]
   if (next.length > 2) next.shift()
+  rangeBoostFailureReason.value = ''
   rangeBoostSelectedIds.value = next
 }
 const clearRangeBoost = () => {
   rangeBoostSelectedIds.value = []
   rangeBoostSourceIndex.value = 0
+  rangeBoostFailureReason.value = ''
 }
 watch([() => session.value?.id, () => store.activeTabId], clearRangeBoost)
 const openRangeBoostModal = () => {
@@ -828,6 +1126,7 @@ const openRangeBoostModal = () => {
     return
   }
   rangeBoostSourceIndex.value = 0
+  rangeBoostFailureReason.value = ''
   rangeBoostModalOpen.value = true
 }
 const confirmRangeBoost = async (seconds: number) => {
@@ -840,15 +1139,18 @@ const confirmRangeBoost = async (seconds: number) => {
     return
   }
   try {
+    rangeBoostFailureReason.value = ''
     const deltaSeconds = source.id === left.id ? -seconds : seconds
     await store.boostEvents([left.id, right.id], deltaSeconds)
     rangeBoostModalOpen.value = false
     clearRangeBoost()
     toast.success('Time boost saved to the active Boost tab')
   } catch (error: any) {
-    toast.error(
-      error?.response?.data?.message || error?.message || 'The time transfer could not be applied'
+    rangeBoostFailureReason.value = getApiErrorMessage(
+      error,
+      'The time transfer could not be applied'
     )
+    toast.error(rangeBoostFailureReason.value)
   }
 }
 const formatGraphEventTime = (timestamp: number) =>
@@ -987,13 +1289,33 @@ const analyzeAiAdvice = async (adviceType: string) => {
     aiAdviceLoading.value = false
   }
 }
-const runNormalize = async (payload: { types: string[]; certificationFix: boolean }) => {
+const openNormalize = () => {
+  normalizeResult.value = null
+  normalizeOpen.value = true
+}
+
+const runNormalize = async (payload: {
+  types: RouteEldNormalizeType[]
+  certificationFix: boolean
+}) => {
   try {
-    const result: any = await store.normalize(payload.types, payload.certificationFix)
-    normalizeOpen.value = false
-    toast.success(
-      `Normalization completed${result?.changedEventCount != null ? ` · ${result.changedEventCount} changes` : ''}`
-    )
+    const result = await store.normalize(payload.types, payload.certificationFix)
+    normalizeResult.value = result
+    if (!result) return
+
+    if (result.messages.length === 0) {
+      normalizeOpen.value = false
+      if (result.success) toast.success('Events normalized')
+      else toast.info('Event normalization completed')
+      return
+    }
+
+    if (result.success) {
+      toast.warning('Events normalized with notices. Review the normalization details.')
+      return
+    }
+
+    toast.error('Event normalization completed with errors. Review the normalization details.')
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || 'Normalization failed')
   }
@@ -1003,12 +1325,29 @@ const runDurationBoost = async (payload: {
   mode: 'expand' | 'reduce'
   ensurePti: boolean
 }) => {
+  durationFailureReason.value = durationRequestError(payload)
+  if (durationFailureReason.value) {
+    toast.error(durationFailureReason.value)
+    return
+  }
   try {
     await submitDurationBoost(payload)
     durationOpen.value = false
+    durationFailureReason.value = ''
   } catch (error) {
-    void error
+    durationFailureReason.value = getApiErrorMessage(
+      error,
+      'The duration change could not be applied.'
+    )
   }
+}
+const openDurationModal = () => {
+  if (durationSelectionError.value) {
+    toast.error(durationSelectionError.value)
+    return
+  }
+  durationFailureReason.value = ''
+  durationOpen.value = true
 }
 const openInsertModal = async () => {
   if (!canEditSession.value) return

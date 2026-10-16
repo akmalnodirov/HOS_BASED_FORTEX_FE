@@ -65,6 +65,7 @@
             size="sm"
             class="h-9.5 px-4 text-sm"
             :disabled="durationDisabled"
+            :title="durationTitle || 'Expand or reduce the selected event'"
             @click="$emit('duration-click')"
           >
             <span>Expand / Reduce{{ selectedSuffix }}</span>
@@ -139,6 +140,7 @@ const props = withDefaults(
     deleteDisabled?: boolean
     reassignDisabled?: boolean
     durationDisabled?: boolean
+    durationTitle?: string
     normalizeDisabled?: boolean
     selectedCount?: number
   }>(),
@@ -148,6 +150,7 @@ const props = withDefaults(
     deleteDisabled: false,
     reassignDisabled: false,
     durationDisabled: false,
+    durationTitle: '',
     normalizeDisabled: false,
     selectedCount: 0,
   }

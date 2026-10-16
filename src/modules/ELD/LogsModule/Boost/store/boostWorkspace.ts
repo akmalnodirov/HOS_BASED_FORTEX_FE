@@ -16,6 +16,8 @@ import type {
   RouteEldWorkspaceEvent,
   RouteEldSessionOperation,
   RouteEldCoDriverSchedule,
+  RouteEldNormalizeResponse,
+  RouteEldNormalizeType,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -481,7 +483,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     return unwrap(response.data)
   }
 
-  async function normalize(normalizeList: string[], applyCertificationFix: boolean) {
+  async function normalize(normalizeList: RouteEldNormalizeType[], applyCertificationFix: boolean) {
     if (!session.value || !activeTabId.value) return null
     if (!canEditWorkingSession.value) {
       throw new Error('Normalization is only available on the active working tab.')
@@ -491,7 +493,9 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
     isMutating.value = true
     try {
-      const response = await api.post(ApiEndpoints.ROUTE_ELD_NORMALIZE, {
+      const response = await api.post<
+        RouteEldNormalizeResponse | ApiEnvelope<RouteEldNormalizeResponse>
+      >(ApiEndpoints.ROUTE_ELD_NORMALIZE, {
         sessionId: session.value.id,
         tabId: activeTabId.value,
         normalizeList,

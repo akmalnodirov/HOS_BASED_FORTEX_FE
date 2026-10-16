@@ -47,7 +47,7 @@
             <span class="text-xs text-muted-foreground">Source duration after transfer</span>
             <span class="font-mono text-sm font-semibold">{{ formatDuration(remainingMs) }}</span>
           </div>
-          <p v-if="error" class="mt-1.5 text-xs text-red-600">{{ error }}</p>
+          <p v-if="displayError" class="mt-1.5 text-xs text-red-600">{{ displayError }}</p>
         </div>
       </div>
 
@@ -79,12 +79,14 @@ const props = withDefaults(defineProps<{
   targetDurationMs: number
   affectedCount: number
   selectionError?: string
+  externalError?: string
   timeZone?: string | null
   loading?: boolean
-}>(), { selectionError: '', timeZone: 'CT', loading: false })
+}>(), { selectionError: '', externalError: '', timeZone: 'CT', loading: false })
 
-defineEmits<{
+const emit = defineEmits<{
   'update:open': [value: boolean]
+  'reset-error': []
   switch: []
   submit: [seconds: number]
 }>()
@@ -101,6 +103,10 @@ const error = computed(() => {
   if (![hours.value, minutes.value, seconds.value].every(Number.isInteger) || minutes.value < 0 || minutes.value > 59 || seconds.value < 0 || seconds.value > 59) return 'Enter whole hours, with minutes and seconds between 0 and 59.'
   if (totalSeconds.value * 1000 > availableMs.value) return 'Transfer time exceeds the available source duration.'
   return ''
+})
+const displayError = computed(() => error.value || props.externalError)
+watch([hours, minutes, seconds], () => {
+  if (props.externalError) emit('reset-error')
 })
 const formatDuration = (milliseconds: number) => {
   const total = Math.max(0, Math.round(milliseconds / 1000))

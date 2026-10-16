@@ -370,6 +370,40 @@ export interface BoostEventEditProfile {
   assignedVehicleIds: string[]
 }
 
+export type RouteEldNormalizeType =
+  | 'future_event'
+  | 'malfunction'
+  | 'unidentified'
+  | 'sequence'
+  | 'driving'
+  | 'engine_hours'
+  | 'intermediate'
+  | 'location'
+  | 'odometer'
+  | 'duplicate'
+  | 'power_up/shut_down'
+  | 'on_duty'
+  | 'missing_location_or_odometer'
+  | 'pti'
+  | 'manual_location'
+  | 'login_logout'
+
+export interface RouteEldNormalizeRepairMessage {
+  type: RouteEldNormalizeType
+  localEventId: string
+  providerEventId: string
+  sequenceId: string | null
+  engineHours: number | null
+  code: string
+  message: string
+}
+
+export interface RouteEldNormalizeResponse {
+  success: boolean
+  changedEventCount: number
+  messages: RouteEldNormalizeRepairMessage[]
+}
+
 export interface RouteEldEventSessionListItem {
   id: string
   driverId: string
