@@ -2,7 +2,7 @@
   <div class="flex items-center flex-col gap-1">
     <div class="flex items-center justify-between bg-white dark:bg-card w-full py-4 px-6">
       <div class="flex items-center gap-2 flex-wrap">
-        <div v-if="tabs.length > 0" class="flex items-center gap-1 flex-wrap">
+        <div v-if="tabs.length > 0 || canManageTabs" class="flex items-center gap-1 flex-wrap">
           <button
             v-for="(tab, i) in tabs"
             :key="tab.id"
@@ -16,7 +16,7 @@
           >
             <span>{{ tab.name }}</span>
             <span
-              v-if="i === tabs.length - 1 && tabs.length > 1"
+              v-if="canManageTabs && tab.type === 1 && i === tabs.length - 1 && tabs.length > 1"
               class="ml-0.5 rounded p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
               @click.stop="requestRemoveTab(tab.id)"
             >
@@ -25,6 +25,7 @@
           </button>
 
           <button
+            v-if="canManageTabs"
             class="flex items-center justify-center w-7 h-7 rounded-md border border-border bg-background hover:bg-muted transition-colors"
             @click="$emit('new-click')"
           >
@@ -34,7 +35,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <Button
+        <!-- <Button
           variant="outline"
           size="sm"
           class="h-9 px-4 text-xs text-blue-600"
@@ -42,16 +43,15 @@
           @click="$emit('ai-advice-click')"
         >
           <Sparkles class="mr-2 h-4 w-4" /> AI Advice
-        </Button>
+        </Button> -->
         <Button
           v-if="primarySessionAction"
-          variant="outline"
           size="sm"
           :class="[
-            'h-9 px-6 text-xs',
+            'h-9 px-5 text-xs font-semibold shadow-sm transition-colors',
             primarySessionAction === 'rollback'
-              ? 'border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30'
-              : 'bg-background',
+              ? 'bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500',
           ]"
           :disabled="submitDisabled || submitLoading || (primarySessionAction === 'rollback' && rollbackBlocked)"
           @click="$emit('session-action', primarySessionAction)"
@@ -161,6 +161,7 @@ const props = withDefaults(
     pendingSubmissionCount?: number
     pendingRollbackCount?: number
     rollbackBlocked?: boolean
+    canManageTabs?: boolean
     freeTimes?: BoostFreeTime[]
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
@@ -174,6 +175,7 @@ const props = withDefaults(
     pendingSubmissionCount: 0,
     pendingRollbackCount: 0,
     rollbackBlocked: false,
+    canManageTabs: false,
     freeTimes: () => [],
     tabs: () => [],
     selectedTab: null,

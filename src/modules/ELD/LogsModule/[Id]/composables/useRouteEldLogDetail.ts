@@ -49,7 +49,12 @@ export function useRouteEldLogDetail() {
   const screenResolution = ref(1440)
   let controller: AbortController | null = null
 
-  const events = computed(() => [...(detail.value?.events ?? [])].sort(compareEvents))
+  const events = computed(() => {
+    const values = [...(detail.value?.events ?? [])]
+    const previous = detail.value?.previousEvent
+    if (previous && !values.some((event) => event.id === previous.id)) values.push(previous)
+    return values.sort(compareEvents)
+  })
   const visualRange = computed(() =>
     dayRange(detailDate.value.format('YYYY-MM-DD'), detail.value?.timeZone)
   )
@@ -89,7 +94,7 @@ export function useRouteEldLogDetail() {
     cycleDuration: clockSeconds(detail.value?.hos?.cycle),
   }))
   const dailyEvents = computed(() =>
-    mapEvents(dayEvents.value, visualRange.value.cutoff, detail.value?.timeZone)
+    mapEvents(dayEvents.value, visualRange.value.start, visualRange.value.cutoff, detail.value?.timeZone)
   )
   const driverDailyForm = computed<DriverDailyFormResponse | null>(() =>
     mapProfileForm(detail.value)
@@ -115,6 +120,8 @@ export function useRouteEldLogDetail() {
         (dailySummary.value?.dailyDriving ?? 0) + (dailySummary.value?.dailyOnDuty ?? 0),
       signaturePath: driverDailyForm.value?.signaturePath || undefined,
       hasViolation: (detail.value?.hos?.violationCount ?? 0) > 0,
+      violations: detail.value?.hos?.violations ?? [],
+      timeZone: detail.value?.timeZone ?? null,
       lastEventCode: mapped?.code ?? null,
       lastEventType: mapped?.type ?? null,
     }
@@ -443,25 +450,26 @@ function buildGraph(
   }
 }
 
-function mapEvents(events: RouteEldEvent[], end: number, zone?: string | null) {
+function mapEvents(events: RouteEldEvent[], start: number, end: number, zone?: string | null) {
   const dutyEvents = events.filter(isActiveDutyEvent)
   const nextDutyById = new Map<string, RouteEldEvent | undefined>()
   dutyEvents.forEach((event, index) => nextDutyById.set(event.id, dutyEvents[index + 1]))
   return events.map((event) =>
-    mapEvent(event, nextDutyById.get(event.id), end, zone, isActiveDutyEvent(event))
+    mapEvent(event, nextDutyById.get(event.id), start, end, zone, isActiveDutyEvent(event))
   )
 }
 
 function mapEvent(
   event: RouteEldEvent,
   next: RouteEldEvent | undefined,
+  start: number,
   end: number,
   zone: string | null | undefined,
   includeDuration: boolean
 ) {
   const definition = eventDefinition(event.eventCode, event.eventCategory)
   const duration = includeDuration
-    ? Math.max(0, (Math.min(next?.timestamp ?? end, end) - event.timestamp) / 1000)
+    ? Math.max(0, (Math.min(next?.timestamp ?? end, end) - Math.max(event.timestamp, start)) / 1000)
     : 0
   return {
     id: event.id,

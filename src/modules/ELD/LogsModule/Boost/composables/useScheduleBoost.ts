@@ -1,5 +1,5 @@
 import dayjs, { type Dayjs } from 'dayjs'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -49,6 +49,9 @@ export interface BoostUiEventRow {
   shippingDocument?: string
   actionState: number
   changeStatus?: string
+  historyId?: string | null
+  deliveryStatus?:
+    'SUBMITTED' | 'SUBMISSION_PENDING' | 'ROLLED_BACK' | 'ROLLBACK_PENDING' | 'NOT_SUBMITTED'
   errorTitles?: string[]
   warningTitles?: string[]
 }
@@ -202,7 +205,9 @@ function asOrigin(value?: string | null) {
 }
 
 function normalizedStatus(value?: string | null) {
-  return String(value || 'ACTIVE').trim().toUpperCase()
+  return String(value || 'ACTIVE')
+    .trim()
+    .toUpperCase()
 }
 
 function asStatus(value?: string | null) {
@@ -255,6 +260,7 @@ export function useScheduleBoost() {
     profileForms,
     schedule,
     coDriverSchedule,
+    coDriverScheduleLoading,
     responsibleUsers,
     coDrivers,
     activeTabId,
@@ -265,6 +271,25 @@ export function useScheduleBoost() {
   const screenResolution = ref(Math.max(900, document.documentElement.clientWidth - 90))
   const selectedEventId = ref('')
   const selectedRowIds = ref<string[]>([])
+  const showCoDrivers = ref(false)
+  const coDriverRenderEnabled = ref(false)
+  let hasRenderedCoDrivers = false
+  let coDriverActivation = 0
+  watch(showCoDrivers, async (visible) => {
+    const version = ++coDriverActivation
+    coDriverRenderEnabled.value = false
+    if (!visible) return
+    if (hasRenderedCoDrivers && coDriverSchedule.value && !coDriverScheduleLoading.value) {
+      coDriverRenderEnabled.value = true
+      return
+    }
+    await nextTick()
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    if (version === coDriverActivation) {
+      coDriverRenderEnabled.value = true
+      hasRenderedCoDrivers = true
+    }
+  }, { flush: 'sync' })
   const dragDropEnabled = ref(false)
   const boostModalOpen = ref(false)
   const reassignModalOpen = ref(false)
@@ -292,26 +317,36 @@ export function useScheduleBoost() {
   )
   const latestPeriodCoDriver = computed(() => {
     if (!session.value) return null
-    return [
-      ...(schedule.value?.dailyLogs ?? []).map((log) => ({
-        id: log.coDriverId?.trim() || log.coDriverEmail?.trim() || log.coDriverName?.trim() || '',
-        name: log.coDriverName?.trim() || log.coDriverEmail?.trim() || 'Co-driver',
-        date: normalizeDateKey(log.logDate),
-        priority: 0,
-      })),
-      ...profileForms.value.map((form) => ({
-        id: form.coDriverId?.trim() || form.coDriverName?.trim() || '',
-        name: form.coDriverName?.trim() || 'Co-driver',
-        date: normalizeDateKey(form.logDate),
-        priority: 1,
-      })),
-    ]
-      .filter((item) => item.id && item.date >= session.value!.fromDate && item.date <= session.value!.toDate)
-      .sort((first, second) => first.date.localeCompare(second.date) || first.priority - second.priority)
-      .at(-1) ?? null
+    return (
+      [
+        ...(schedule.value?.dailyLogs ?? []).map((log) => ({
+          id: log.coDriverId?.trim() || log.coDriverEmail?.trim() || log.coDriverName?.trim() || '',
+          name: log.coDriverName?.trim() || log.coDriverEmail?.trim() || 'Co-driver',
+          date: normalizeDateKey(log.logDate),
+          priority: 0,
+        })),
+        ...profileForms.value.map((form) => ({
+          id: form.coDriverId?.trim() || form.coDriverName?.trim() || '',
+          name: form.coDriverName?.trim() || 'Co-driver',
+          date: normalizeDateKey(form.logDate),
+          priority: 1,
+        })),
+      ]
+        .filter(
+          (item) =>
+            item.id && item.date >= session.value!.fromDate && item.date <= session.value!.toDate
+        )
+        .sort(
+          (first, second) =>
+            first.date.localeCompare(second.date) || first.priority - second.priority
+        )
+        .at(-1) ?? null
+    )
   })
   const coDriverGraphEvents = computed(() =>
-    [...(coDriverSchedule.value?.events ?? [])].sort((first, second) => first.timestamp - second.timestamp)
+    [...(coDriverSchedule.value?.events ?? [])].sort(
+      (first, second) => first.timestamp - second.timestamp
+    )
   )
   const workspaceTimeZone = computed(() => rawEvents.value[0]?.event.timeZone ?? 'CT')
   const periodStartMs = computed(() =>
@@ -360,7 +395,8 @@ export function useScheduleBoost() {
   const coDriverDurationById = computed(() => {
     const result = new Map<string, number>()
     const eligible = coDriverGraphEvents.value.filter(
-      (event) => normalizedStatus(event.recordStatus) === 'ACTIVE' && event.eventCategory !== 'OTHER'
+      (event) =>
+        normalizedStatus(event.recordStatus) === 'ACTIVE' && event.eventCategory !== 'OTHER'
     )
     eligible.forEach((event, index) => {
       result.set(
@@ -393,6 +429,18 @@ export function useScheduleBoost() {
       const event = workspaceEvent.event
       const [eventType, eventCode] = numericEvent(event)
       const issues = issueMap.value.get(event.id)
+      const tabKind = store.activeTab?.kind
+      const deliveryStatus = !workspaceEvent.historyId || !['FINAL', 'ROLLBACK'].includes(tabKind ?? '')
+        ? undefined
+        : tabKind === 'ROLLBACK'
+          ? workspaceEvent.isRolledBack
+            ? 'ROLLED_BACK'
+            : workspaceEvent.isSubmitted
+              ? 'ROLLBACK_PENDING'
+              : 'NOT_SUBMITTED'
+          : workspaceEvent.isSubmitted
+            ? 'SUBMITTED'
+            : 'SUBMISSION_PENDING'
       return {
         eventId: event.id,
         sequenceId: sequenceIdHexToDecimal(event.sequenceId),
@@ -423,6 +471,8 @@ export function useScheduleBoost() {
             ? 8
             : 1,
         changeStatus: workspaceEvent.changeStatus,
+        historyId: workspaceEvent.historyId,
+        deliveryStatus,
         errorTitles: issues?.errors ?? [],
         warningTitles: issues?.warnings ?? [],
       }
@@ -469,7 +519,7 @@ export function useScheduleBoost() {
         row,
         date: normalizeDateKey(rawEvents.value[index].event.logDate),
       })),
-      ...coDriverRows.value.map((row, index) => ({
+      ...(coDriverRenderEnabled.value ? coDriverRows.value : []).map((row, index) => ({
         row,
         date: normalizeDateKey(coDriverGraphEvents.value[index].logDate),
       })),
@@ -769,7 +819,8 @@ export function useScheduleBoost() {
     const sourceEventValue = source?.event
     if (
       sourceEventValue &&
-      (sourceEventValue.timestamp < periodStartMs.value || sourceEventValue.timestamp >= periodEndMs.value)
+      (sourceEventValue.timestamp < periodStartMs.value ||
+        sourceEventValue.timestamp >= periodEndMs.value)
     ) {
       throw new Error('Events outside the session period cannot be copied')
     }
@@ -897,7 +948,7 @@ export function useScheduleBoost() {
               ? 'OTHER_USER'
               : form.origin === 4
                 ? 'UNIDENTIFIED_DRIVER'
-                : event?.recordOrigin ?? 'OTHER_USER',
+                : (event?.recordOrigin ?? 'OTHER_USER'),
       recordStatus: form.recordStatus,
       vehicleId: form.vehicleId,
       odometerMiles: form.odometer,
@@ -981,6 +1032,7 @@ export function useScheduleBoost() {
   }
 
   async function openEditDailyForm(date: string) {
+    if (session.value?.status !== 'DRAFT' || !workspace.value?.canEdit || store.activeTab?.kind !== 'WORKING') return
     const normalizedDate = normalizeDateKey(date)
     const form = profileForms.value.find(
       (item) => normalizeDateKey(item.logDate) === normalizedDate
@@ -1040,6 +1092,7 @@ export function useScheduleBoost() {
   }
 
   async function submitDailyForm(form: BoostEventEditProfile) {
+    if (session.value?.status !== 'DRAFT' || !workspace.value?.canEdit || store.activeTab?.kind !== 'WORKING') return
     const current = profileForms.value.find(
       (item) => normalizeDateKey(item.logDate) === normalizeDateKey(form.date)
     )
@@ -1083,6 +1136,7 @@ export function useScheduleBoost() {
 
   async function revertDailyForm() {
     if (!session.value || !editDailyForm.date) return
+    if (session.value.status !== 'DRAFT' || !workspace.value?.canEdit || store.activeTab?.kind !== 'WORKING') return
     isActionLoading.value = true
     try {
       await api.post(
@@ -1161,7 +1215,9 @@ export function useScheduleBoost() {
     try {
       await prepareInsertEvent(eventId)
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to prepare event copy')
+      toast.error(
+        error?.response?.data?.message || error?.message || 'Failed to prepare event copy'
+      )
     }
   }
 
@@ -1286,9 +1342,9 @@ export function useScheduleBoost() {
       await store.updateEvent(targetEventId, {
         ...currentEventPayload(source),
         positioning: manual ? 'MANUAL' : 'AUTOMATIC',
-        latitude: manual ? source.event.latitude ?? null : data.latitude ?? null,
-        longitude: manual ? source.event.longitude ?? null : data.longitude ?? null,
-        location: manual ? source.event.location ?? null : data.calculatedLocation ?? null,
+        latitude: manual ? (source.event.latitude ?? null) : (data.latitude ?? null),
+        longitude: manual ? (source.event.longitude ?? null) : (data.longitude ?? null),
+        location: manual ? (source.event.location ?? null) : (data.calculatedLocation ?? null),
         driverLocationDescription: manual
           ? data.manualLocation?.trim() || data.calculatedLocation?.trim() || null
           : null,
@@ -1329,23 +1385,26 @@ export function useScheduleBoost() {
     { immediate: true }
   )
 
+  let coDriverRequestVersion = 0
   watch(
-    () => [
-      session.value?.id,
-      schedule.value?.driverId,
-      latestPeriodCoDriver.value?.id,
-      session.value?.fromDate,
-      session.value?.toDate,
-    ] as const,
+    () =>
+      [
+        session.value?.id,
+        schedule.value?.driverId,
+        latestPeriodCoDriver.value?.id,
+        session.value?.fromDate,
+        session.value?.toDate,
+      ] as const,
     async ([sessionId, scheduleDriverId, coDriverId, fromDate, toDate]) => {
+      const version = ++coDriverRequestVersion
       if (!sessionId || !scheduleDriverId || !coDriverId || !fromDate || !toDate) {
-        store.coDriverSchedule = null
+        store.clearCoDriverSchedule()
         return
       }
       try {
         await store.fetchCoDriverSchedule(scheduleDriverId, coDriverId, fromDate, toDate)
       } catch {
-        store.coDriverSchedule = null
+        if (version === coDriverRequestVersion) store.clearCoDriverSchedule()
       }
     },
     { immediate: true }
@@ -1371,6 +1430,8 @@ export function useScheduleBoost() {
     chartData,
     dailyEvents,
     coDriverGraphEvents,
+    showCoDrivers,
+    coDriverRenderEnabled,
     latestPeriodCoDriver,
     graphEventDurationById,
     dailyPixelViolations,
@@ -1394,6 +1455,7 @@ export function useScheduleBoost() {
     editEventForm,
     editDailyForm,
     isGraphLoading: isLoading,
+    isCoDriverLoading: coDriverScheduleLoading,
     isDailyEventsLoading: isLoading,
     isEditEventLoading: isActionLoading,
     isEditDailyFormLoading: isActionLoading,

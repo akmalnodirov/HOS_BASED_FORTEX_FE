@@ -31,25 +31,31 @@
             <div class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Seq ID</span
+              >Seq ID</span
               >
             </div>
             <div class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Time ({{ timeZone || 'CT' }})</span
+              >Time ({{ timeZone || 'CT' }})</span
               >
             </div>
             <div v-if="isColumnVisible('duration')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Duration</span
+              >Duration</span
               >
             </div>
             <div v-if="isColumnVisible('event')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Event</span
+              >Event</span
+              >
+            </div>
+            <div v-if="showDriverColumn" class="flex items-center">
+              <span
+                class="text-sm font-semibold uppercase text-[#666666] dark:text-muted-foreground"
+                >Driver name</span
               >
             </div>
             <div
@@ -60,13 +66,13 @@
             >
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Location</span
+              >Location</span
               >
             </div>
             <div v-if="isColumnVisible('system')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >System</span
+              >System</span
               >
             </div>
             <div
@@ -77,7 +83,7 @@
             >
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Odometer</span
+              >Odometer</span
               >
             </div>
             <div
@@ -88,37 +94,37 @@
             >
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Engine Hrs</span
+              >Engine Hrs</span
               >
             </div>
             <div v-if="isColumnVisible('notes')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Notes</span
+              >Notes</span
               >
             </div>
             <div v-if="isColumnVisible('status')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Status</span
+              >Status</span
               >
             </div>
             <div v-if="isColumnVisible('trailer')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Trailer</span
+              >Trailer</span
               >
             </div>
             <div v-if="isColumnVisible('document')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Document</span
+              >Document</span
               >
             </div>
             <div v-if="isColumnVisible('change')" class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-                >Change</span
+              >Change</span
               >
             </div>
             <div
@@ -127,7 +133,7 @@
             >
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase pr-3"
-                >Actions</span
+              >Actions</span
               >
             </div>
           </div>
@@ -239,6 +245,7 @@
                     </div>
 
                     <Button
+                      v-if="canEditProfile"
                       type="button"
                       variant="ghost"
                       size="icon"
@@ -273,15 +280,17 @@
                   class="boost-events-grid group grid gap-3 border-t bg-white px-4 py-3 hover:bg-muted/30 dark:bg-background cursor-pointer"
                   :style="[
                     gridStyle,
-                    selectedEventId === event.eventId
-                      ? { backgroundColor: '#EFF6FF', boxShadow: 'inset 3px 0 0 #2563EB' }
+                    highlightedEventId === event.eventId
+                      ? { backgroundColor: '#ECFDF5', boxShadow: 'inset 0 0 0 2px #10B981' }
                       : event.errorTitles?.length || event.warningTitles?.length
                         ? { backgroundColor: event.errorTitles?.length ? '#F7EDED' : '#FBF4EC' }
                         : undefined,
                   ]"
                   :class="[
                     event.actionState === 4 ? 'opacity-55' : '',
-                    selectedEventId === event.eventId ? 'bg-primary/5 dark:bg-primary/10' : '',
+                    highlightedEventId === event.eventId
+                      ? 'bg-emerald-50 dark:bg-emerald-950/25'
+                      : '',
                     selectedRowIds.includes(event.eventId) ? 'bg-blue-50 dark:bg-blue-900/20' : '',
                   ]"
                   @click="handleRowClick(event.eventId)"
@@ -302,19 +311,29 @@
                             <span
                               v-if="event.errorTitles?.length"
                               class="rounded bg-red-100 px-1 text-[9px] font-semibold leading-3 text-red-700"
-                            >E{{ event.errorTitles.length }}</span>
+                              >E{{ event.errorTitles.length }}</span
+                            >
                             <span
                               v-if="event.warningTitles?.length"
                               class="rounded bg-amber-100 px-1 text-[9px] font-semibold leading-3 text-amber-700"
-                            >W{{ event.warningTitles.length }}</span>
+                              >W{{ event.warningTitles.length }}</span
+                            >
                           </span>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent class="max-w-64 text-xs">
-                        <div v-for="(error, index) in event.errorTitles" :key="`e-${index}-${error}`" class="text-red-600">
+                        <div
+                          v-for="(error, index) in event.errorTitles"
+                          :key="`e-${index}-${error}`"
+                          class="text-red-600"
+                        >
                           Error: {{ error }}
                         </div>
-                        <div v-for="(warning, index) in event.warningTitles" :key="`w-${index}-${warning}`" class="text-amber-600">
+                        <div
+                          v-for="(warning, index) in event.warningTitles"
+                          :key="`w-${index}-${warning}`"
+                          class="text-amber-600"
+                        >
                           Warning: {{ warning }}
                         </div>
                       </TooltipContent>
@@ -328,11 +347,17 @@
                     {{ formatEventTime(event.startTime) }}
                   </div>
 
-                  <div v-if="isColumnVisible('duration')" class="min-w-0 overflow-hidden whitespace-nowrap font-mono text-xs text-foreground">
+                  <div
+                    v-if="isColumnVisible('duration')"
+                    class="min-w-0 overflow-hidden whitespace-nowrap font-mono text-xs text-foreground"
+                  >
                     {{ formatDutyDuration(event.duration) }}
                   </div>
 
-                  <div v-if="isColumnVisible('event')" class="flex min-w-0 items-center gap-x-2 overflow-visible">
+                  <div
+                    v-if="isColumnVisible('event')"
+                    class="flex min-w-0 items-center gap-x-2 overflow-visible"
+                  >
                     <template v-if="findEventByTypeAndCode(event.eventType, event.eventCode)">
                       <div
                         class="w-3 h-4 rounded-[5px] shrink-0"
@@ -364,7 +389,9 @@
                             @click.stop
                           >
                             <Camera class="h-3.5 w-3.5" />
-                            <span class="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1 text-[8px] leading-3 text-white">
+                            <span
+                              class="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1 text-[8px] leading-3 text-white"
+                            >
                               {{ cameraMatchByEvent.get(event.eventId)?.cameras.length }}
                             </span>
                           </Button>
@@ -384,6 +411,14 @@
                     >
                       Co-driver
                     </span>
+                  </div>
+
+                  <div
+                    v-if="showDriverColumn"
+                    class="min-w-0 truncate text-xs text-foreground"
+                    :title="event.driverFullName"
+                  >
+                    {{ event.driverFullName || '—' }}
                   </div>
 
                   <div
@@ -438,7 +473,10 @@
                     {{ event.engineHours ?? '-' }}
                   </div>
 
-                  <div v-if="isColumnVisible('notes')" class="text-sm text-foreground wrap-break-word">
+                  <div
+                    v-if="isColumnVisible('notes')"
+                    class="text-sm text-foreground wrap-break-word"
+                  >
                     {{ event.annotation || '-' }}
                   </div>
 
@@ -461,9 +499,18 @@
                     {{ event.shippingDocument || '-' }}
                   </div>
 
-                  <div v-if="isColumnVisible('change')" class="flex items-center">
+                  <div
+                    v-if="isColumnVisible('change')"
+                    class="flex min-w-0 flex-col items-start gap-1"
+                  >
                     <span :class="changeStatusClass(event.changeStatus)">
                       {{ changeStatusLabel(event.changeStatus) }}
+                    </span>
+                    <span
+                      v-if="event.deliveryStatus"
+                      :class="deliveryStatusClass(event.deliveryStatus)"
+                    >
+                      {{ deliveryStatusLabel(event.deliveryStatus) }}
                     </span>
                   </div>
 
@@ -474,6 +521,7 @@
                     @click.stop
                   >
                     <Button
+                      v-if="canEditEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -483,6 +531,7 @@
                       <Pencil class="h-3.5 w-3.5" />
                     </Button>
                     <Button
+                      v-if="canEditEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -492,7 +541,7 @@
                       <Copy class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="event.changeStatus && event.changeStatus.toUpperCase() !== 'UNCHANGED'"
+                      v-if="canEditEvents && event.changeStatus && event.changeStatus.toUpperCase() !== 'UNCHANGED'"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-blue-600"
@@ -503,7 +552,7 @@
                       <Undo2 class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="event.actionState === 8"
+                      v-if="!canEditEvents || event.actionState === 8"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -513,6 +562,7 @@
                       <Eye class="h-3.5 w-3.5" />
                     </Button>
                     <Button
+                      v-if="canEditEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -598,7 +648,11 @@ interface Props {
   events?: BoostUiEventGroup[]
   loading?: boolean
   selectedEventId?: string
+  highlightedEventId?: string
   selectedRowIds?: string[]
+  showDriverColumn?: boolean
+  canEditProfile?: boolean
+  canEditEvents?: boolean
   dragDropEnabled?: boolean
   columnVisibility?: BoostEventTableColumnVisibility
   timeZone?: string | null
@@ -609,7 +663,11 @@ const props = withDefaults(defineProps<Props>(), {
   events: () => [],
   loading: false,
   selectedEventId: '',
+  highlightedEventId: '',
   selectedRowIds: () => [],
+  showDriverColumn: false,
+  canEditProfile: false,
+  canEditEvents: false,
   dragDropEnabled: false,
   columnVisibility: () => ({
     duration: true,
@@ -653,8 +711,8 @@ const emit = defineEmits<{
 const openItems = ref<string[]>([])
 const isColumnVisible = (column: BoostEventTableColumn) => props.columnVisibility[column]
 const columnTracks: Array<[BoostEventTableColumn, string]> = [
-  ['duration', 'minmax(132px,.72fr)'],
-  ['event', 'minmax(185px,1.15fr)'],
+  ['duration', 'minmax(105px,.62fr)'],
+  ['event', 'minmax(165px,1.05fr)'],
   ['location', 'minmax(210px,1.65fr)'],
   ['system', 'minmax(82px,.6fr)'],
   ['odometer', 'minmax(94px,.7fr)'],
@@ -663,20 +721,24 @@ const columnTracks: Array<[BoostEventTableColumn, string]> = [
   ['status', '90px'],
   ['trailer', 'minmax(95px,.75fr)'],
   ['document', 'minmax(115px,.9fr)'],
-  ['change', '100px'],
-  ['actions', '140px'],
+  ['change', '132px'],
+  ['actions', '132px'],
 ]
 const gridStyle = computed(() => ({
   gridTemplateColumns: [
     '40px',
-    'minmax(72px,.55fr)',
-    'minmax(145px,.9fr)',
-    ...columnTracks.filter(([column]) => isColumnVisible(column)).map(([, track]) => track),
+    'minmax(58px,.38fr)',
+    'minmax(132px,.82fr)',
+    ...columnTracks.flatMap(([column, track]) => {
+      const result = isColumnVisible(column) ? [track] : []
+      if (column === 'event' && props.showDriverColumn) result.push('minmax(140px,.85fr)')
+      return result
+    }),
   ].join(' '),
 }))
 const minimumColumnWidths: Record<BoostEventTableColumn, number> = {
-  duration: 132,
-  event: 185,
+  duration: 105,
+  event: 165,
   location: 210,
   system: 82,
   odometer: 94,
@@ -685,14 +747,15 @@ const minimumColumnWidths: Record<BoostEventTableColumn, number> = {
   status: 90,
   trailer: 95,
   document: 115,
-  change: 100,
-  actions: 140,
+  change: 132,
+  actions: 132,
 }
 const tableMinWidth = computed(
   () =>
     40 +
-    72 +
-    145 +
+    58 +
+    132 +
+    (props.showDriverColumn ? 152 : 0) +
     48 +
     columnTracks.reduce(
       (total, [column]) => total + (isColumnVisible(column) ? minimumColumnWidths[column] + 12 : 0),
@@ -713,7 +776,7 @@ const isGroupOpen = (date: string) => openItems.value.includes(`group-${date}`)
 const scrollContainer = ref<HTMLElement | null>(null)
 
 watch(
-  () => props.selectedEventId,
+  () => props.highlightedEventId,
   async (eventId) => {
     if (!eventId) return
     await nextTick()
@@ -886,6 +949,24 @@ const getStatusClass = (status: string) =>
   String(status).toUpperCase() === 'ACTIVE'
     ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
     : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
+
+const deliveryStatusLabel = (status: NonNullable<BoostUiEventRow['deliveryStatus']>) =>
+  ({
+    SUBMITTED: 'Submitted',
+    SUBMISSION_PENDING: 'Submission pending',
+    ROLLED_BACK: 'Rolled back',
+    ROLLBACK_PENDING: 'Rollback pending',
+    NOT_SUBMITTED: 'Not submitted',
+  })[status]
+
+const deliveryStatusClass = (status: NonNullable<BoostUiEventRow['deliveryStatus']>) => {
+  const base =
+    'inline-flex max-w-full rounded px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap'
+  if (status === 'SUBMITTED') return `${base} bg-emerald-50 text-emerald-700`
+  if (status === 'ROLLED_BACK') return `${base} bg-blue-50 text-blue-700`
+  if (status.endsWith('PENDING')) return `${base} bg-amber-50 text-amber-700`
+  return `${base} bg-slate-100 text-slate-600`
+}
 
 const dragDropHeaderClass = () =>
   props.dragDropEnabled

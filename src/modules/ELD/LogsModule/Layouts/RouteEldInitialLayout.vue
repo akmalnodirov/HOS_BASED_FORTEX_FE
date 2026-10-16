@@ -20,7 +20,7 @@
             :driver-name="boostWorkspace?.session.driverName"
             :external-driver-id="boostSchedule?.externalDriverId"
             :company-name="boostWorkspace?.session.companyName"
-            :can-edit="boostWorkspace?.canEdit"
+            :can-edit="boostWorkspace?.session.status === 'DRAFT' && boostWorkspace?.canEdit && boostWorkspaceStore.activeTab?.kind === 'WORKING'"
             :time-zone="boostWorkspace?.events[0]?.event.timeZone ?? 'CT'"
             @edit="boostWorkspaceStore.requestProfileFormEdit"
           />

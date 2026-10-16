@@ -20,9 +20,7 @@
         >
           <Minus class="h-3.5 w-3.5" />
         </Button>
-        <span class="w-11 text-center text-[11px] text-muted-foreground"
-          >{{ Math.round(zoom * 100) }}%</span
-        >
+        <span class="w-11 text-center text-[11px] text-muted-foreground">{{ Math.round(zoom * 100) }}%</span>
         <Button
           variant="outline"
           size="icon"
@@ -44,13 +42,18 @@
 
     <div class="relative grid grid-cols-[52px_minmax(0,1fr)_62px]">
       <div
-        v-if="isGraphLoading"
+        v-if="isGraphLoading || isCoDriverLoading"
         class="absolute inset-0 z-30 flex items-center justify-center gap-2 bg-background/80 text-xs text-muted-foreground backdrop-blur-[1px]"
       >
-        <Loader2 class="h-4 w-4 animate-spin" /> Loading session event graph
+        <Loader2 class="h-4 w-4 animate-spin" />
+        {{ isGraphLoading ? 'Loading session event graph' : 'Loading co-driver graph' }}
       </div>
 
-      <svg :viewBox="`0 0 52 ${chartHeight}`" :style="{ height: `${chartHeight}px` }" class="w-[52px] bg-white dark:bg-card">
+      <svg
+        :viewBox="`0 0 52 ${chartHeight}`"
+        :style="{ height: `${chartHeight}px` }"
+        class="w-[52px] bg-white dark:bg-card"
+      >
         <text
           v-for="(label, index) in statusLabels"
           :key="label"
@@ -61,14 +64,6 @@
         >
           {{ label }}
         </text>
-        <text
-          v-for="series in secondarySeries"
-          :key="`label-${series.key}`"
-          x="46"
-          :y="series.baseY + 25"
-          text-anchor="end"
-          class="fill-muted-foreground text-[8px] font-semibold"
-        >{{ series.shortLabel }}</text>
       </svg>
 
       <div
@@ -334,17 +329,60 @@
             <title>{{ point.title }}</title>
           </circle>
 
-          <g v-for="series in secondarySeries" :key="series.key">
-            <line x1="0" :x2="plotWidth" :y1="series.baseY" :y2="series.baseY" class="stroke-border" />
-            <text x="8" :y="series.baseY + 12" class="fill-muted-foreground text-[8px] font-semibold">{{ series.label }}</text>
-            <path v-if="series.path" :d="series.path" fill="none" :stroke="series.color" stroke-width="2" stroke-linejoin="round" />
-            <g v-for="segment in series.segments" :key="`${series.key}-${segment.eventId}`" class="cursor-pointer" @click="selectEvent(segment.eventId)">
-              <rect :x="segment.startX" :y="series.baseY + 5" :width="Math.max(2, segment.endX - segment.startX)" height="42" fill="transparent" pointer-events="all" />
-              <title>{{ segment.title }}</title>
-            </g>
+          <g
+            v-for="intermediate in intermediateLines"
+            :key="`intermediate-${intermediate.eventId}`"
+            class="cursor-pointer"
+            @click.stop="selectEvent(intermediate.eventId)"
+          >
+            <line
+              :x1="intermediate.x"
+              :x2="intermediate.x"
+              :y1="intermediate.y - 5"
+              :y2="intermediate.y + 5"
+              stroke="#2563EB"
+              :stroke-width="intermediate.eventId === selectedEventId ? 7 : 4"
+            />
+            <rect
+              :x="intermediate.x - 6"
+              :y="intermediate.y - 10"
+              width="12"
+              height="20"
+              fill="transparent"
+              pointer-events="all"
+            />
+            <title>{{ intermediate.title }}</title>
+          </g>
+
+          <g v-if="coDriverPath" class="pointer-events-none opacity-50">
+            <path :d="coDriverPath" fill="none" stroke="#64748B" stroke-width="2" stroke-linejoin="round" />
+            <circle
+              v-for="point in coDriverPoints"
+              :key="`co-${point.event.id}`"
+              :cx="point.x"
+              :cy="point.y"
+              r="3"
+              fill="#64748B"
+              stroke="white"
+              stroke-width="1.5"
+            >
+              <title>{{ coDriverName || 'Co-driver' }} · {{ point.event.eventName }}</title>
+            </circle>
+          </g>
+          <g v-if="reassignedSegments.length" class="pointer-events-none opacity-80">
+            <path
+              v-for="segment in reassignedSegments"
+              :key="`reassigned-${segment.id}`"
+              :d="`M ${segment.startX} ${segment.previousY} V ${segment.y} H ${segment.endX}`"
+              fill="none"
+              stroke="#D97706"
+              stroke-width="2.5"
+              stroke-dasharray="5 4"
+              stroke-linejoin="round"
+            />
           </g>
           <text
-            v-if="!dutyPath"
+            v-if="!dutyPath && !coDriverPath"
             :x="plotWidth / 2"
             y="104"
             text-anchor="middle"
@@ -355,7 +393,11 @@
         </svg>
       </div>
 
-      <svg :viewBox="`0 0 62 ${chartHeight}`" :style="{ height: `${chartHeight}px` }" class="w-[62px] bg-white dark:bg-card">
+      <svg
+        :viewBox="`0 0 62 ${chartHeight}`"
+        :style="{ height: `${chartHeight}px` }"
+        class="w-[62px] bg-white dark:bg-card"
+      >
         <text x="31" y="18" text-anchor="middle" class="fill-foreground text-[10px] font-semibold">
           {{ visibleDayLabel }}
         </text>
@@ -404,6 +446,7 @@ const props = withDefaults(
     coDriverEvents?: RouteEldHosEvent[]
     coDriverName?: string | null
     isGraphLoading?: boolean
+    isCoDriverLoading?: boolean
   }>(),
   {
     events: () => [],
@@ -418,6 +461,7 @@ const props = withDefaults(
     coDriverEvents: () => [],
     coDriverName: null,
     isGraphLoading: false,
+    isCoDriverLoading: false,
   }
 )
 const emit = defineEmits<{
@@ -451,7 +495,7 @@ const dayWidth = computed(() => Math.max(baseDayWidth, viewportWidth.value) * zo
 const plotWidth = computed(() => Math.max(days.value.length, 1) * dayWidth.value)
 const totalHours = computed(() => days.value.length * 24)
 const graphTimeZone = computed(() => props.timeZone || props.events[0]?.timeZone || 'CT')
-const chartHeight = computed(() => 190 + secondarySeries.value.length * 52)
+const chartHeight = 190
 const periodEndTimestamp = computed(() => {
   if (!props.toDate) return Date.now()
   return zonedTimestamp(`${nextDate(props.toDate)}T00:00:00`, graphTimeZone.value)
@@ -557,29 +601,59 @@ const dutyPoints = computed(() =>
     title: `${event.eventName} · ${formatEventTime(event)}`,
   }))
 )
-const secondarySeries = computed(() => {
-  const definitions = [
-    { key: 'reassigned', label: 'Reassigned events', shortLabel: 'REASSIGNED', color: '#DC2626', events: props.reassignedEvents },
-    { key: 'co-driver', label: props.coDriverName ? `Co-driver · ${props.coDriverName}` : 'Co-driver', shortLabel: 'CO-DRIVER', color: '#7C3AED', events: props.coDriverEvents },
-  ].filter((series) => series.events.length)
-  return definitions.map((series, seriesIndex) => {
-    const baseY = 190 + seriesIndex * 52
-    const points = series.events
-      .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
-      .map((event) => ({ event, x: eventX(event), y: baseY + 12 + Math.max(0, statusLabels.indexOf(event.eventCategory as (typeof statusLabels)[number])) * 9 }))
-      .filter((point) => point.x >= 0 && point.x <= plotWidth.value)
-      .sort((first, second) => first.event.timestamp - second.event.timestamp)
-    let path = points.length ? `M ${points[0].x} ${points[0].y}` : ''
-    for (let index = 1; index < points.length; index += 1) path += ` H ${points[index].x} V ${points[index].y}`
-    if (points.length) path += ` H ${Math.min(plotWidth.value, timeX(graphEndTimestamp.value, graphTimeZone.value))}`
-    const segments = points.map((point, index) => ({
-      eventId: point.event.id,
-      startX: point.x,
-      endX: points[index + 1]?.x ?? Math.min(plotWidth.value, timeX(graphEndTimestamp.value, graphTimeZone.value)),
-      title: `${point.event.eventName} · ${formatEventTime(point.event)}`,
+const intermediateLines = computed(() => {
+  const dutyTimeline = props.events
+    .filter((event) =>
+      event.recordStatus === 'ACTIVE' &&
+      !isIntermediate(event) &&
+      statusLabels.includes(event.eventCategory as (typeof statusLabels)[number])
+    )
+    .sort((first, second) => first.timestamp - second.timestamp || first.id.localeCompare(second.id))
+  return props.events
+    .filter((event) => event.recordStatus === 'ACTIVE' && isIntermediate(event))
+    .filter((event) =>
+      dutyTimeline.findLast((dutyEvent) => dutyEvent.timestamp <= event.timestamp)?.eventCategory === 'D'
+    )
+    .map((event) => ({
+      eventId: event.id,
+      x: eventX(event),
+      y: categoryY('D'),
+      title: `${event.eventName} · ${formatEventTime(event)}`,
     }))
-    return { ...series, baseY, path, segments }
-  })
+    .filter((event) => event.x >= 0 && event.x <= plotWidth.value)
+})
+
+function isIntermediate(event: RouteEldHosEvent) {
+  return ['LOG_NORMAL_PRECISION', 'LOG_REDUCED_PRECISION', 'ILC', 'ILR', 'INTERMEDIATE_CLP', 'INTERMEDIATE_RLP']
+    .includes(event.eventCode.toUpperCase())
+}
+const coDriverPoints = computed(() =>
+  props.coDriverEvents
+    .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
+    .map((event) => ({ event, x: eventX(event), y: categoryY(event.eventCategory) }))
+    .filter((point) => point.x >= 0 && point.x <= plotWidth.value)
+    .sort((a, b) => a.event.timestamp - b.event.timestamp || a.event.id.localeCompare(b.event.id))
+)
+const coDriverPath = computed(() => {
+  const points = coDriverPoints.value
+  if (!points.length) return ''
+  let path = `M ${points[0].x} ${points[0].y}`
+  for (let index = 1; index < points.length; index += 1) path += ` H ${points[index].x} V ${points[index].y}`
+  const lastDayEnd = Math.min(plotWidth.value, (Math.floor(points.at(-1)!.x / dayWidth.value) + 1) * dayWidth.value)
+  return `${path} H ${lastDayEnd}`
+})
+const reassignedSegments = computed(() => {
+  const reassigned = props.reassignedEvents
+    .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
+  const reassignedIds = new Set(reassigned.map((event) => event.id))
+  const timeline = [...new Map([...props.events, ...reassigned].map((event) => [event.id, event])).values()]
+    .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
+    .map((event) => ({ event, x: eventX(event), y: categoryY(event.eventCategory) }))
+    .filter((point) => point.x >= 0 && point.x <= plotWidth.value)
+    .sort((a, b) => a.event.timestamp - b.event.timestamp || a.event.id.localeCompare(b.event.id))
+  return timeline.flatMap((point, index) => reassignedIds.has(point.event.id)
+    ? [{ id: point.event.id, startX: point.x, endX: Math.max(point.x, timeline[index + 1]?.x ?? lastEndX.value), previousY: timeline[index - 1]?.y ?? point.y, y: point.y }]
+    : [])
 })
 const specialDutySegments = computed(() =>
   dutySegments.value.filter((segment) => segment.specialKind)
@@ -703,9 +777,10 @@ function selectMarker(marker: { key: string; eventId: string }) {
 function scrollToEventSegment(eventId: string) {
   const segment = dutySegments.value.find((item) => item.eventId === eventId)
   const marker = graphMarkers.value.find((item) => item.eventId === eventId)
+  const intermediate = intermediateLines.value.find((item) => item.eventId === eventId)
   const element = scroller.value
-  if ((!segment && !marker) || !element) return false
-  const x = segment ? (segment.startX + segment.endX) / 2 : marker!.x
+  if ((!segment && !marker && !intermediate) || !element) return false
+  const x = segment ? (segment.startX + segment.endX) / 2 : (marker?.x ?? intermediate!.x)
   element.scrollTo({ left: Math.max(0, x - element.clientWidth / 2), behavior: 'smooth' })
   return true
 }

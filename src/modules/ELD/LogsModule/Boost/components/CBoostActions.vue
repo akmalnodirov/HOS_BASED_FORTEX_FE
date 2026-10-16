@@ -46,11 +46,13 @@
 
           <Label
             class="hover:bg-accent/50 flex items-start gap-3 rounded border py-2.5 px-3 has-aria-checked:border-[#666666] has-aria-checked:bg-white dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
+            :class="!canEdit ? 'cursor-not-allowed opacity-50' : ''"
           >
             <Checkbox
               id="toggle-2"
               :model-value="dragDropEnabled"
-              @update:model-value="$emit('dragdrop-change', $event === true)"
+              :disabled="!canEdit"
+              @update:model-value="canEdit && $emit('dragdrop-change', $event === true)"
               class="border-[#DBDBDB] data-[state=checked]:border-black data-[state=checked]:bg-black data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
             />
             <div class="grid gap-1.5 font-normal">
@@ -72,6 +74,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
+            :disabled="normalizeDisabled"
             @click="$emit('normalize-click')"
           >
             <span>Normalize</span>
@@ -132,16 +135,20 @@ import {
 const props = withDefaults(
   defineProps<{
     dragDropEnabled?: boolean
+    canEdit?: boolean
     deleteDisabled?: boolean
     reassignDisabled?: boolean
     durationDisabled?: boolean
+    normalizeDisabled?: boolean
     selectedCount?: number
   }>(),
   {
     dragDropEnabled: false,
+    canEdit: false,
     deleteDisabled: false,
     reassignDisabled: false,
     durationDisabled: false,
+    normalizeDisabled: false,
     selectedCount: 0,
   }
 )

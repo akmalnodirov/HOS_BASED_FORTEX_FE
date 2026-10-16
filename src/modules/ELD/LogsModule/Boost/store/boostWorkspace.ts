@@ -41,12 +41,16 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const coDrivers = ref<RouteEldResponsibleUser[]>([])
   const reassignTargets = ref<RouteEldDriverOption[]>([])
   const coDriverSchedule = ref<RouteEldCoDriverSchedule | null>(null)
+  const coDriverScheduleLoading = ref(false)
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
   const isMutating = ref(false)
   const activeTabId = ref<string | null>(null)
   const workspaceCache = new Map<string, RouteEldWorkspace>()
   const profileFormsCache = new Map<string, RouteEldProfileForm[]>()
+  const coDriverScheduleCache = new Map<string, RouteEldCoDriverSchedule>()
+  const coDriverSchedulePending = new Map<string, Promise<RouteEldCoDriverSchedule>>()
+  let requestedCoDriverScheduleKey = ''
 
   const tabCacheKey = (sessionId: string, tabId: string) => `${sessionId}:${tabId}`
 
@@ -57,6 +61,21 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const activeTab = computed(
     () => session.value?.tabs.find((tab) => tab.id === activeTabId.value) ?? null
   )
+  const canEditWorkingSession = computed(
+    () => session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && activeTab.value?.kind === 'WORKING'
+  )
+
+  function assertDraftSession() {
+    if (session.value?.status !== 'DRAFT') {
+      throw new Error('Only draft sessions can have their tabs changed.')
+    }
+  }
+
+  function assertEditableSession() {
+    if (!canEditWorkingSession.value) {
+      throw new Error('Only the working tab of a draft session can be changed.')
+    }
+  }
 
   async function fetchSessions(driverId: string) {
     const response = await api.get<
@@ -131,8 +150,11 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         activeTabId.value = null
         return null
       }
-      await Promise.all([loadWorkspace(sessionId, tab.id), fetchProfileForms(sessionId, tab.id)])
-      await fetchSchedule(session.value.driverId, session.value.fromDate, session.value.toDate)
+      await Promise.all([
+        loadWorkspace(sessionId, tab.id),
+        fetchProfileForms(sessionId, tab.id),
+        fetchSchedule(session.value.driverId, session.value.fromDate, session.value.toDate),
+      ])
       return workspace.value
     } finally {
       isLoading.value = false
@@ -189,6 +211,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function createTab() {
     if (!session.value) return null
+    assertDraftSession()
     isMutating.value = true
     try {
       const response = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -209,6 +232,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function deleteTab(tabId: string) {
     if (!session.value) return null
+    assertDraftSession()
     const deletedKey = tabCacheKey(session.value.id, tabId)
     isMutating.value = true
     try {
@@ -239,6 +263,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     url: string,
     body?: Record<string, unknown> | null
   ) {
+    assertEditableSession()
     isMutating.value = true
     try {
       const response = await api[method]<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -276,6 +301,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function updateEvent(eventId: string, body: Record<string, unknown>) {
     if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
     isMutating.value = true
     try {
       await api.put(
@@ -290,6 +316,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function insertEvent(body: Record<string, unknown>) {
     if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
     isMutating.value = true
     try {
       await api.post(
@@ -304,31 +331,19 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function revertEvent(eventId: string) {
     if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
     try {
-      const response = await api.post<
-        RouteEldWorkspaceEvent | ApiEnvelope<RouteEldWorkspaceEvent>
-      >(
-        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVERT_EVENT(
-          sessionId,
-          tabId,
-          eventId
-        ),
+      const response = await api.post<RouteEldWorkspaceEvent | ApiEnvelope<RouteEldWorkspaceEvent>>(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVERT_EVENT(sessionId, tabId, eventId),
         null
       )
       const updated = unwrap(response.data)
-      if (workspace.value) {
-        workspace.value = {
-          ...workspace.value,
-          events: workspace.value.events.map((item) =>
-            item.event.id === updated.event.id ? updated : item
-          ),
-        }
-        cacheWorkspace(workspace.value)
-      }
-      await fetchProfileForms(sessionId, tabId)
+      // Rebuild the whole effective workspace. A revert can restore profile data,
+      // remove reassignment side effects, and change neighbouring calculations.
+      await Promise.all([loadWorkspace(sessionId, tabId), fetchProfileForms(sessionId, tabId)])
       return updated
     } finally {
       isMutating.value = false
@@ -369,6 +384,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function updateProfileForm(form: RouteEldProfileForm) {
     if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
     isMutating.value = true
     try {
       const response = await api.put<RouteEldProfileForm | ApiEnvelope<RouteEldProfileForm>>(
@@ -410,12 +426,40 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     fromDate: string,
     toDate: string
   ) {
-    const response = await api.get<RouteEldCoDriverSchedule | ApiEnvelope<RouteEldCoDriverSchedule>>(
-      ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE(driverId),
-      { params: { coDriverId, fromDate, toDate } }
-    )
-    coDriverSchedule.value = unwrap(response.data)
-    return coDriverSchedule.value
+    const key = `${driverId}:${coDriverId}:${fromDate}:${toDate}`
+    requestedCoDriverScheduleKey = key
+    const cached = coDriverScheduleCache.get(key)
+    if (cached) {
+      coDriverSchedule.value = cached
+      coDriverScheduleLoading.value = false
+      return cached
+    }
+    coDriverScheduleLoading.value = true
+    let pending = coDriverSchedulePending.get(key)
+    if (!pending) {
+      pending = api.get<RouteEldCoDriverSchedule | ApiEnvelope<RouteEldCoDriverSchedule>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE(driverId),
+        { params: { coDriverId, fromDate, toDate } }
+      ).then((response) => {
+        const result = unwrap(response.data)
+        coDriverScheduleCache.set(key, result)
+        return result
+      }).finally(() => coDriverSchedulePending.delete(key))
+      coDriverSchedulePending.set(key, pending)
+    }
+    try {
+      const result = await pending
+      if (requestedCoDriverScheduleKey === key) coDriverSchedule.value = result
+      return result
+    } finally {
+      if (requestedCoDriverScheduleKey === key) coDriverScheduleLoading.value = false
+    }
+  }
+
+  function clearCoDriverSchedule() {
+    requestedCoDriverScheduleKey = ''
+    coDriverSchedule.value = null
+    coDriverScheduleLoading.value = false
   }
 
   async function fetchReassignTargets(driverId: string) {
@@ -439,6 +483,12 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function normalize(normalizeList: string[], applyCertificationFix: boolean) {
     if (!session.value || !activeTabId.value) return null
+    if (!canEditWorkingSession.value) {
+      throw new Error('Normalization is only available on the active working tab.')
+    }
+    if (!normalizeList.length && !applyCertificationFix) {
+      throw new Error('Select at least one repair routine.')
+    }
     isMutating.value = true
     try {
       const response = await api.post(ApiEndpoints.ROUTE_ELD_NORMALIZE, {
@@ -461,11 +511,17 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     if (!session.value) return null
     isMutating.value = true
     try {
-      const url = type === 'rollback'
-        ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(session.value.id)
-        : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(session.value.id)
+      const url =
+        type === 'rollback'
+          ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(session.value.id)
+          : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(session.value.id)
       let operation = unwrap(
-        (await api.post<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(url, null)).data
+        (
+          await api.post<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(
+            url,
+            null
+          )
+        ).data
       )
       onProgress?.(operation)
       while (operation.status === 'QUEUED' || operation.status === 'RUNNING') {
@@ -480,7 +536,13 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         onProgress?.(operation)
       }
       if (operation.status === 'FAILED') throw new Error(operation.error || 'Operation failed')
-      await loadSession(session.value.id, activeTabId.value)
+      const sessionId = session.value.id
+      await loadSession(sessionId)
+      const targetKind = type === 'rollback' ? 'ROLLBACK' : 'FINAL'
+      const targetTab = [...(session.value?.tabs ?? [])]
+        .filter((tab) => tab.kind === targetKind)
+        .sort((left, right) => right.position - left.position)[0]
+      if (targetTab) await selectTab(targetTab.id)
       return operation
     } finally {
       isMutating.value = false
@@ -493,7 +555,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   }
 
   function requestProfileFormEdit(logDate: string) {
-    profileFormEditRequest.value = logDate
+    if (canEditWorkingSession.value) profileFormEditRequest.value = logDate
   }
 
   function clearProfileFormEditRequest() {
@@ -510,11 +572,13 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     responsibleUsers.value = []
     coDrivers.value = []
     reassignTargets.value = []
-    coDriverSchedule.value = null
+    clearCoDriverSchedule()
     profileFormEditRequest.value = null
     activeTabId.value = null
     workspaceCache.clear()
     profileFormsCache.clear()
+    coDriverScheduleCache.clear()
+    coDriverSchedulePending.clear()
   }
 
   return {
@@ -528,6 +592,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     coDrivers,
     reassignTargets,
     coDriverSchedule,
+    coDriverScheduleLoading,
     profileFormEditRequest,
     activeTabId,
     activeTab,
@@ -554,6 +619,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     updateProfileForm,
     fetchDriverOptions,
     fetchCoDriverSchedule,
+    clearCoDriverSchedule,
     fetchReassignTargets,
     analyzeAiAdvice,
     normalize,

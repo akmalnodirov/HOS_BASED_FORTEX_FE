@@ -183,7 +183,7 @@
           <g
             v-for="marker in intermediateMarkers"
             :key="`intermediate-${marker.event.id}`"
-            class="cursor-pointer text-[#465A95] dark:text-[#9BA9D2]"
+            class="cursor-pointer"
             @click="emit('select-event', marker.event)"
           >
             <title>{{ marker.title }}</title>
@@ -192,7 +192,7 @@
               :x2="marker.x"
               :y1="orderY(3) - 5"
               :y2="orderY(3) + 5"
-              stroke="currentColor"
+              stroke="#2563EB"
               :stroke-width="selectedEventId === marker.event.id ? 7 : 4"
             />
             <rect
@@ -365,18 +365,21 @@ const intermediateMarkers = computed(() => {
   let duty: RouteEldEvent['eventCategory'] | null = null
   const result: Array<{ event: RouteEldEvent; x: number; title: string }> = []
   for (const event of sorted) {
-    if (event.recordStatus === 'ACTIVE' && ['OFF', 'SB', 'D', 'ON'].includes(event.eventCategory)) {
-      duty = event.eventCategory
+    if (event.recordStatus !== 'ACTIVE') continue
+    if (isIntermediate(event)) {
+      if (duty !== 'D') continue
+      result.push({
+        event,
+        x: eventX(event),
+        title: `Intermediate driving · ${formatMarkerTime(event)}`,
+      })
       continue
     }
-    if (event.recordStatus !== 'ACTIVE' || duty !== 'D' || !isIntermediate(event)) continue
-    result.push({
-      event,
-      x: eventX(event),
-      title: `Intermediate driving · ${formatMarkerTime(event)}`,
-    })
+    if (['OFF', 'SB', 'D', 'ON'].includes(event.eventCategory)) {
+      duty = event.eventCategory
+    }
   }
-  return result
+  return result.filter((marker) => marker.x >= 0 && marker.x <= graphWidth)
 })
 
 const totals = computed(() => [

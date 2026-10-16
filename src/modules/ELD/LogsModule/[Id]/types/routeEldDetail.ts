@@ -19,6 +19,12 @@ export interface RouteEldHosStatus {
   shift: RouteEldClock | null
   cycle: RouteEldClock | null
   violationCount: number
+  violations: RouteEldHosViolation[]
+}
+
+export interface RouteEldHosViolation {
+  regulation: string
+  startTime: string | null
 }
 
 export interface RouteEldProfileForm {

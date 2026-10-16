@@ -10,6 +10,7 @@
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
       :rollback-blocked="Boolean(session?.isRollbackBlocked)"
+      :can-manage-tabs="session?.status === 'DRAFT'"
       :submit-loading="sessionActionLoading"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
@@ -50,14 +51,16 @@
         :violations="workspace?.calculations.violations ?? []"
         :event-issues="workspace?.calculations.eventIssues ?? []"
         :reassigned-events="workspace?.reassignedEvents.map((item) => item.event) ?? []"
-        :co-driver-events="showCoDrivers ? coDriverGraphEvents : []"
+        :co-driver-events="coDriverRenderEnabled ? coDriverGraphEvents : []"
         :co-driver-name="latestPeriodCoDriver?.name"
         :is-graph-loading="isGraphLoading"
+        :is-co-driver-loading="showCoDrivers && (isCoDriverLoading || !coDriverRenderEnabled)"
         @selected-event="onGraphEventSelect"
         @boost-select="onGraphBoostSelect"
       >
         <template #graph-actions>
           <button
+            v-if="latestPeriodCoDriver"
             type="button"
             role="switch"
             :aria-checked="showCoDrivers"
@@ -74,9 +77,10 @@
                 :class="showCoDrivers ? 'translate-x-4' : 'translate-x-0.5'"
               />
             </span>
-            Co-drivers
-            <span v-if="showCoDrivers" class="max-w-28 truncate">
-              {{ latestPeriodCoDriver?.name || 'None in period' }}
+            Co-driver
+            <LoaderCircle v-if="isCoDriverLoading" class="h-3.5 w-3.5 animate-spin" />
+            <span v-else-if="showCoDrivers" class="max-w-28 truncate">
+              {{ latestPeriodCoDriver?.name }}
             </span>
           </button>
         </template>
@@ -89,7 +93,9 @@
               class="inline-flex max-w-60 items-center gap-1.5 rounded-full border bg-muted/60 px-2 py-0.5 text-[11px]"
               @click="onGraphEventSelect(event.id)"
             >
-              <span class="flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">
+              <span
+                class="flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background"
+              >
                 {{ index + 1 }}
               </span>
               <span class="truncate">{{ event.eventName }} · {{ formatGraphEventTime(event.timestamp) }}</span>
@@ -104,7 +110,13 @@
             >
               <Zap class="mr-1 h-3 w-3" /> Boost
             </Button>
-            <Button variant="ghost" size="icon" class="h-6 w-6" title="Clear Boost selection" @click="clearRangeBoost">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-6 w-6"
+              title="Clear Boost selection"
+              @click="clearRangeBoost"
+            >
               <X class="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -122,25 +134,35 @@
           <Button
             variant="outline"
             size="sm"
-            :disabled="!hasAlprOrigin || alprLoading"
-            title="Find ALPR cameras along the active tab's event routes"
-            @click="analyzeAlpr"
+            :disabled="!canEditSession"
+            @click="openInsertModal"
           >
-            <Camera class="mr-2 h-4 w-4" /> {{ alprAnalysis ? 'Refresh ALPR' : 'Find ALPR' }}
+            <Plus class="mr-2 h-4 w-4" /> Insert event
           </Button>
           <Button
             variant="outline"
             size="sm"
-            :disabled="!workspace?.canEdit"
-            @click="openInsertModal"
+            :disabled="!hasAlprOrigin || alprLoading"
+            title="Find ALPR cameras along the active tab's event routes"
+            @click="analyzeAlpr"
           >
-            <Plus class="mr-2 h-4 w-4" /> Insert event
+            <LoaderCircle v-if="alprLoading" class="mr-2 h-4 w-4 animate-spin" />
+            <Camera v-else class="mr-2 h-4 w-4" />
+            {{ alprLoading ? 'Finding ALPR…' : alprAnalysis ? 'Refresh ALPR' : 'Find ALPR' }}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="!hasAlprOrigin"
+            @click="alprRouteOpen = true"
+          >
+            <RouteIcon class="mr-2 h-4 w-4" /> ALPR route
           </Button>
           <Button variant="outline" size="sm" @click="showLocationFinderModal = true">
             <MapPin class="mr-2 h-4 w-4" /> Location finder
           </Button>
           <Select v-model="changeFilter">
-            <SelectTrigger class="h-9 w-38 text-xs">
+            <SelectTrigger class="h-9 w-38 text-sm font-normal">
               <SelectValue placeholder="All changes" />
             </SelectTrigger>
             <SelectContent :body-lock="false">
@@ -150,18 +172,20 @@
               </SelectItem>
             </SelectContent>
           </Select>
-          <Select v-if="showCoDrivers" v-model="driverFilter">
-            <SelectTrigger class="h-9 w-44 text-xs">
+          <Select v-if="showCoDrivers && latestPeriodCoDriver" v-model="driverFilter">
+            <SelectTrigger class="h-9 w-44 text-sm font-normal">
               <SelectValue placeholder="Driver" />
             </SelectTrigger>
             <SelectContent :body-lock="false">
               <SelectItem value="__all__">All drivers</SelectItem>
               <SelectItem value="__main__">{{ session?.driverName || 'Driver' }}</SelectItem>
-              <SelectItem value="__co_driver__">{{ latestPeriodCoDriver?.name || 'Co-driver' }}</SelectItem>
+              <SelectItem value="__co_driver__">
+                {{ latestPeriodCoDriver?.name || 'Co-driver' }}
+              </SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="statusFilter">
-            <SelectTrigger class="h-9 w-40 text-xs">
+            <SelectTrigger class="h-9 w-40 text-sm font-normal">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent :body-lock="false">
@@ -181,16 +205,20 @@
       </div>
       <CBoostEventsTable
         :events="filteredDailyEvents"
-        :loading="isDailyEventsLoading"
+        :loading="isDailyEventsLoading || (showCoDrivers && (!coDriverRenderEnabled || isCoDriverLoading))"
         :selected-event-id="selectedEventId"
+        :highlighted-event-id="highlightedEventId"
         :selected-row-ids="selectedRowIds"
-        :drag-drop-enabled="dragDropEnabled"
+        :show-driver-column="coDriverRenderEnabled && Boolean(latestPeriodCoDriver)"
+        :can-edit-profile="canEditSession"
+        :drag-drop-enabled="dragDropEnabled && canEditSession"
+        :can-edit-events="canEditSession"
         :column-visibility="eventTableColumnVisibility"
         :time-zone="workspaceTimeZone"
         :camera-matches="alprAnalysis?.matches ?? []"
         @toggle-selection="onTableEventSelect"
         @update:selected-row-ids="onSelectedRowIdsUpdate"
-        @edit-event="openEditEvent"
+        @edit-event="openEditableEvent"
         @copy-event="copyBoostEvent"
         @delete-event="deleteBoostEvent"
         @revert-event="revertBoostEvent"
@@ -201,10 +229,12 @@
     </section>
 
     <CBoostActions
-      :drag-drop-enabled="dragDropEnabled"
-      :delete-disabled="!selectedRowIds.length || !workspace?.canEdit"
-      :duration-disabled="selectedRowIds.length !== 1 || !workspace?.canEdit"
-      :reassign-disabled="!selectedRowIds.length || !workspace?.canEdit"
+      :drag-drop-enabled="dragDropEnabled && canEditSession"
+      :can-edit="canEditSession"
+      :delete-disabled="!selectedRowIds.length || !canEditSession"
+      :duration-disabled="selectedRowIds.length !== 1 || !canEditSession"
+      :reassign-disabled="!selectedRowIds.length || !canEditSession"
+      :normalize-disabled="!canEditSession"
       :selected-count="selectedRowIds.length"
       @dragdrop-change="dragDropEnabled = $event"
       @delete-click="deleteSelectedBoostEvents"
@@ -260,6 +290,7 @@
       :from-date="session?.fromDate"
       :to-date="session?.toDate"
       :loading="isEditEventLoading"
+      :readonly="eventEditorReadonly"
       @update:form="updateEditEventForm"
       @submit="submitEditEvent"
       @delete="deleteEventFromEditor"
@@ -295,40 +326,16 @@
       @submit="runDurationBoost"
     />
 
-    <Dialog v-model:open="eventViewerOpen">
-      <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-210">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <span>Event details</span>
-            <span v-if="selectedViewEvent" class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-              {{ selectedViewEvent.event.recordStatus }}
-            </span>
-          </DialogTitle>
-          <DialogDescription>{{ selectedViewEvent?.event.eventName || 'Route ELD event' }}</DialogDescription>
-        </DialogHeader>
-        <div v-if="selectedViewEvent" class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div v-for="item in eventDetailItems" :key="item.label" class="min-w-0 rounded-md border bg-muted/20 p-3">
-            <p class="text-[10px] font-medium uppercase text-muted-foreground">{{ item.label }}</p>
-            <p class="mt-1 break-words font-medium">{{ item.value }}</p>
-          </div>
-          <div v-if="selectedViewEventIssues.length" class="rounded-md border border-amber-200 bg-amber-50/60 p-3 sm:col-span-2 lg:col-span-3">
-            <p class="text-[10px] font-semibold uppercase text-amber-700">Errors & warnings</p>
-            <div class="mt-2 flex flex-col gap-1.5">
-              <span v-for="issue in selectedViewEventIssues" :key="`${issue.severity}-${issue.code}-${issue.title}`" class="text-xs text-amber-900">
-                <strong>{{ issue.severity }}:</strong> {{ issue.title }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" @click="eventViewerOpen = false">Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <CBoostAlprRouteDialog
+      v-model:open="alprRouteOpen"
+      :session-id="session?.id ?? null"
+      :tab-id="store.activeTabId"
+    />
 
     <Dialog v-model:open="sessionProgressOpen">
       <DialogContent
         class="sm:max-w-130"
+        :show-close="!sessionActionLoading"
         @pointer-down-outside="(event) => sessionActionLoading && event.preventDefault()"
         @escape-key-down="(event) => sessionActionLoading && event.preventDefault()"
       >
@@ -339,17 +346,52 @@
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-2">
-          <Progress :model-value="sessionOperationPercent" class="h-2.5" />
-          <div class="grid grid-cols-3 gap-2 text-center text-xs">
-            <div class="rounded-md border p-2"><strong class="block text-base">{{ sessionOperation?.total ?? 0 }}</strong>Total</div>
-            <div class="rounded-md border p-2"><strong class="block text-base text-emerald-600">{{ sessionOperation?.completed ?? 0 }}</strong>Completed</div>
-            <div class="rounded-md border p-2"><strong class="block text-base text-destructive">{{ sessionOperation?.failed ?? 0 }}</strong>Failed</div>
+          <div class="relative h-7 overflow-hidden rounded-full bg-muted">
+            <div
+              class="h-full bg-primary transition-[width] duration-300"
+              :style="{ width: `${sessionOperationPercent}%` }"
+            />
+            <span
+              class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold"
+              :class="sessionOperationPercent > 52 ? 'text-primary-foreground' : 'text-foreground'"
+            >
+              {{ (sessionOperation?.completed ?? 0) + (sessionOperation?.failed ?? 0) }} /
+              {{ sessionOperation?.total ?? 0 }} · {{ sessionOperationPercent }}%
+            </span>
           </div>
-          <div v-if="sessionOperation?.failures?.length" class="max-h-36 space-y-1 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs">
-            <p v-for="failure in sessionOperation.failures" :key="`${failure.label}-${failure.message}`">
+          <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <div class="rounded-md border p-2">
+              <strong class="block text-base">{{ sessionOperation?.total ?? 0 }}</strong>Total
+            </div>
+            <div class="rounded-md border p-2">
+              <strong class="block text-base text-emerald-600">{{
+                sessionOperation?.completed ?? 0
+              }}</strong>Completed
+            </div>
+            <div class="rounded-md border p-2">
+              <strong class="block text-base text-destructive">{{
+                sessionOperation?.failed ?? 0
+              }}</strong>Failed
+            </div>
+          </div>
+          <div
+            v-if="sessionOperation?.failures?.length"
+            class="max-h-36 space-y-1 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs"
+          >
+            <p
+              v-for="failure in sessionOperation.failures"
+              :key="`${failure.label}-${failure.message}`"
+            >
               <strong>{{ failure.label }}:</strong> {{ failure.message }}
             </p>
           </div>
+          <p
+            v-if="sessionOperationError"
+            role="alert"
+            class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
+          >
+            {{ sessionOperationError }}
+          </p>
         </div>
         <DialogFooter v-if="!sessionActionLoading">
           <Button variant="outline" @click="sessionProgressOpen = false">Close</Button>
@@ -362,7 +404,7 @@
       :report="certificationReport"
       :loading="certificationLoading"
       :fixing="certificationFixing"
-      :can-edit="Boolean(workspace?.canEdit)"
+      :can-edit="canEditSession"
       :time-zone="workspaceTimeZone"
       @apply="applyCertificationFix"
     />
@@ -372,10 +414,19 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { Camera, ChevronDown, ChevronUp, MapPin, Plus, X, Zap } from 'lucide-vue-next'
+import {
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  LoaderCircle,
+  MapPin,
+  Plus,
+  Route as RouteIcon,
+  X,
+  Zap,
+} from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -417,6 +468,7 @@ import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostCertificationModal from '../components/modals/CBoostCertificationModal.vue'
+import CBoostAlprRouteDialog from '../components/modals/CBoostAlprRouteDialog.vue'
 import CBoostEventTableColumnSettings from '../components/CBoostEventTableColumnSettings.vue'
 import {
   boostEventTableColumnOptions,
@@ -441,6 +493,8 @@ const {
   chartData,
   dailyEvents,
   coDriverGraphEvents,
+  showCoDrivers,
+  coDriverRenderEnabled,
   latestPeriodCoDriver,
   graphEventDurationById,
   dailyPixelViolations,
@@ -462,6 +516,7 @@ const {
   editEventForm,
   editDailyForm,
   isGraphLoading,
+  isCoDriverLoading,
   isDailyEventsLoading,
   isEditEventLoading,
   isEditDailyFormLoading,
@@ -482,7 +537,6 @@ const {
   deleteSelectedBoostEvents,
   copyBoostEvent,
   revertBoostEvent,
-  getEventDetails,
   submitDurationBoost,
   submitReassignSelectedEvents,
   submitMultiUpdateEvents,
@@ -496,8 +550,7 @@ const boostGraphRef = ref<InstanceType<typeof CBoostGraph> | null>(null)
 const showGraph = ref(true)
 const changeFilter = ref('__all__')
 const statusFilter = ref('__all__')
-const showCoDrivers = ref(false)
-const driverFilter = ref('__all__')
+const driverFilter = ref('__main__')
 const showLocationFinderModal = ref(false)
 const showErrorWarningModal = ref(false)
 const showViolationModal = ref(false)
@@ -516,16 +569,25 @@ interface ApiEnvelope<T> {
 const certificationReport = ref<RouteEldCertificationReport | null>(null)
 const durationOpen = ref(false)
 const reassignTargetsLoading = ref(false)
-const eventViewerOpen = ref(false)
-const selectedViewEvent = ref<any>(null)
+const eventEditorReadonly = ref(false)
 const alprLoading = ref(false)
 const alprAnalysis = ref<RouteEldEventCameraAnalysis | null>(null)
+const alprRouteOpen = ref(false)
+const highlightedEventId = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
 const sessionProgressOpen = ref(false)
 const sessionActionLoading = ref(false)
 const sessionOperationType = ref<'submit' | 'rollback'>('submit')
 const sessionOperation = ref<RouteEldSessionOperation | null>(null)
-const { visibility: eventTableColumnVisibility, setVisible: setEventTableColumnVisible, showAll: showAllEventTableColumns } =
-  useBoostEventTableColumns(computed(() => store.activeTabId))
+const sessionOperationError = ref('')
+const canEditSession = computed(
+  () => session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
+)
+const {
+  visibility: eventTableColumnVisibility,
+  setVisible: setEventTableColumnVisible,
+  showAll: showAllEventTableColumns,
+} = useBoostEventTableColumns(computed(() => store.activeTabId))
 const stableScrollbarClass = 'boost-scrollbar-stable'
 
 const enableStableScrollbar = () => document.body.classList.add(stableScrollbarClass)
@@ -534,7 +596,10 @@ const disableStableScrollbar = () => document.body.classList.remove(stableScroll
 onMounted(enableStableScrollbar)
 onActivated(enableStableScrollbar)
 onDeactivated(disableStableScrollbar)
-onBeforeUnmount(disableStableScrollbar)
+onBeforeUnmount(() => {
+  disableStableScrollbar()
+  if (highlightTimer) clearTimeout(highlightTimer)
+})
 
 watch(
   () => store.profileFormEditRequest,
@@ -600,7 +665,8 @@ const rangeBoostSelectionError = computed(() => {
         event.recordStatus.toUpperCase() !== 'ACTIVE' ||
         !['OFF', 'SB', 'D', 'ON'].includes(event.eventCategory)
     )
-  ) return 'Boost boundaries must be active duty events.'
+  )
+    return 'Boost boundaries must be active duty events.'
   if (rangeBoostAffectedEvents.value.some((event) => event.isFrozen))
     return 'Boost cannot move a range containing DOT-inspected events.'
   return ''
@@ -640,7 +706,7 @@ const filteredDailyEvents = computed(() => {
   }))
 })
 watch(showCoDrivers, (visible) => {
-  if (!visible) driverFilter.value = '__all__'
+  driverFilter.value = visible ? '__main__' : '__all__'
 })
 const changeStatusLabel = (value?: string) => {
   const normalized = String(value || 'UNCHANGED').toUpperCase()
@@ -659,11 +725,15 @@ const issueCount = computed(() => workspace.value?.calculations.eventIssues.leng
 const sessionOperationPercent = computed(() => {
   const operation = sessionOperation.value
   if (!operation?.total) return operation?.status === 'COMPLETED' ? 100 : 0
-  return Math.min(100, Math.round(((operation.completed + operation.failed) / operation.total) * 100))
+  return Math.min(
+    100,
+    Math.round(((operation.completed + operation.failed) / operation.total) * 100)
+  )
 })
 const sessionOperationTitle = computed(() => {
   const prefix = sessionOperationType.value === 'rollback' ? 'Rollback' : 'Submit'
   if (sessionActionLoading.value) return `${prefix} in progress`
+  if (sessionOperationError.value) return `${prefix} failed`
   if (sessionOperation.value?.failed) return `${prefix} finished with issues`
   return `${prefix} complete`
 })
@@ -672,67 +742,30 @@ const sessionPeriodLabel = computed(() =>
     ? `${dayjs(session.value.fromDate).format('MMM D, YYYY')} – ${dayjs(session.value.toDate).format('MMM D, YYYY')}`
     : ''
 )
-const eventDetailItems = computed(() => {
-  const source = selectedViewEvent.value
-  if (!source) return []
-  const event = source.event
-  return [
-    { label: 'Sequence', value: event.sequenceId || '—' },
-    {
-      label: 'Time',
-      value: new Intl.DateTimeFormat('en-US', {
-        timeZone: resolveRouteEldScheduleTimeZone(event.timeZone),
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }).format(new Date(event.timestamp)),
-    },
-    { label: 'Status', value: event.recordStatus || '—' },
-    { label: 'Origin', value: event.recordOrigin || '—' },
-    { label: 'Positioning', value: event.positioning || '—' },
-    { label: 'Location', value: event.location || event.driverLocationDescription || '—' },
-    {
-      label: 'Coordinates',
-      value:
-        event.latitude == null || event.longitude == null
-          ? '—'
-          : `${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}`,
-    },
-    { label: 'Vehicle', value: event.vehicleName || event.vehicleVin || '—' },
-    { label: 'Odometer', value: event.odometerMiles == null ? '—' : String(event.odometerMiles) },
-    { label: 'Engine hours', value: event.engineHours == null ? '—' : String(event.engineHours) },
-    { label: 'ELD', value: event.eldSerialNumber || event.eldMacAddress || event.eldId || '—' },
-    { label: 'Trailers', value: source.trailers.join(', ') || '—' },
-    { label: 'Documents', value: source.documents.join(', ') || '—' },
-    { label: 'Notes', value: event.notes || '—' },
-    { label: 'Change', value: source.changeStatus || 'Unchanged' },
-    { label: 'Version', value: String(source.version ?? '—') },
-    { label: 'Delivery', value: source.isSubmitted ? (source.isRolledBack ? 'Rolled back' : 'Submitted') : 'Not submitted' },
-    { label: 'DOT freeze', value: event.isFrozen ? event.freezeSource || 'Frozen' : 'No' },
-  ]
-})
-const selectedViewEventIssues = computed(() => {
-  const id = selectedViewEvent.value?.event?.id
-  return id ? workspace.value?.calculations.eventIssues.filter((issue) => issue.eventId === id) ?? [] : []
-})
-
 const runSessionAction = async (action: 'submit' | 'rollback') => {
   sessionOperationType.value = action
   sessionOperation.value = null
+  sessionOperationError.value = ''
   sessionProgressOpen.value = true
   sessionActionLoading.value = true
   try {
     const result = await store.runSessionOperation(action, (operation) => {
-      sessionOperation.value = { ...operation, failures: [...operation.failures] }
+      sessionOperation.value = { ...operation, failures: [...(operation.failures ?? [])] }
     })
     if (result) sessionOperation.value = result
-    if (result?.failed) toast.warning(`${result.failed} event${result.failed === 1 ? '' : 's'} could not be processed`)
-    else toast.success(action === 'rollback' ? 'Session rolled back successfully' : 'Session submitted successfully')
+    if (result?.failed)
+      toast.warning(
+        `${result.failed} event${result.failed === 1 ? '' : 's'} could not be processed`
+      )
+    else
+      toast.success(
+        action === 'rollback'
+          ? 'Session rolled back successfully'
+          : 'Session submitted successfully'
+      )
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || `Session ${action} failed`)
+    sessionOperationError.value = error?.response?.data?.message || error?.message || `Session ${action} failed`
+    toast.error(sessionOperationError.value)
   } finally {
     sessionActionLoading.value = false
   }
@@ -745,16 +778,21 @@ const selectInitialTab = () => {
 const onSelectedRowIdsUpdate = (ids: string[]) => {
   selectedRowIds.value = ids
 }
+const highlightEventRow = (eventId: string) => {
+  highlightedEventId.value = eventId
+  if (highlightTimer) clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => {
+    if (highlightedEventId.value === eventId) highlightedEventId.value = ''
+  }, 3500)
+}
 const onGraphEventSelect = (event: any) => {
   const eventId = typeof event === 'string' ? event : String(event?.eventId || event?.id || '')
   if (!eventId) return
+  highlightEventRow(eventId)
   getSelectedEvent(eventId)
-  const row = dailyEvents.value.flatMap((group) => group.events).find((item) => item.eventId === eventId)
-  if (row && row.actionState !== 4 && row.actionState !== 8 && !selectedRowIds.value.includes(eventId)) {
-    selectedRowIds.value = [...selectedRowIds.value, eventId]
-  }
 }
 const onGraphBoostSelect = (eventId: string) => {
+  if (!canEditSession.value) return
   getSelectedEvent(eventId)
   const event = graphEvents.value.find((item) => item.id === eventId)
   if (!event) return
@@ -783,6 +821,7 @@ const clearRangeBoost = () => {
 }
 watch([() => session.value?.id, () => store.activeTabId], clearRangeBoost)
 const openRangeBoostModal = () => {
+  if (!canEditSession.value) return
   if (rangeBoostSelectedEvents.value.length !== 2) return
   if (rangeBoostSelectionError.value) {
     toast.error(rangeBoostSelectionError.value)
@@ -807,7 +846,9 @@ const confirmRangeBoost = async (seconds: number) => {
     clearRangeBoost()
     toast.success('Time boost saved to the active Boost tab')
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || 'The time transfer could not be applied')
+    toast.error(
+      error?.response?.data?.message || error?.message || 'The time transfer could not be applied'
+    )
   }
 }
 const formatGraphEventTime = (timestamp: number) =>
@@ -820,20 +861,24 @@ const formatGraphEventTime = (timestamp: number) =>
     second: '2-digit',
   }).format(new Date(timestamp))
 const onTableEventSelect = (eventId: string) => {
+  highlightEventRow(eventId)
   getSelectedEvent(eventId)
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
 const handleErrorWarningRowClick = (eventId: string) => {
+  highlightEventRow(eventId)
   getSelectedEvent(eventId)
   showErrorWarningModal.value = false
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
 const handleViolationSelect = (eventId: string) => {
+  highlightEventRow(eventId)
   getSelectedEvent(eventId)
   showViolationModal.value = false
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
 const handleLocationScrollToEvent = (eventId: string) => {
+  highlightEventRow(eventId)
   getSelectedEvent(eventId)
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
@@ -841,18 +886,22 @@ const analyzeAlpr = async () => {
   if (!session.value || !store.activeTabId || !hasAlprOrigin.value) return
   alprLoading.value = true
   try {
-    const response = await api.get<RouteEldEventCameraAnalysis | ApiEnvelope<RouteEldEventCameraAnalysis>>(
-      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERAS(session.value.id, store.activeTabId),
-      { params: { radiusMetres: 150 } }
-    )
-    alprAnalysis.value = 'successResult' in response.data ? response.data.successResult : response.data
+    const response = await api.get<
+      RouteEldEventCameraAnalysis | ApiEnvelope<RouteEldEventCameraAnalysis>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERAS(session.value.id, store.activeTabId), {
+      params: { radiusMetres: 150 },
+    })
+    alprAnalysis.value =
+      'successResult' in response.data ? response.data.successResult : response.data
     toast.success(
       alprAnalysis.value.matches.length
         ? `${alprAnalysis.value.matches.length} events matched ALPR cameras`
         : 'No ALPR cameras matched these event locations'
     )
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || 'ALPR cameras could not be analyzed')
+    toast.error(
+      error?.response?.data?.message || error?.message || 'ALPR cameras could not be analyzed'
+    )
   } finally {
     alprLoading.value = false
   }
@@ -863,23 +912,65 @@ watch([() => session.value?.id, () => store.activeTabId], () => {
 const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   boostGraphRef.value?.scrollToEventSegment?.(freeTime.eventId)
 }
-const openEventViewer = (eventId: string) => {
-  selectedViewEvent.value = getEventDetails(eventId)
-  if (!selectedViewEvent.value) {
-    const event = coDriverGraphEvents.value.find((item) => item.id === eventId)
-    if (event) {
-      selectedViewEvent.value = {
-        event,
-        trailers: event.trailers,
-        documents: event.documents,
-        changeStatus: 'CO_DRIVER',
-        version: 0,
-        isSubmitted: false,
-        isRolledBack: false,
-      }
-    }
+const openEditableEvent = async (eventId: string) => {
+  if (!canEditSession.value) return
+  eventEditorReadonly.value = false
+  await openEditEvent(eventId)
+}
+const openEventViewer = async (eventId: string) => {
+  eventEditorReadonly.value = true
+  const mainEvent = workspace.value?.events.some((item) => item.event.id === eventId)
+  if (mainEvent) {
+    await openEditEvent(eventId)
+    return
   }
-  eventViewerOpen.value = Boolean(selectedViewEvent.value)
+  const event = coDriverGraphEvents.value.find((item) => item.id === eventId)
+  if (!event) return
+  const numericByCode: Record<string, [number, number]> = {
+    DS_OFF: [1, 1], DS_WT: [1, 1], DS_SB: [1, 2], DS_D: [1, 3], DS_ON: [1, 4],
+    LOG_NORMAL_PRECISION: [2, 1], LOG_REDUCED_PRECISION: [2, 2],
+    DR_IND_PC: [3, 1], DR_IND_YM: [3, 2], DR_LOGIN: [5, 1], DR_LOGOUT: [5, 2],
+    ENG_UP_NORMAL: [6, 1], ENG_UP_REDUCED: [6, 2], ENG_DOWN_NORMAL: [6, 3], ENG_DOWN_REDUCED: [6, 4],
+  }
+  const certification = /^DR_CERT_(\d+)$/.exec(event.eventCode)
+  const [eventType, eventCode] = certification
+    ? [4, Number(certification[1])]
+    : numericByCode[event.eventCode] ?? [0, 0]
+  const date = dayjs(event.timestamp)
+  editEventForm.value = {
+    id: Number.parseInt(event.sequenceId || '0', 16) || 0,
+    eventId: event.id,
+    sequenceId: Number.isFinite(Number.parseInt(event.sequenceId || '', 16))
+      ? String(Number.parseInt(event.sequenceId || '0', 16))
+      : event.sequenceId ?? null,
+    event: { eventType, eventCode },
+    eventCodeId: event.eventCode,
+    origin: event.recordOrigin === 'ELD' ? 1 : event.recordOrigin === 'DRIVER' ? 2 : event.recordOrigin === 'UNIDENTIFIED_DRIVER' ? 4 : 3,
+    recordStatus: event.recordStatus,
+    vehicleId: event.vehicleId ?? null,
+    vehicleUnit: event.vehicleName ?? null,
+    eldId: event.eldId ?? null,
+    positioning: event.driverLocationDescription
+      ? 'MANUAL'
+      : event.positioning === 'MANUAL' || event.positioning === 'AUTOMATIC'
+        ? event.positioning
+        : null,
+    odometer: event.odometerMiles ?? null,
+    engineHours: event.engineHours ?? null,
+    trailer: event.trailers.join(', ') || null,
+    doc: event.documents.join(', ') || null,
+    locationOrigin: event.driverLocationDescription ? 2 : 1,
+    latitude: event.latitude ?? null,
+    longitude: event.longitude ?? null,
+    location: event.location ?? null,
+    locationNote: event.driverLocationDescription ?? null,
+    notes: event.notes ?? null,
+    startDate: event.logDate,
+    time: { hours: date.hour(), minutes: date.minute(), seconds: date.second() },
+    certifiedDate: event.dateToCertify ?? null,
+    certifiedTime: { hours: date.hour(), minutes: date.minute(), seconds: date.second() },
+  }
+  showEditEventModal.value = true
 }
 const deleteEventFromEditor = async (eventId: string) => {
   await deleteBoostEvent(eventId)
@@ -920,13 +1011,16 @@ const runDurationBoost = async (payload: {
   }
 }
 const openInsertModal = async () => {
+  if (!canEditSession.value) return
   try {
+    eventEditorReadonly.value = false
     await prepareInsertEvent()
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || 'Failed to prepare event')
   }
 }
 const openReassignModal = async () => {
+  if (!canEditSession.value) return
   reassignModalOpen.value = true
   reassignTargetsLoading.value = true
   try {
@@ -958,7 +1052,7 @@ const openCertification = async () => {
   }
 }
 const applyCertificationFix = async () => {
-  if (!session.value || !store.activeTabId) return
+  if (!canEditSession.value || !session.value || !store.activeTabId) return
   certificationFixing.value = true
   try {
     await api.post(

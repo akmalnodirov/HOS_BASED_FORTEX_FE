@@ -10,7 +10,7 @@
           <h1 class="lg:text-sm 2xl:text-base font-semibold text-foreground uppercase">
             {{ driverInfo?.name || 'N/A' }}
           </h1>
-          <span v-if="coDriverName" class="max-w-52 truncate text-xs font-medium text-muted-foreground" :title="coDriverName">
+          <span v-if="coDriverName" class="max-w-72 truncate text-xs font-medium text-muted-foreground" :title="coDriverName">
             (Co-driver: {{ coDriverName }})
           </span>
           <CEventBadge
@@ -70,17 +70,40 @@
               <span class="text-[#6082E0] font-medium">{{ totalWorkedHours }}</span>
             </span>
           </div>
-          <div class="flex items-center gap-2 text-muted-foreground">
-            <AlertCircle class="w-4 h-4 text-[#AF4B4B]" />
-            <span class="text-[#AF4B4B]">
+          <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+            <AlertCircle
+              class="w-4 h-4"
+              :class="driverInfo?.hasViolation ? 'text-[#AF4B4B]' : 'text-[#589E67]'"
+            />
+            <span :class="driverInfo?.hasViolation ? 'text-[#AF4B4B]' : 'text-[#589E67]'">
               Violations:
-              <span class="text-[#AF4B4B] font-medium">{{
-                driverInfo?.hasViolation ? 'Yes' : 'No'
-              }}</span>
+              <span class="font-medium">
+                {{ driverInfo?.hasViolation ? 'Yes' : 'No' }}
+              </span>
             </span>
+            <Popover
+              v-for="(violation, index) in driverInfo?.violations ?? []"
+              :key="`${violation.regulation}-${violation.startTime ?? index}`"
+            >
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  class="rounded border border-red-300 px-1.5 py-0.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:hover:bg-red-950/30"
+                >
+                  {{ violation.regulation }}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto min-w-60 p-3" align="center">
+                <div class="text-sm font-medium text-red-600">{{ violation.regulation }}</div>
+                <div class="mt-1 text-xs text-muted-foreground">
+                  {{ violation.startTime ? `Occurred ${formatViolationTime(violation.startTime)}` : 'Occurrence time is not available from Route ELD.' }}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div class="flex items-center gap-2 text-muted-foreground">
             <svg
+              :class="hasSignature ? 'text-[#589E67]' : 'text-[#AF4B4B]'"
               width="16"
               height="16"
               viewBox="0 0 16 16"
@@ -100,7 +123,7 @@
                 <rect width="16" height="16" fill="url(#pattern0_2001_118042)" />
               </mask>
               <g mask="url(#mask0_2001_118042)">
-                <rect width="16" height="16" fill="#589E67" />
+                <rect width="16" height="16" fill="currentColor" />
               </g>
               <defs>
                 <pattern
@@ -121,11 +144,9 @@
               </defs>
             </svg>
 
-            <span class="text-[#589E67]">
+            <span :class="hasSignature ? 'text-[#589E67]' : 'text-[#AF4B4B]'">
               Signature:
-              <span class="text-[#589E67] font-medium">{{
-                driverInfo?.signaturePath ? 'Yes' : 'No'
-              }}</span>
+              <span class="font-medium">{{ hasSignature ? 'Yes' : 'No' }}</span>
             </span>
           </div>
         </div>
@@ -180,6 +201,7 @@ import { formatDuration } from '@/utils/time.ts'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 import type { DailySummaryResponse } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 import { useRoute } from 'vue-router'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CEventBadge from './CEventBadge.vue'
 
 interface DriverInfo {
@@ -188,6 +210,8 @@ interface DriverInfo {
   phone?: string
   vehicleUnit?: string
   hasViolation?: boolean
+  violations?: { regulation: string; startTime: string | null }[]
+  timeZone?: string | null
   connectionStatus?: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONNECTED' | string
   signaturePath?: string
   workedDurationInSeconds?: number
@@ -218,6 +242,29 @@ const props = defineProps<{
 const { isDarkMode } = useDarkMode()
 const route = useRoute()
 const isBoostLayout = computed(() => route.name === 'ELDBoost')
+const hasSignature = computed(() => Boolean(props.driverInfo?.signaturePath?.trim()))
+
+function formatViolationTime(value: string) {
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) return value
+  const zone = ({
+    ET: 'America/New_York', CT: 'America/Chicago', MT: 'America/Denver',
+    PT: 'America/Los_Angeles', AT: 'America/Halifax', NT: 'America/St_Johns',
+    AKT: 'America/Anchorage', HT: 'Pacific/Honolulu', AZ: 'America/Phoenix',
+    SK: 'America/Regina',
+  } as Record<string, string>)[props.driverInfo?.timeZone?.trim().toUpperCase() ?? '']
+    ?? props.driverInfo?.timeZone
+    ?? 'America/Chicago'
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', second: '2-digit',
+    }).format(timestamp)
+  } catch {
+    return value
+  }
+}
 
 const connectionStatusLabel = computed(() => {
   if (props.driverInfo?.connectionStatus === 'CONNECTED') return 'Connected'

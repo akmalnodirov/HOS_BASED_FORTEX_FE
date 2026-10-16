@@ -596,6 +596,43 @@ export interface RouteEldCoDriverSchedule {
   events: RouteEldHosEvent[]
 }
 
+export interface RouteEldAlprOrigin {
+  eventId: string
+  sequenceId: string | null
+  timestamp: number
+  location: import('@/modules/AlprCamera/types').AlprLocation
+}
+
+export interface RouteEldAlprRouteHistoryItem {
+  id: string
+  originLabel: string
+  destinationLabel: string
+  createdAt: string
+  routeCount: number
+  recommendedCameraCount: number | null
+  originEventId: string
+  originSequenceId: string | null
+}
+
+export interface RouteEldAlprRouteContext {
+  origin: RouteEldAlprOrigin | null
+  history: RouteEldAlprRouteHistoryItem[]
+}
+
+export interface RouteEldAlprRouteAnalysis {
+  id: string | null
+  createdAt: string
+  origin: RouteEldAlprOrigin
+  analysis: import('@/modules/AlprCamera/types').AlprCameraRouteAnalysisResponse
+}
+
+export interface RouteEldAlprRouteHistoryDetail {
+  id: string
+  originEventId: string
+  originSequenceId: string | null
+  report: import('@/modules/AlprCamera/types').AlprCameraRouteHistoryDetail
+}
+
 export interface RouteEldMatchedCamera {
   id: number
   displayName: string

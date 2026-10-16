@@ -257,6 +257,10 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/location-finder`
   static readonly ROUTE_ELD_EVENT_SESSION_CAMERAS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/cameras`
+  static readonly ROUTE_ELD_EVENT_SESSION_ALPR_ROUTES = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/alpr-routes`
+  static readonly ROUTE_ELD_EVENT_SESSION_ALPR_ROUTE = (sessionId: string, routeId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/alpr-routes/${routeId}`
   static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/ai-advice`
   static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE_HISTORY = (sessionId: string) =>
