@@ -122,9 +122,8 @@
           v-model:map-type="mapType"
           v-model:current-filter="currentStatusFilter"
           :filter-options="eventStatuses"
-          :is-traffic-active="isTrafficActive"
           :is-fullscreen="isFullscreen"
-          @toggle-traffic="toggleTraffic"
+          :get-map="getMap"
           @toggle-fullscreen="toggleFullscreen"
         />
 
@@ -251,7 +250,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref, onUnmounted, nextTick } from 'vue'
+import { computed, watch, ref, nextTick } from 'vue'
 import { ChevronsUpDown, Navigation, MapPin, Clock, Calendar, FileText } from 'lucide-vue-next'
 import CMapControls from '@/components/custom/CMapControls.vue'
 import { GoogleMap, CustomMarker, Polyline } from 'vue3-google-map'
@@ -283,11 +282,9 @@ const emit = defineEmits<{
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const mapInstance = ref<any>(null)
 const rawMapInstance = ref<any>(null)
-const trafficLayer = ref<any>(null)
 const isMapReady = ref(false)
 
-const mapType = ref<'roadmap' | 'terrain' | 'satellite'>('roadmap')
-const isTrafficActive = ref(false)
+const mapType = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const isFullscreen = ref(false)
 const currentStatusFilter = ref('all')
 
@@ -391,6 +388,7 @@ const getMapWrapper = () => {
   }
   return null
 }
+const getMap = () => getMapWrapper()?.map ?? null
 
 const onMapReady = async (instance: any) => {
   rawMapInstance.value = instance
@@ -415,22 +413,6 @@ const fitRouteToMap = () => {
   routePath.value.forEach((point) => bounds.extend(point))
   mapWrapper.map.fitBounds(bounds)
   if (routePath.value.length === 1) mapWrapper.map.setZoom(14)
-}
-
-const toggleTraffic = () => {
-  isTrafficActive.value = !isTrafficActive.value
-
-  const mapWrapper = getMapWrapper()
-  if (!mapWrapper?.map) return
-
-  if (isTrafficActive.value) {
-    if (!trafficLayer.value && window.google?.maps) {
-      trafficLayer.value = new (window.google.maps as any).TrafficLayer()
-    }
-    trafficLayer.value?.setMap(mapWrapper.map)
-  } else {
-    trafficLayer.value?.setMap(null)
-  }
 }
 
 const toggleFullscreen = () => {
@@ -513,7 +495,4 @@ watch(
   }
 )
 
-onUnmounted(() => {
-  trafficLayer.value?.setMap(null)
-})
 </script>

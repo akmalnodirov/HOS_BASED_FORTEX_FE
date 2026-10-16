@@ -1,8 +1,3 @@
-/**
- * Service layer for Role API operations
- * Follows SOLID principles - Single Responsibility: handles all API calls for Roles
- */
-
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import type {
@@ -14,10 +9,6 @@ import type {
 
 class RoleService {
   private api = useApi()
-
-  /**
-   * Get paginated list of roles
-   */
   async getRoles(params?: {
     pageNumber?: number
     pageSize?: number
@@ -30,9 +21,6 @@ class RoleService {
     return response.data
   }
 
-  /**
-   * Get all permissions (for role assignment)
-   */
   async getPermissions(): Promise<{ successResult: PermissionResponse[] }> {
     const response = await this.api.get<{ successResult: PermissionResponse[] }>(
       ApiEndpoints.PERMISSIONS_URL
@@ -40,9 +28,6 @@ class RoleService {
     return response.data
   }
 
-  /**
-   * Create a new role
-   */
   async createRole(data: RoleRequest): Promise<void> {
     await this.api.post(
       ApiEndpoints.ROLES_URL,
@@ -54,9 +39,6 @@ class RoleService {
     )
   }
 
-  /**
-   * Update an existing role
-   */
   async updateRole(id: string, data: RoleRequest): Promise<void> {
     await this.api.put(
       `${ApiEndpoints.ROLES_URL}/${id}`,
@@ -68,9 +50,6 @@ class RoleService {
     )
   }
 
-  /**
-   * Delete a role
-   */
   async deleteRole(id: string): Promise<void> {
     await this.api.delete(
       `${ApiEndpoints.ROLES_URL}/${id}`,
@@ -81,9 +60,6 @@ class RoleService {
     )
   }
 
-  /**
-   * Assign permissions to a role
-   */
   async assignPermissionsToRole(roleId: string, permissionIds: string[]): Promise<void> {
     await this.api.post(
       `${ApiEndpoints.ROLES_URL}/${roleId}/permissions`,
@@ -96,5 +72,4 @@ class RoleService {
   }
 }
 
-// Export singleton instance
 export const roleService = new RoleService()

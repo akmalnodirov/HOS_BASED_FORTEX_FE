@@ -117,10 +117,10 @@
                 <input
                   type="radio"
                   name="mapLayer"
-                  value="satellite"
+                value="hybrid"
                   v-model="selectedMapLayer"
                   class="w-3.5 h-3.5 text-gray-900 border-gray-300 focus:ring-gray-900"
-                  @change="$emit('update:mapLayer', 'satellite')"
+                  @change="$emit('update:mapLayer', 'hybrid')"
                 />
                 <span class="text-xs text-gray-700 dark:text-gray-300">Satellite</span>
               </label>

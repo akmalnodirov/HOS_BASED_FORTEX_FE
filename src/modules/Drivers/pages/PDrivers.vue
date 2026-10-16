@@ -37,6 +37,7 @@ const {
 const summaryCards = computed(() => [
   { label: 'Total drivers', value: summary.value.total, className: '' },
   { label: 'Active drivers', value: summary.value.active, className: 'text-green-600' },
+  { label: 'Inactive drivers', value: summary.value.inactive, className: 'text-red-600' },
   {
     label: 'Monitoring enabled',
     value: summary.value.monitoringEnabled,
@@ -98,7 +99,7 @@ const closeModal = () => {
         </Select>
       </div>
     </div>
-    <div class="mb-4 grid flex-none grid-cols-2 gap-3 xl:grid-cols-4">
+    <div class="mb-4 grid flex-none grid-cols-2 gap-3 xl:grid-cols-5">
       <div
         v-for="card in summaryCards"
         :key="card.label"

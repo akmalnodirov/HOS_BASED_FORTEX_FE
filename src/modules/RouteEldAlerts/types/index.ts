@@ -50,6 +50,7 @@ export interface AlprCameraAlert {
 }
 
 export interface RouteEldWeighStationApproachMessage {
+  companyId: string | null
   alertId: string
   driverId: string
   driverName: string
@@ -69,6 +70,7 @@ export interface RouteEldWeighStationApproachMessage {
 }
 
 export interface RouteEldAlprCameraApproachMessage {
+  companyId: string | null
   alertId: string
   driverId: string
   driverName: string
@@ -108,4 +110,7 @@ export interface ViolationAlert {
   timeZone: string | null
   occurredAt: string
   isRead: boolean
+  driverLatitude: number | null
+  driverLongitude: number | null
+  driverLocation: string | null
 }

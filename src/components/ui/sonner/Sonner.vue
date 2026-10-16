@@ -12,7 +12,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 
 <template>
   <Sonner
-    class="toaster group !bottom-14"
+    class="toaster group !bottom-16"
     :toast-options="{
       classes: {
         toast: 'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',

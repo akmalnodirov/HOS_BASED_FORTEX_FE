@@ -8,7 +8,7 @@
     </div>
 
     <div class="absolute right-4 top-4 z-30 flex flex-wrap items-center justify-end gap-2">
-      <CAlprMapTypeControl v-model="mapTypeId" :get-map="getMap" />
+      <CMapTypeControl v-model="mapTypeId" :get-map="getMap" />
       <Button
         type="button"
         :title="
@@ -207,7 +207,7 @@ import { Camera, LocateFixed, Maximize, Minimize, X } from 'lucide-vue-next'
 import { GoogleMap, InfoWindow, Marker, Polyline } from 'vue3-google-map'
 import { ApiEndpoints } from '@/api/endpoints'
 import { Button } from '@/components/ui/button'
-import CAlprMapTypeControl from './CAlprMapTypeControl.vue'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 import { useApi } from '@/composables/useAxiosService'
 import { mapStyles } from '@/utils/maps'
 import type {

@@ -86,7 +86,7 @@ export function useDrivers() {
   })
 
   // Pagination setup - server-side
-  const pagination = usePagination(totalCount, { itemsPerPage: 10 })
+  const pagination = usePagination(computed(() => filteredDrivers.value.length), { itemsPerPage: 10 })
 
   // Debounce search
   const debouncedSearch = useDebounce(searchQuery, 300, () => {
@@ -106,7 +106,7 @@ export function useDrivers() {
   // Format event time for display
   const formatEventTime = (dateTime: string | null): string => {
     if (!dateTime) return 'N/A'
-    return dayjs(dateTime).format('MMM D, hh:mm A')
+    return dayjs(dateTime).format('MMM D, YYYY hh:mm A')
   }
 
   // Transform API response to UI Driver shape
@@ -156,8 +156,6 @@ export function useDrivers() {
       const [driversResult, routeEldResult] = await Promise.allSettled([
         api.post<DriversListResponse>(ApiEndpoints.DRIVERS_FILTER, {
           companyId: getCompanyId(),
-          pageNumber: pagination.currentPage.value,
-          pageSize: pagination.itemsPerPage.value,
         }),
         api.get<RouteEldDriversResponse>(ApiEndpoints.ROUTE_ELD_DRIVERS, {
           params: { companyId: getCompanyId() },
@@ -248,7 +246,7 @@ export function useDrivers() {
 
   // Computed - Filtered drivers (client-side on current page)
   const filteredDrivers = computed(() => {
-    let filtered = drivers.value
+    let filtered = [...drivers.value]
 
     // Search filter
     if (debouncedSearch.value) {
@@ -270,21 +268,21 @@ export function useDrivers() {
 
     // Sort using generic utility
     sortArray(filtered, sorting.sortKey.value, sorting.sortOrder.value, {
-      id: commonTransformers.toNumber,
+      eventsTime: commonTransformers.toDate,
       status: commonTransformers.toBoolean,
     })
 
     return filtered
   })
 
-  // Server-side paginated, so return filtered as-is
-  const paginatedDrivers = computed(() => filteredDrivers.value)
+  const paginatedDrivers = computed(() => pagination.paginateData(filteredDrivers.value))
 
   const summary = computed(() => ({
-    total: routeEldDrivers.value.length || totalCount.value,
-    active: routeEldDrivers.value.filter((driver) => driver.isActive).length,
-    monitoringEnabled: routeEldDrivers.value.filter((driver) => driver.isMonitoringEnabled).length,
-    monitoringDisabled: routeEldDrivers.value.filter(
+    total: totalCount.value,
+    active: drivers.value.filter((driver) => driver.status).length,
+    inactive: drivers.value.filter((driver) => !driver.status).length,
+    monitoringEnabled: drivers.value.filter((driver) => driver.isMonitoringEnabled).length,
+    monitoringDisabled: drivers.value.filter(
       (driver) => !driver.isMonitoringEnabled
     ).length,
   }))
@@ -429,8 +427,8 @@ export function useDrivers() {
   }
 
   // Watch pagination changes
-  watch([() => pagination.currentPage.value, () => pagination.itemsPerPage.value], async () => {
-    await fetchDrivers()
+  watch([sorting.sortKey, sorting.sortOrder, statusFilter, pagination.itemsPerPage], () => {
+    pagination.resetPage()
   })
 
   // Initial fetch

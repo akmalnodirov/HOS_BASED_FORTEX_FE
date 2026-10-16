@@ -89,9 +89,8 @@
         v-model:map-type="mapType"
         v-model:current-filter="statusFilter"
         :filter-options="driverStatuses"
-        :is-traffic-active="isTrafficActive"
         :is-fullscreen="isFullscreen"
-        @toggle-traffic="toggleTraffic"
+        :get-map="getMap"
         @toggle-fullscreen="toggleFullscreen"
       />
       <div
@@ -151,12 +150,10 @@ const router = useRouter()
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const search = ref('')
 const statusFilter = ref('all')
-const mapType = ref<'roadmap' | 'terrain' | 'satellite'>('roadmap')
+const mapType = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const mapCenter = { lat: 39.8283, lng: -98.5795 }
 const mapContainer = ref<HTMLElement | null>(null)
 const rawMap = ref<any>(null)
-const trafficLayer = ref<any>(null)
-const isTrafficActive = ref(false)
 const isFullscreen = ref(false)
 const { drivers, isLoading, isRefreshing, error, load } = useRouteEldOverviewDrivers()
 
@@ -202,10 +199,7 @@ const filteredDrivers = computed(() => {
 
 onMounted(() => document.addEventListener('fullscreenchange', handleFullscreenChange))
 
-onBeforeUnmount(() => {
-  trafficLayer.value?.setMap(null)
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
-})
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', handleFullscreenChange))
 
 const locatedDrivers = computed(() => filteredDrivers.value.filter((driver) => driver.latestPoint))
 
@@ -225,12 +219,7 @@ function handleMapReady(instance: any) {
   rawMap.value = instance?.map ?? instance
 }
 
-function toggleTraffic() {
-  isTrafficActive.value = !isTrafficActive.value
-  if (!rawMap.value || !(window as any).google?.maps) return
-  if (!trafficLayer.value) trafficLayer.value = new (window as any).google.maps.TrafficLayer()
-  trafficLayer.value.setMap(isTrafficActive.value ? rawMap.value : null)
-}
+const getMap = () => rawMap.value
 
 async function toggleFullscreen() {
   if (!mapContainer.value) return

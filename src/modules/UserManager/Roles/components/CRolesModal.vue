@@ -43,7 +43,6 @@ const formData = ref<RoleFormData>({
 const errors = ref<Partial<Record<keyof RoleFormData, string>>>({})
 const isSubmitting = ref(false)
 
-// Load form data when role prop changes
 watch(
   () => props.role,
   (role) => {
@@ -58,7 +57,6 @@ watch(
   { immediate: true }
 )
 
-// Reset form when modal opens/closes
 watch(
   () => props.open,
   (isOpen) => {
@@ -117,11 +115,10 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    // Create a deep copy to prevent issues with array reference being cleared on modal close
     const dataToEmit: RoleFormData = {
       name: formData.value.name,
       type: formData.value.type,
-      permissions: [...formData.value.permissions], // Copy array to avoid reference issues
+      permissions: [...formData.value.permissions],
     }
     emit('save', dataToEmit)
   } catch (error) {

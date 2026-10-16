@@ -105,7 +105,7 @@
             </div>
           </div>
           <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
-            <CWeightStationMapTypeControl v-model="mapTypeId" :get-map="getStationMap" />
+            <CMapTypeControl v-model="mapTypeId" :get-map="getStationMap" />
             <button
               type="button"
               title="Toggle fullscreen"
@@ -371,7 +371,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import CWeightStationMapTypeControl from '../components/CWeightStationMapTypeControl.vue'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 import { useWeightStationAddressReveal } from '../composables/useWeightStationAddressReveal'
 import { mapStyles } from '@/utils/maps'
 import { US_STATES } from '../usStates'

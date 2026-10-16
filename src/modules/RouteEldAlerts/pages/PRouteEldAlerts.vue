@@ -8,26 +8,13 @@
         <p class="mt-1 text-sm text-muted-foreground">{{ pageDescription }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <Select v-model="selectedCompanyId" :disabled="companiesLoading">
-          <SelectTrigger class="h-10 w-56">
-            <SelectValue
-              :placeholder="companiesLoading ? 'Loading companies…' : 'Select company'"
-            />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All companies</SelectItem>
-            <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
-              {{ company.name }}{{ company.isActive ? '' : ' (Inactive)' }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
         <Select v-model="alertType">
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="station">Station Alerts</SelectItem>
-            <SelectItem value="alpr">ALPR Camera Alerts</SelectItem>
-            <SelectItem value="violation">Violation Alerts</SelectItem>
-            <SelectItem value="speed">Speed Alerts</SelectItem>
+            <SelectItem value="station">Station alerts</SelectItem>
+            <SelectItem value="alpr">ALPR camera alerts</SelectItem>
+            <SelectItem value="violation">Violation alerts</SelectItem>
+            <SelectItem value="speed">Speed alerts</SelectItem>
           </SelectContent>
         </Select>
         <div class="relative w-64">
@@ -45,7 +32,7 @@
         <Button
           variant="outline"
           class="h-10"
-          :disabled="isRefreshing || companiesLoading"
+          :disabled="isRefreshing || !requestCompanyId"
           @click="refresh"
         >
           <RefreshCw class="mr-2 h-4 w-4" :class="isRefreshing && 'animate-spin'" />
@@ -72,6 +59,56 @@
       {{ pageError }}
     </div>
 
+    <section v-if="mapSelection" class="mb-4 flex-none overflow-hidden rounded-lg border border-border bg-card">
+      <div class="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <div>
+          <div class="font-semibold">{{ mapSelection.driver }} — {{ mapSelection.reason }}</div>
+          <div class="text-xs text-muted-foreground">{{ mapSelection.detail }}</div>
+        </div>
+        <Button variant="ghost" size="icon" aria-label="Close map" @click="mapSelection = null">
+          <X class="h-4 w-4" />
+        </Button>
+      </div>
+      <div v-if="mapSelection.latitude !== null && mapSelection.longitude !== null && mapApiKey" class="relative h-72">
+      <div class="absolute right-3 top-3 z-10"><CMapTypeControl v-model="mapType" :get-map="getMap" /></div>
+      <GoogleMap
+        ref="mapRef"
+        :api-key="mapApiKey"
+        :center="{ lat: mapSelection.latitude, lng: mapSelection.longitude }"
+        :zoom="12"
+        :styles="mapStyles"
+        :map-type-id="mapType"
+        :disable-default-ui="true"
+        :zoom-control="true"
+        class="h-full w-full"
+        @ready="fitMapSelection"
+      >
+        <CustomMarker :options="{ position: { lat: mapSelection.latitude, lng: mapSelection.longitude }, anchorPoint: 'CENTER' }">
+          <div class="relative">
+          <button type="button" class="rounded-full border-2 border-white bg-blue-600 p-2 text-white shadow-lg" :title="mapSelection.driver" @click.stop="showDriverInfo = true">
+            <Truck class="h-4 w-4" />
+          </button>
+          <CMapMarkerInfo v-if="showDriverInfo" placement="left" :title="mapSelection.driver" :rows="mapSelection.driverRows" @close="showDriverInfo = false" />
+          </div>
+        </CustomMarker>
+        <CustomMarker
+          v-if="mapSelection.targetLatitude !== null && mapSelection.targetLongitude !== null"
+          :options="{ position: { lat: mapSelection.targetLatitude, lng: mapSelection.targetLongitude }, anchorPoint: 'CENTER' }"
+        >
+          <div class="relative">
+          <button type="button" class="rounded-full border-2 border-white bg-emerald-600 p-2 text-white shadow-lg" :title="mapSelection.reason" @click.stop="showTargetInfo = true">
+            <MapPin class="h-4 w-4" />
+          </button>
+          <CMapMarkerInfo v-if="showTargetInfo" placement="right" :title="mapSelection.targetName || mapSelection.reason" :rows="mapSelection.targetRows" @close="showTargetInfo = false" />
+          </div>
+        </CustomMarker>
+      </GoogleMap>
+      </div>
+      <div v-else class="flex h-28 items-center justify-center text-sm text-muted-foreground">
+        {{ mapApiKey ? 'Coordinates are unavailable for this notification.' : 'Map is unavailable: Google Maps key is not configured.' }}
+      </div>
+    </section>
+
     <div class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
       <table
         v-if="alertType === 'station'"
@@ -88,7 +125,7 @@
             <th class="px-3">Distance</th>
             <th class="px-3">Occurred</th>
             <th class="px-3">Status</th>
-            <th class="w-28 px-3 text-center">Action</th>
+            <th class="w-24 px-3 text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -157,22 +194,28 @@
               </div>
             </td>
             <td class="px-3 text-center">
+              <div class="flex items-center justify-center gap-1">
+                <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewStationMap(alert)">
+                  <MapPinned class="h-4 w-4" />
+                </Button>
               <Button
                 v-if="!alert.isRead"
                 variant="ghost"
-                size="sm"
+                size="icon"
                 :disabled="markingReadId === alert.id"
+                title="Mark read"
+                aria-label="Mark read"
                 @click="markStationRead(alert.id)"
               >
-                <LoaderCircle v-if="markingReadId === alert.id" class="mr-2 h-4 w-4 animate-spin" />
-                Mark read
+                <LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" />
+                <Check v-else class="h-4 w-4" />
               </Button>
-              <span v-else class="text-xs text-muted-foreground">Read</span>
+              </div>
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedStationAlerts.length === 0">
             <td colspan="10" class="h-28 text-center text-muted-foreground">
-              No station alerts match the selected filters.
+              No station notifications match the selected filters.
             </td>
           </tr>
         </tbody>
@@ -193,7 +236,7 @@
             <th class="px-3">Distance</th>
             <th class="px-3">Occurred</th>
             <th class="px-3">Status</th>
-            <th class="w-28 px-3 text-center">Action</th>
+            <th class="w-24 px-3 text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -267,22 +310,28 @@
               </div>
             </td>
             <td class="px-3 text-center">
+              <div class="flex items-center justify-center gap-1">
+                <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewAlprMap(alert)">
+                  <MapPinned class="h-4 w-4" />
+                </Button>
               <Button
                 v-if="!alert.isRead"
                 variant="ghost"
-                size="sm"
+                size="icon"
                 :disabled="markingReadId === alert.id"
+                title="Mark read"
+                aria-label="Mark read"
                 @click="markAlprCameraRead(alert.id)"
               >
-                <LoaderCircle v-if="markingReadId === alert.id" class="mr-2 h-4 w-4 animate-spin" />
-                Mark read
+                <LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" />
+                <Check v-else class="h-4 w-4" />
               </Button>
-              <span v-else class="text-xs text-muted-foreground">Read</span>
+              </div>
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedAlprCameraAlerts.length === 0">
             <td colspan="10" class="h-28 text-center text-muted-foreground">
-              No ALPR camera alerts match the selected filters.
+              No ALPR camera notifications match the selected filters.
             </td>
           </tr>
         </tbody>
@@ -303,11 +352,12 @@
             <th class="px-3">Location</th>
             <th class="px-3">Occurred</th>
             <th class="px-3">Status</th>
+            <th class="w-16 px-3 text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="9" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td colspan="10" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedSpeedAlerts"
@@ -341,10 +391,15 @@
                 {{ alert.isRead ? 'Read' : 'Unread' }}
               </span>
             </td>
+            <td class="px-3 text-center">
+              <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewSpeedMap(alert)">
+                <MapPinned class="h-4 w-4" />
+              </Button>
+            </td>
           </tr>
           <tr v-if="!isLoading && paginatedSpeedAlerts.length === 0">
-            <td colspan="9" class="h-28 text-center text-muted-foreground">
-              No speed alerts match the selected filters.
+            <td colspan="10" class="h-28 text-center text-muted-foreground">
+              No speed notifications match the selected filters.
             </td>
           </tr>
         </tbody>
@@ -361,11 +416,12 @@
             <th class="px-3">Time zone</th>
             <th class="px-3">Occurred</th>
             <th class="px-3">Status</th>
+            <th class="w-16 px-3 text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="8" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td colspan="9" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedViolationAlerts"
@@ -390,10 +446,15 @@
                 {{ alert.isRead ? 'Read' : 'Unread' }}
               </span>
             </td>
+            <td class="px-3 text-center">
+              <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewViolationMap(alert)">
+                <MapPinned class="h-4 w-4" />
+              </Button>
+            </td>
           </tr>
           <tr v-if="!isLoading && paginatedViolationAlerts.length === 0">
-            <td colspan="8" class="h-28 text-center text-muted-foreground">
-              No violation alerts match the selected filters.
+            <td colspan="9" class="h-28 text-center text-muted-foreground">
+              No violation notifications match the selected filters.
             </td>
           </tr>
         </tbody>
@@ -462,8 +523,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { ChevronLeft, ChevronRight, LoaderCircle, MapPin, RefreshCw, Search } from 'lucide-vue-next'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { Check, ChevronLeft, ChevronRight, LoaderCircle, MapPin, MapPinned, RefreshCw, Search, Truck, X } from 'lucide-vue-next'
+import { CustomMarker, GoogleMap } from 'vue3-google-map'
+import CMapTypeControl, { type MapType } from '@/components/custom/CMapTypeControl.vue'
+import CMapMarkerInfo from '@/components/custom/CMapMarkerInfo.vue'
+import { mapMarkerInfoPadding, mapStyles } from '@/utils/maps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -475,9 +540,14 @@ import {
 } from '@/components/ui/select'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { useRoute } from 'vue-router'
+import { useApi } from '@/composables/useAxiosService'
+import { ApiEndpoints } from '@/api/endpoints'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { getCompanyId } from '@/utils/company'
+import type { RouteEldCompaniesResponse } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
-import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert } from '../types'
+import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const { formatToTimeZone } = useTimeZoneHelper()
 const route = useRoute()
@@ -486,14 +556,10 @@ const {
   alprCameraAlerts,
   speedAlerts,
   violationAlerts,
-  companies,
-  companiesLoading,
-  companiesError,
   isLoading,
   isRefreshing,
   markingReadId,
   error,
-  fetchCompanies,
   fetchAlerts,
   ensureAlerts,
   resetAlerts,
@@ -502,7 +568,12 @@ const {
 } = useRouteEldAlerts()
 const { latestWeighStationAlert, latestAlprCameraAlert } = useRouteEldAlertSocket()
 
-const selectedCompanyId = ref('all')
+const api = useApi()
+const authStore = useAuthStore()
+const selectedCompanyId = computed(() => authStore.companyId ?? getCompanyId())
+const requestCompanyId = ref<string | null>(null)
+const selectedCompanyName = ref<string | null>(null)
+const companyError = ref<string | null>(null)
 const requestedAlertType = route.query.type
 const alertType = ref<RouteEldAlertType>(
   requestedAlertType === 'alpr' ||
@@ -515,15 +586,32 @@ const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
 const pageSize = ref(25)
-const requestCompanyId = computed(() =>
-  selectedCompanyId.value === 'all' ? null : selectedCompanyId.value
-)
-const pageError = computed(() => companiesError.value ?? error.value)
+const mapApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+const mapRef = ref<any>(null)
+const mapType = ref<MapType>('roadmap')
+const getMap = () => mapRef.value?.map ?? null
+interface AlertMapSelection {
+  driver: string
+  reason: string
+  detail: string
+  driverRows: { label: string; value: string | number | null | undefined }[]
+  targetName: string | null
+  targetRows: { label: string; value: string | number | null | undefined }[]
+  latitude: number | null
+  longitude: number | null
+  targetLatitude: number | null
+  targetLongitude: number | null
+}
+const showDriverInfo = ref(true)
+const showTargetInfo = ref(true)
+const mapSelection = ref<AlertMapSelection | null>(null)
+let companyResolutionVersion = 0
+const pageError = computed(() => companyError.value ?? error.value)
 
 const pageDescription = computed(() => {
-  if (alertType.value === 'station') return 'Driver approaches to Route ELD weigh stations'
+  if (alertType.value === 'station') return 'Driver approaches to weigh stations'
   if (alertType.value === 'alpr') return 'Drivers approaching ALPR cameras'
-  if (alertType.value === 'speed') return 'Drivers exceeding the state speed limit from Route ELD'
+  if (alertType.value === 'speed') return 'Drivers exceeding the state speed limit'
   return 'Drivers with HOS violations from Route ELD daily logs'
 })
 
@@ -537,7 +625,7 @@ const searchPlaceholder = computed(() => {
 const statusOptions = computed(() => {
   if (alertType.value === 'station' || alertType.value === 'alpr') {
     return [
-      { value: 'all', label: 'All alerts' },
+      { value: 'all', label: 'All statuses' },
       { value: 'unread', label: 'Unread' },
       { value: 'active', label: 'Active' },
       { value: 'resolved', label: 'Resolved' },
@@ -742,10 +830,11 @@ const summaryCards = computed(() => {
 })
 
 watch(alertType, async (value) => {
+  mapSelection.value = null
   search.value = ''
   statusFilter.value = 'all'
   pageNumber.value = 1
-  await ensureAlerts(value, requestCompanyId.value)
+  if (requestCompanyId.value) await ensureAlerts(value, requestCompanyId.value)
 })
 watch(
   () => route.query.type,
@@ -756,17 +845,25 @@ watch(
   }
 )
 watch(latestWeighStationAlert, () => {
-  if (alertType.value === 'station') void fetchAlerts('station', requestCompanyId.value, true)
+  if (alertType.value === 'station' && requestCompanyId.value)
+    void fetchAlerts('station', requestCompanyId.value, true)
 })
 watch(latestAlprCameraAlert, () => {
-  if (alertType.value === 'alpr') void fetchAlerts('alpr', requestCompanyId.value, true)
+  if (alertType.value === 'alpr' && requestCompanyId.value)
+    void fetchAlerts('alpr', requestCompanyId.value, true)
 })
 watch(selectedCompanyId, async () => {
+  mapSelection.value = null
   search.value = ''
   statusFilter.value = 'all'
   pageNumber.value = 1
   resetAlerts()
-  await ensureAlerts(alertType.value, requestCompanyId.value)
+  await resolveSelectedCompany()
+})
+watch(mapSelection, () => {
+  showDriverInfo.value = true
+  showTargetInfo.value = true
+  void nextTick(() => fitMapSelection())
 })
 watch([search, statusFilter, pageSize], () => {
   pageNumber.value = 1
@@ -776,12 +873,151 @@ watch(totalPages, (value) => {
 })
 
 onMounted(async () => {
-  await fetchCompanies()
-  await ensureAlerts(alertType.value, requestCompanyId.value)
+  await resolveSelectedCompany()
 })
 
+async function resolveSelectedCompany() {
+  const version = ++companyResolutionVersion
+  requestCompanyId.value = null
+  selectedCompanyName.value = null
+  companyError.value = null
+  const companyId = selectedCompanyId.value
+  if (!companyId) {
+    companyError.value = 'Select a company before opening notifications.'
+    return
+  }
+  try {
+    const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
+    if (version !== companyResolutionVersion) return
+    const company = response.data.successResult.find(
+      (company) => company.id.toLowerCase() === companyId.toLowerCase()
+    )
+    requestCompanyId.value = company?.externalCompanyId ?? null
+    selectedCompanyName.value = company?.name ?? null
+    companyError.value = requestCompanyId.value ? null : 'The selected company could not be resolved.'
+    if (requestCompanyId.value) await ensureAlerts(alertType.value, requestCompanyId.value)
+  } catch {
+    if (version !== companyResolutionVersion) return
+    companyError.value = 'The selected company could not be loaded.'
+  }
+}
+
 function refresh() {
-  void fetchAlerts(alertType.value, requestCompanyId.value, true)
+  if (requestCompanyId.value) void fetchAlerts(alertType.value, requestCompanyId.value, true)
+}
+
+function viewStationMap(alert: StationAlert) {
+  mapSelection.value = {
+    driver: alert.driverName,
+    reason: `Approaching ${alert.stationName}`,
+    detail: `${alert.distanceMiles.toFixed(2)} mi away · ${stationLocation(alert)}`,
+    driverRows: [
+      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Location', value: stationDriverLocation(alert) },
+      { label: 'Time', value: formatDate(alert.occurredAt) },
+      { label: 'Distance', value: `${alert.distanceMiles.toFixed(2)} mi` },
+    ],
+    targetName: alert.stationName,
+    targetRows: [
+      { label: 'Location', value: stationLocation(alert) },
+      { label: 'Direction', value: alert.direction },
+      { label: 'Type', value: alert.stationType },
+    ],
+    latitude: alert.driverLatitude,
+    longitude: alert.driverLongitude,
+    targetLatitude: alert.stationLatitude,
+    targetLongitude: alert.stationLongitude,
+  }
+}
+
+function viewAlprMap(alert: AlprCameraAlert) {
+  mapSelection.value = {
+    driver: alert.driverName,
+    reason: `Approaching ALPR camera ${alert.cameraName}`,
+    detail: `${alert.distanceMiles.toFixed(2)} mi away · ${alert.brand || alert.operator || 'Camera'}`,
+    driverRows: [
+      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Location', value: alprDriverLocation(alert) },
+      { label: 'Time', value: formatDate(alert.occurredAt) },
+      { label: 'Distance', value: `${alert.distanceMiles.toFixed(2)} mi` },
+    ],
+    targetName: alert.cameraName,
+    targetRows: [
+      { label: 'Location', value: alprCameraLocation(alert) },
+      { label: 'Brand', value: alert.brand },
+      { label: 'Operator', value: alert.operator },
+    ],
+    latitude: alert.driverLatitude,
+    longitude: alert.driverLongitude,
+    targetLatitude: alert.cameraLatitude,
+    targetLongitude: alert.cameraLongitude,
+  }
+}
+
+function viewSpeedMap(alert: SpeedAlert) {
+  mapSelection.value = {
+    driver: alert.driverName,
+    reason: `Speed ${Math.round(alert.speed)} mph in a ${alert.speedLimit} mph zone`,
+    detail: speedLocation(alert),
+    driverRows: [
+      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Location', value: speedLocation(alert) },
+      { label: 'Time', value: formatDate(alert.occurredAt) },
+      { label: 'Speed', value: `${alert.speed} mph` },
+      { label: 'Limit', value: `${alert.speedLimit} mph` },
+    ],
+    targetName: null,
+    targetRows: [],
+    latitude: alert.latitude,
+    longitude: alert.longitude,
+    targetLatitude: null,
+    targetLongitude: null,
+  }
+}
+
+function viewViolationMap(alert: ViolationAlert) {
+  mapSelection.value = {
+    driver: alert.driverName,
+    reason: `${alert.violationCount} HOS violation${alert.violationCount === 1 ? '' : 's'}`,
+    detail: `${formatLogDate(alert.logDate)} · ${alert.note || 'No additional details'} · Last known driver position, not necessarily the violation site.`,
+    driverRows: [
+      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Last location', value: alert.driverLocation || formatCoordinates(alert.driverLatitude, alert.driverLongitude) },
+      { label: 'Time', value: formatDate(alert.occurredAt) },
+      { label: 'Log date', value: formatLogDate(alert.logDate) },
+      { label: 'Violations', value: alert.violationCount },
+      { label: 'Note', value: alert.note },
+    ],
+    targetName: null,
+    targetRows: [],
+    latitude: alert.driverLatitude,
+    longitude: alert.driverLongitude,
+    targetLatitude: null,
+    targetLongitude: null,
+  }
+}
+
+function formatCoordinates(latitude: number | null, longitude: number | null) {
+  return latitude === null || longitude === null ? '—' : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+}
+
+function fitMapSelection(instance?: any) {
+  const selection = mapSelection.value
+  const map = instance?.map ?? instance ?? getMap()
+  const googleMaps = (window as any).google?.maps
+  if (!selection || !map || !googleMaps || selection.latitude === null || selection.longitude === null) return
+  const driver = { lat: selection.latitude, lng: selection.longitude }
+  if (selection.targetLatitude === null || selection.targetLongitude === null ||
+      (selection.targetLatitude === selection.latitude && selection.targetLongitude === selection.longitude)) {
+    map.setCenter(driver)
+    map.setZoom(12)
+    map.panBy?.(0, -75)
+    return
+  }
+  const bounds = new googleMaps.LatLngBounds()
+  bounds.extend(driver)
+  bounds.extend({ lat: selection.targetLatitude, lng: selection.targetLongitude })
+  map.fitBounds(bounds, mapMarkerInfoPadding(map))
 }
 
 function rowNumber(index: number) {

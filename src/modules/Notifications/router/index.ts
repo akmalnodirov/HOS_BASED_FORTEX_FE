@@ -2,9 +2,9 @@ import { RouteRecordRaw } from 'vue-router'
 
 const routes: Readonly<RouteRecordRaw[]> = [
   {
-    path: '/alerts',
-    name: 'Alerts',
-    component: () => import('@/modules/Alerts/pages/PAlerts.vue'),
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('@/modules/Notifications/pages/PNotifications.vue'),
     meta: {
       layout: 'default',
     },

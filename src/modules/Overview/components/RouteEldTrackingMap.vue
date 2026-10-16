@@ -156,46 +156,7 @@
       >
         <LocateFixed class="h-5 w-5" />
       </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        :class="[
-          'h-10 w-10 bg-white shadow-md dark:bg-card',
-          isTrafficActive &&
-            'bg-slate-900 text-white hover:bg-slate-800 hover:text-white dark:bg-slate-100 dark:text-slate-900',
-        ]"
-        title="Traffic"
-        @click="toggleTraffic"
-      >
-        <TrafficCone class="h-5 w-5" />
-      </Button>
-      <div ref="mapMenuRef" class="relative">
-        <Button
-          variant="outline"
-          class="h-10 gap-2 bg-white px-3 text-xs shadow-md dark:bg-card"
-          @click="showMapMenu = !showMapMenu"
-        >
-          <Layers class="h-4 w-4" />
-          Map
-        </Button>
-        <div
-          v-if="showMapMenu"
-          class="absolute right-0 top-12 w-44 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg"
-        >
-          <button
-            v-for="option in mapTypes"
-            :key="option.value"
-            type="button"
-            :class="[
-              'flex w-full items-center rounded px-2 py-2 text-left text-xs hover:bg-muted',
-              mapTypeId === option.value && 'bg-muted font-medium',
-            ]"
-            @click="selectMapType(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </div>
+      <CMapTypeControl v-model="mapTypeId" :get-map="getMap" />
       <Button
         variant="outline"
         size="icon"
@@ -234,17 +195,10 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  Layers,
-  LocateFixed,
-  Maximize,
-  Minimize,
-  Navigation,
-  TrafficCone,
-  X,
-} from 'lucide-vue-next'
+import { LocateFixed, Maximize, Minimize, Navigation, X } from 'lucide-vue-next'
 import { CustomMarker, GoogleMap, Polyline } from 'vue3-google-map'
 import { Button } from '@/components/ui/button'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 import { mapStyles } from '@/utils/maps'
 import type { RouteEldLiveTrackingPoint } from '../types'
 
@@ -268,17 +222,9 @@ const FOLLOW_PAN_DISTANCE_METERS = 800
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const mapRef = ref<any>(null)
 const containerRef = ref<HTMLElement | null>(null)
-const mapMenuRef = ref<HTMLElement | null>(null)
-const mapTypeId = ref<'roadmap' | 'terrain' | 'satellite'>('roadmap')
-const mapTypes = [
-  { value: 'roadmap' as const, label: 'Map' },
-  { value: 'terrain' as const, label: 'Terrain' },
-  { value: 'satellite' as const, label: 'Satellite' },
-]
+const mapTypeId = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const isFullscreen = ref(false)
-const isTrafficActive = ref(false)
 const autoFollow = ref(true)
-const showMapMenu = ref(false)
 const isMatchingRoute = ref(false)
 const selectedStatus = ref<StatusFilter>('all')
 const selectedPoint = ref<RouteEldLiveTrackingPoint | null>(null)
@@ -289,7 +235,6 @@ const animationCumulativeDistances = ref<number[]>([])
 const animationSegmentIndex = ref(0)
 const bearing = ref(0)
 const visiblePointTimestamp = ref(Number.POSITIVE_INFINITY)
-const trafficLayer = ref<any>(null)
 const directionsCache = new Map<string, LatLng[]>()
 let animationStartedAt = 0
 let animationDuration = 0
@@ -377,14 +322,11 @@ watch(
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', handleFullscreenChange)
-  document.addEventListener('click', handleOutsideClick)
 })
 
 onBeforeUnmount(() => {
   stopAnimation()
-  trafficLayer.value?.setMap(null)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  document.removeEventListener('click', handleOutsideClick)
 })
 
 async function consumePoints(points: RouteEldLiveTrackingPoint[]) {
@@ -734,19 +676,6 @@ function maybePanToVehicle(value: LatLng) {
   lastPanPosition = value
 }
 
-function toggleTraffic() {
-  isTrafficActive.value = !isTrafficActive.value
-  const googleMaps = (window as any).google?.maps
-  if (!getMap() || !googleMaps) return
-  if (!trafficLayer.value) trafficLayer.value = new googleMaps.TrafficLayer()
-  trafficLayer.value.setMap(isTrafficActive.value ? getMap() : null)
-}
-
-function selectMapType(value: 'roadmap' | 'terrain' | 'satellite') {
-  mapTypeId.value = value
-  showMapMenu.value = false
-}
-
 async function toggleFullscreen() {
   if (!containerRef.value) return
   if (document.fullscreenElement === containerRef.value) await document.exitFullscreen()
@@ -762,11 +691,6 @@ function handleFullscreenChange() {
     if (autoFollow.value && animatedPosition.value) map?.panTo(animatedPosition.value)
     else fitRoute()
   })
-}
-
-function handleOutsideClick(event: MouseEvent) {
-  if (mapMenuRef.value && !mapMenuRef.value.contains(event.target as Node))
-    showMapMenu.value = false
 }
 
 function statusForPoint(point: RouteEldLiveTrackingPoint): Exclude<StatusFilter, 'all'> {

@@ -37,10 +37,10 @@ export function useWeightStationAddressReveal() {
       if (!request) {
         request = api
           .get<ReverseGeocodeResult>(ApiEndpoints.ALPR_GEOCODE_REVERSE, {
-            params: { latitude, longitude },
+            params: { latitude, longitude, relative: true },
             _skipErrorHandling: true,
           })
-          .then((response) => response.data.label?.trim() || null)
+          .then((response) => response.data.label?.trim().replace(/, United States$/i, '') || null)
           .catch(() => null)
           .finally(() => requests.delete(key))
         requests.set(key, request)

@@ -57,11 +57,13 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
   }
 
   function publishWeighStationAlert(message: RouteEldWeighStationApproachMessage) {
+    if (!companyId.value || message.companyId?.toLowerCase() !== companyId.value.toLowerCase()) return
     if (!message.alertId || !rememberAlert('station', message.alertId)) return
     latestWeighStationAlert.value = message
   }
 
   function publishAlprCameraAlert(message: RouteEldAlprCameraApproachMessage) {
+    if (!companyId.value || message.companyId?.toLowerCase() !== companyId.value.toLowerCase()) return
     if (!message.alertId || !rememberAlert('alpr', message.alertId)) return
     latestAlprCameraAlert.value = message
   }

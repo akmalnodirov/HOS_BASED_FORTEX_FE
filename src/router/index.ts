@@ -1,6 +1,6 @@
 import { createWebHistory, createRouter } from 'vue-router'
 import AuthRoutes from '@/modules/Auth/router'
-import AlertRoutes from '@/modules/Alerts/router'
+import NotificationRoutes from '@/modules/Notifications/router'
 import OverviewRoutes from '@/modules/Overview/router'
 import ELDRoutes from '@/modules/ELD/router'
 import VehicleRoutes from '@/modules/Vehicles/router'
@@ -27,7 +27,7 @@ const router = createRouter({
       path: '',
       component: () => import('@/layouts/Default/PIndex.vue'),
       children: [
-        ...AlertRoutes,
+        ...NotificationRoutes,
         ...OverviewRoutes,
         ...ELDRoutes,
         ...VehicleRoutes,

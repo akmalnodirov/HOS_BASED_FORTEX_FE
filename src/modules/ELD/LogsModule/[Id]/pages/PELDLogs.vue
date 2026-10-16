@@ -76,7 +76,7 @@ const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilte
         >
           <Checkbox
             id="violation-filter"
-            v-model:checked="violationFilter"
+            v-model="violationFilter"
             class="h-4 w-4 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
           />
           <span class="whitespace-nowrap text-sm font-medium">Only violations</span>

@@ -56,7 +56,7 @@ async function confirmDelete() {
   <div class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background">
     <div class="mb-5 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-foreground">Uers</h2>
+        <h2 class="text-xl font-semibold text-foreground">Users</h2>
         <p class="mt-1 text-sm text-muted-foreground">
           Manage Route ELD dispatchers, roles, and company access.
         </p>

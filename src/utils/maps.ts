@@ -35,3 +35,17 @@ export const mapStyles = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
 ]
+
+// Leave room for the information cards anchored above the selected map markers.
+export function mapMarkerInfoPadding(map: { getDiv?: () => HTMLElement }) {
+  const container = map.getDiv?.()
+  const width = container?.clientWidth || 650
+  const height = container?.clientHeight || 288
+  const horizontal = Math.min(245, Math.floor(width * 0.37))
+  return {
+    top: Math.min(190, Math.floor(height * 0.65)),
+    right: horizontal,
+    bottom: 30,
+    left: horizontal,
+  }
+}

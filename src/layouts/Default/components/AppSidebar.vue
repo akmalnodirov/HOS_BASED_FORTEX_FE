@@ -219,10 +219,10 @@ const menuItems: MenuItem[] = [
         path: '/drivers',
       },
       {
-        id: 'alerts',
-        label: 'Alerts',
+        id: 'notifications',
+        label: 'Notifications',
         icon: '/icons/bell.svg',
-        path: '/alerts',
+        path: '/notifications',
       },
       {
         id: 'chat',

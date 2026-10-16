@@ -25,7 +25,7 @@ export function useVehicles() {
   const searchQuery = ref('')
   const statusFilter = ref<'all' | 'active' | 'inactive'>('all')
   const sorting = useSorting<SortKey>({ defaultKey: 'id', defaultOrder: 'asc' })
-  const pagination = usePagination(totalCount, { itemsPerPage: 10 })
+  const pagination = usePagination(computed(() => filteredVehicles.value.length), { itemsPerPage: 10 })
   const debouncedSearch = useDebounce(searchQuery, 300, pagination.resetPage)
 
   const fetchVehicles = async () => {
@@ -33,8 +33,6 @@ export function useVehicles() {
     try {
       const response = await api.post<VehiclesListResponse>(ApiEndpoints.VEHICLES_FILTER, {
         companyId: getCompanyId(),
-        pageNumber: pagination.currentPage.value,
-        pageSize: pagination.itemsPerPage.value,
         status: statusFilter.value === 'all' ? null : statusFilter.value === 'active',
       })
       const result = response.data?.successResult
@@ -66,18 +64,14 @@ export function useVehicles() {
         )
       : [...allVehicles.value]
     sortArray(vehicles, sorting.sortKey.value, sorting.sortOrder.value, {
-      id: commonTransformers.toNumber,
       status: commonTransformers.toBoolean,
     })
     return vehicles
   })
 
-  watch([() => pagination.currentPage.value, () => pagination.itemsPerPage.value], fetchVehicles)
+  watch([sorting.sortKey, sorting.sortOrder, pagination.itemsPerPage], pagination.resetPage)
   watch(statusFilter, async () => {
-    if (pagination.currentPage.value !== 1) {
-      pagination.resetPage()
-      return
-    }
+    pagination.resetPage()
     await fetchVehicles()
   })
   onMounted(fetchVehicles)
@@ -95,7 +89,7 @@ export function useVehicles() {
     goToPage: pagination.goToPage,
     nextPage: pagination.nextPage,
     previousPage: pagination.previousPage,
-    paginatedVehicles: filteredVehicles,
+    paginatedVehicles: computed(() => pagination.paginateData(filteredVehicles.value)),
     handleSort: sorting.handleSort,
     fetchVehicles,
   }
