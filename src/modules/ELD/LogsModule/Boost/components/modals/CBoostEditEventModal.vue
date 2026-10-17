@@ -254,6 +254,7 @@
               <label class="text-sm font-medium">Latitude</label>
               <Input
                 type="number"
+                step="any"
                 :model-value="form.latitude ?? ''"
                 @input="onNumberInput('latitude', $event)"
                 placeholder="Latitude"
@@ -264,6 +265,7 @@
               <label class="text-sm font-medium">Longitude</label>
               <Input
                 type="number"
+                step="any"
                 :model-value="form.longitude ?? ''"
                 @input="onNumberInput('longitude', $event)"
                 placeholder="Longitude"
