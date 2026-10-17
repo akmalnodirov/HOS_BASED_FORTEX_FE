@@ -80,7 +80,7 @@
         <span class="text-amber-600">Warnings: {{ warningCount }}</span>
       </Button>
 
-      <div v-if="freeTimes.length" class="flex items-center gap-1">
+      <div v-if="freeTimesFiltered.length" class="flex items-center gap-1">
         <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="scrollLeft">
           <ChevronLeft class="w-4 h-4" />
         </Button>
@@ -96,7 +96,7 @@
             :style="{ transform: `translateX(-${scrollOffset}px)` }"
           >
             <button
-              v-for="(freeTime, index) in freeTimes"
+              v-for="(freeTime, index) in freeTimesFiltered"
               :key="freeTime.eventId || index"
               class="shrink-0 px-4 py-1.5 bg-[#f8f9fd] dark:bg-muted border-[#d6e1ff] dark:border-border border rounded-md text-xs font-medium text-[#090909] dark:text-foreground hover:bg-[#e8ecfa] dark:hover:bg-muted/80 hover:border-[#b8c8ff] dark:hover:border-border transition-colors cursor-pointer"
               @click="handleFreeTimeClick(freeTime)"
@@ -187,6 +187,8 @@ const props = withDefaults(
     warningCount: 0,
   }
 )
+
+const freeTimesFiltered = computed(() => props.freeTimes?.filter((e) => e.freeDurationInSeconds >= 3600))
 
 const emit = defineEmits<{
   (e: 'initial-click'): void
