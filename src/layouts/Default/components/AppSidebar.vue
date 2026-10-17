@@ -268,12 +268,6 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/bank.svg',
         path: '/company',
       },
-      {
-        id: 'users',
-        label: 'Users',
-        icon: '/icons/user.svg',
-        path: '/users',
-      },
     ],
   },
   {
@@ -314,6 +308,7 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/menu.svg',
         uppercase: true,
         children: [
+          { id: 'users', label: 'Users', icon: '/icons/user.svg', path: '/users' },
           { id: 'users-roles', label: 'Roles', icon: null, path: '/users/roles' },
           { id: 'users-permissions', label: 'Permissions', icon: null, path: '/users/permissions' },
         ],
