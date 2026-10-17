@@ -2,8 +2,8 @@ import { computed, ref, watch } from 'vue'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import type { RouteEldCompaniesResponse } from '@/types/company'
-import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import type {
   StationAlert,
   AlprCameraAlert,
@@ -103,7 +103,7 @@ export function useNotifications() {
     }
     error.value = null
     try {
-      const selectedId = authStore.companyId ?? getCompanyId()
+      const selectedId = authStore.companyId
       if (!selectedId) throw new Error('Select a company to view notifications.')
       const companyResponse = await api.get<RouteEldCompaniesResponse>(
         ApiEndpoints.ROUTE_ELD_COMPANIES
@@ -114,11 +114,13 @@ export function useNotifications() {
       const companyId = company?.externalCompanyId
       if (!companyId) throw new Error('The selected company could not be resolved.')
       const params = { companyId, limit: 500 }
+      const allowed = (code: string) => hasPermission(authStore.token, code)
+      const empty = { data: [] }
       const results = await Promise.allSettled([
-        api.get<Envelope<StationAlert[]>>(ApiEndpoints.ROUTE_ELD_STATION_ALERTS, { params }),
-        api.get<Envelope<AlprCameraAlert[]>>(ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS, { params }),
-        api.get<Envelope<ViolationAlert[]>>(ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS, { params }),
-        api.get<Envelope<SpeedAlert[]>>(ApiEndpoints.ROUTE_ELD_SPEED_ALERTS, { params }),
+        allowed('route_eld.alerts.station') ? api.get<Envelope<StationAlert[]>>(ApiEndpoints.ROUTE_ELD_STATION_ALERTS, { params }) : Promise.resolve(empty),
+        allowed('route_eld.alerts.alpr') ? api.get<Envelope<AlprCameraAlert[]>>(ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS, { params }) : Promise.resolve(empty),
+        allowed('route_eld.alerts.violation') ? api.get<Envelope<ViolationAlert[]>>(ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS, { params }) : Promise.resolve(empty),
+        allowed('route_eld.alerts.speed') ? api.get<Envelope<SpeedAlert[]>>(ApiEndpoints.ROUTE_ELD_SPEED_ALERTS, { params }) : Promise.resolve(empty),
       ])
       if (currentRequest !== requestId) return
       const values = results.map((result) =>

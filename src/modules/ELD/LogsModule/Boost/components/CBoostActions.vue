@@ -8,6 +8,7 @@
 
         <div class="flex items-center justify-end gap-2 flex-1">
           <Button
+            v-if="canDelete"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -35,6 +36,7 @@
           </Button>
 
           <Button
+            v-if="canMultiUpdate"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -44,7 +46,7 @@
             <span>Multi Update{{ selectedSuffix }}</span>
           </Button>
 
-          <Label
+          <Label v-if="canEdit"
             class="hover:bg-accent/50 flex items-start gap-3 rounded border py-2.5 px-3 has-aria-checked:border-[#666666] has-aria-checked:bg-white dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
             :class="!canEdit ? 'cursor-not-allowed opacity-50' : ''"
           >
@@ -61,6 +63,7 @@
           </Label>
 
           <Button
+            v-if="canBoost"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -72,6 +75,7 @@
           </Button>
 
           <Button
+            v-if="canNormalize"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -82,6 +86,7 @@
           </Button>
 
           <Button
+            v-if="canCertification"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -91,6 +96,7 @@
           </Button>
 
           <Button
+            v-if="canReassign"
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
@@ -137,6 +143,12 @@ const props = withDefaults(
   defineProps<{
     dragDropEnabled?: boolean
     canEdit?: boolean
+    canDelete?: boolean
+    canMultiUpdate?: boolean
+    canBoost?: boolean
+    canNormalize?: boolean
+    canCertification?: boolean
+    canReassign?: boolean
     deleteDisabled?: boolean
     reassignDisabled?: boolean
     durationDisabled?: boolean
@@ -147,6 +159,12 @@ const props = withDefaults(
   {
     dragDropEnabled: false,
     canEdit: false,
+    canDelete: false,
+    canMultiUpdate: false,
+    canBoost: false,
+    canNormalize: false,
+    canCertification: false,
+    canReassign: false,
     deleteDisabled: false,
     reassignDisabled: false,
     durationDisabled: false,

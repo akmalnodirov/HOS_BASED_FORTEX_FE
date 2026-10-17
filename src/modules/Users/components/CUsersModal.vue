@@ -55,7 +55,7 @@
           </Select>
           <p v-if="errors.roleId" class="text-xs text-destructive">{{ errors.roleId }}</p>
           <p v-if="selectedRole" class="text-xs text-muted-foreground">
-            {{ selectedRole.permissions.length }} Route ELD permissions assigned through this role.
+            {{ selectedRole.permissions.length }} Vectorium permissions assigned through this role.
           </p>
         </div>
 

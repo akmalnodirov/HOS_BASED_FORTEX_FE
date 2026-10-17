@@ -42,7 +42,7 @@ export function useRoles() {
   })
 
   const getClientId = (): string | null => {
-    return authStore.clientId || authStore.companyId || null
+    return authStore.clientId
   }
 
   const fetchRoles = async () => {
@@ -158,6 +158,7 @@ export function useRoles() {
       permission: role.permissions?.length || 0,
       type: role.type,
       permissions: role.permissions,
+      canManage: role.canManage,
     })) as Role[]
   })
 
@@ -177,10 +178,6 @@ export function useRoles() {
 
     try {
       const clientId = getClientId()
-      if (!clientId) {
-        throw new Error('Client ID is required')
-      }
-
       await roleService.createRole({
         name: data.name,
         type: parseInt(data.type, 10) || 5,
@@ -204,10 +201,6 @@ export function useRoles() {
 
     try {
       const clientId = getClientId()
-      if (!clientId) {
-        throw new Error('Client ID is required')
-      }
-
       await roleService.updateRole(String(id), {
         name: data.name,
         type: parseInt(data.type, 10) || 5,

@@ -6,7 +6,6 @@ import { useDebounce } from '@/composables/useDebounce'
 import { usePagination } from '@/composables/usePagination'
 import { useSorting } from '@/composables/useSorting'
 import { commonTransformers, sortArray } from '@/utils/sort'
-import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type {
   DispatcherCompany,
   User,
@@ -36,7 +35,6 @@ function errorMessage(error: unknown, fallback: string) {
 
 export function usePortalUsers() {
   const api = useApi()
-  const authStore = useAuthStore()
   const portalUsers = ref<User[]>([])
   const roles = ref<Role[]>([])
   const companies = ref<DispatcherCompany[]>([])
@@ -105,20 +103,13 @@ export function usePortalUsers() {
   async function fetchOptions() {
     isLoadingRoles.value = true
     try {
-      const clientId = authStore.clientId
-      if (!clientId) throw new Error('Client ID is unavailable for role management.')
-
       const [rolesResponse, companiesResponse] = await Promise.all([
-        api.get<Role[] | ApiEnvelope<Role[]>>(ApiEndpoints.ROLES_URL, {
-          params: { clientId },
-        }),
+        api.get<Role[] | ApiEnvelope<Role[]>>(ApiEndpoints.ROUTE_ELD_DISPATCHER_ROLES),
         api.get<DispatcherCompany[] | ApiEnvelope<DispatcherCompany[]>>(
           ApiEndpoints.ROUTE_ELD_DISPATCHER_COMPANIES
         ),
       ])
-      roles.value = unwrap(rolesResponse.data).filter((role) =>
-        role.permissions.some((permission) => permission.code.startsWith('route_eld.'))
-      )
+      roles.value = unwrap(rolesResponse.data).filter((role) => role.permissions.length > 0)
       companies.value = unwrap(companiesResponse.data)
     } catch (error) {
       toast.error(errorMessage(error, 'Failed to load roles and companies'))

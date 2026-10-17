@@ -43,6 +43,7 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 interface RequestConfig extends AxiosRequestConfig {
   _retry?: boolean
   _skipErrorHandling?: boolean
+  _skipErrorToast?: boolean
   _showSuccessToast?: boolean
   _successMessage?: string
 }
@@ -161,7 +162,7 @@ class ApiService {
         }
 
         // Handle other errors
-        this.handleError(error)
+        if (!originalRequest?._skipErrorToast) this.handleError(error)
         return Promise.reject(error)
       }
     )

@@ -14,6 +14,11 @@ import DriversTable from '@/modules/Drivers/components/CDriverTable.vue'
 import DriverModal from '@/modules/Drivers/components/CDriversModal.vue'
 import { useDrivers } from '@/modules/Drivers/composables/useDrivers'
 import type { Driver, RouteEldDriverUpdateFormData } from '@/modules/Drivers/types'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
+
+const authStore = useAuthStore()
+const canManageDrivers = computed(() => hasPermission(authStore.token, 'route_eld.drivers.manage'))
 
 const {
   searchQuery,
@@ -54,12 +59,13 @@ const isModalOpen = ref(false)
 const editingDriver = ref<Driver | null>(null)
 
 const openEditModal = (driver: Driver) => {
+  if (!canManageDrivers.value) return
   editingDriver.value = { ...driver }
   isModalOpen.value = true
 }
 
 const handleSaveDriver = async (driverData: RouteEldDriverUpdateFormData) => {
-  if (!editingDriver.value) return
+  if (!editingDriver.value || !canManageDrivers.value) return
   await updateDriver(editingDriver.value.id, driverData)
   isModalOpen.value = false
   editingDriver.value = null
@@ -117,6 +123,7 @@ const closeModal = () => {
       :sort-key="sortKey"
       :sort-order="sortOrder"
       :monitoring-changing-ids="monitoringChangingIds"
+      :can-manage="canManageDrivers"
       @sort="handleSort"
       @edit="openEditModal"
       @toggle-monitoring="setMonitoring"

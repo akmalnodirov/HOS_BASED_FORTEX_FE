@@ -20,6 +20,7 @@ interface Props {
   sortKey: SortKey
   sortOrder: SortOrder
   monitoringChangingIds: Set<string>
+  canManage: boolean
 }
 
 defineProps<Props>()
@@ -106,7 +107,7 @@ const emit = defineEmits<{
           <TableHead>
             <span class="font-medium dark:text-gray-300">Monitoring</span>
           </TableHead>
-          <TableHead class="w-28">
+          <TableHead v-if="canManage" class="w-28">
             <span class="font-medium dark:text-gray-300">Actions</span>
           </TableHead>
         </TableRow>
@@ -147,7 +148,7 @@ const emit = defineEmits<{
               {{ driver.isMonitoringEnabled ? 'Enabled' : 'Disabled' }}
             </span>
           </TableCell>
-          <TableCell class="p-2">
+          <TableCell v-if="canManage" class="p-2">
             <div class="flex items-center gap-1">
               <Button @click="emit('edit', driver)" variant="ghost" size="icon" class="h-8 w-8">
                 <Pencil class="h-4 w-4 text-gray-600 dark:text-gray-400" />
@@ -177,7 +178,7 @@ const emit = defineEmits<{
 
         <!-- No results -->
         <TableRow v-if="drivers.length === 0">
-          <TableCell colspan="9" class="text-center py-8 text-gray-500 dark:text-gray-400">
+          <TableCell :colspan="canManage ? 9 : 8" class="text-center py-8 text-gray-500 dark:text-gray-400">
             No drivers found
           </TableCell>
         </TableRow>

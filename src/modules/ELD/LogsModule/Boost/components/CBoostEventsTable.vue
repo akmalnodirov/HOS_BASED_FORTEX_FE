@@ -349,7 +349,7 @@
 
                   <div
                     v-if="isColumnVisible('duration')"
-                    class="min-w-0 overflow-hidden whitespace-nowrap font-mono text-xs text-foreground"
+                    class="min-w-0 overflow-hidden whitespace-nowrap text-xs text-foreground"
                   >
                     {{ formatDutyDuration(event.duration) }}
                   </div>
@@ -531,7 +531,7 @@
                       <Pencil class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canEditEvents"
+                      v-if="canInsertEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -562,7 +562,7 @@
                       <Eye class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canEditEvents"
+                      v-if="canDeleteEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -653,6 +653,8 @@ interface Props {
   showDriverColumn?: boolean
   canEditProfile?: boolean
   canEditEvents?: boolean
+  canInsertEvents?: boolean
+  canDeleteEvents?: boolean
   dragDropEnabled?: boolean
   columnVisibility?: BoostEventTableColumnVisibility
   timeZone?: string | null
@@ -668,6 +670,8 @@ const props = withDefaults(defineProps<Props>(), {
   showDriverColumn: false,
   canEditProfile: false,
   canEditEvents: false,
+  canInsertEvents: false,
+  canDeleteEvents: false,
   dragDropEnabled: false,
   columnVisibility: () => ({
     duration: true,

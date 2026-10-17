@@ -56,10 +56,10 @@ const headings: { label: string; key: SortKey; class?: string }[] = [
           <TableCell class="p-2">{{ role.permission }}</TableCell>
           <TableCell class="p-2">
             <div class="flex items-center justify-end gap-1">
-              <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('edit', role)">
+              <Button v-if="role.canManage !== false" variant="ghost" size="icon" class="h-8 w-8" @click="emit('edit', role)">
                 <Pencil class="h-4 w-4 text-muted-foreground" />
               </Button>
-              <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('delete', role)">
+              <Button v-if="role.canManage !== false" variant="ghost" size="icon" class="h-8 w-8" @click="emit('delete', role)">
                 <Trash2 class="h-4 w-4 text-destructive" />
               </Button>
             </div>

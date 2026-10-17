@@ -15,6 +15,7 @@
 
     <div v-if="isBoostPage" class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 mb-1">
       <Button
+        v-if="canCreateSession"
         class="h-8 lg:h-9 2xl:h-10 bg-[#111] dark:bg-foreground text-white dark:text-background hover:bg-[#111]/90 text-[10px] lg:text-xs 2xl:text-sm px-3 lg:px-4"
         :disabled="boostStore.isMutating || !boostDateRange?.start || !boostDateRange?.end"
         @click="handleBoostCreate"
@@ -150,6 +151,8 @@ import type { WeeklyViolationResponse } from '../../types/chart.ts'
 import type { DateValue } from 'reka-ui'
 import { CalendarDate } from '@internationalized/date'
 import { useBoostWorkspaceStore } from '../../../Boost/store/boostWorkspace'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import type { RouteEldEventSessionListItem } from '../../../Boost/types/boost'
 
 // Define props
@@ -177,6 +180,8 @@ const props = defineProps<Props>()
 const router = useRouter()
 const route = useRoute()
 const boostStore = useBoostWorkspaceStore()
+const authStore = useAuthStore()
+const canCreateSession = computed(() => hasPermission(authStore.token, 'route_eld.log_details.sessions.create'))
 const { sessions, session: activeSession } = storeToRefs(boostStore)
 const activeSessionId = computed(() => activeSession.value?.id ?? '')
 
@@ -329,6 +334,7 @@ watch([() => route.query.fromDate, () => route.query.toDate], ([fromDate, toDate
 })
 
 const handleBoostCreate = async () => {
+  if (!canCreateSession.value) return
   if (!boostDateRange.value?.start || !boostDateRange.value?.end) return
   const fromDate = calendarDateToDayjs(boostDateRange.value.start)
   const toDate = calendarDateToDayjs(boostDateRange.value.end)
@@ -452,6 +458,15 @@ watch(
       const attemptKey = `${normalizedDriverId}:${fromDate}:${toDate}`
       if (automaticSessionAttemptKey.value === attemptKey) return
       automaticSessionAttemptKey.value = attemptKey
+
+      if (!canCreateSession.value) {
+        const fallback = items[0]
+        if (fallback) {
+          const workspace = await boostStore.loadSession(fallback.id)
+          if (workspace) await applyBoostWorkspaceRoute(workspace)
+        }
+        return
+      }
 
       try {
         const workspace = await boostStore.createSession(normalizedDriverId, fromDate, toDate)

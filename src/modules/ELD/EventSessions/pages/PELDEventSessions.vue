@@ -223,7 +223,7 @@
                     <ExternalLink class="h-4 w-4" />
                   </Button>
                   <Button
-                    v-if="session.status === 'SUBMITTED'"
+                    v-if="session.status === 'SUBMITTED' && canRollback"
                     variant="ghost"
                     size="icon"
                     class="h-8 w-8 text-[#AF4B4B] hover:bg-red-50 hover:text-[#AF4B4B] dark:hover:bg-red-950/30"
@@ -402,7 +402,12 @@ import { useDebounceSearch } from '@/composables/useDebounceSearch'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { getCompanyId } from '@/utils/company'
 import { useEventSessions } from '../composables/useEventSessions'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import type { EventSessionFilters, EventSessionListItem, EventSessionStatus } from '../types'
+
+const authStore = useAuthStore()
+const canRollback = computed(() => hasPermission(authStore.token, 'route_eld.log_details.rollback'))
 
 type SessionSortKey =
   | 'name'

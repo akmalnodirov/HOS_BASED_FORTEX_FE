@@ -20,6 +20,7 @@
               Companies
             </TabsTrigger>
             <TabsTrigger
+              v-if="canManageClients"
               class="cursor-pointer text-[#666] dark:text-gray-400 data-[state=active]:font-medium data-[state=active]:text-[#090909] dark:data-[state=active]:text-gray-100 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700"
               value="/initial/clients"
             >
@@ -61,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { User, LogOut, ChevronDown } from 'lucide-vue-next'
@@ -75,6 +76,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,11 +84,11 @@ const authStore = useAuthStore()
 
 const currentTab = computed(() => route.path)
 
-const userInfo = ref({
-  id: '001',
-  name: 'Unione team',
-  email: 'walt@disney.com',
-})
+const canManageClients = computed(() => hasPermission(authStore.token, 'clients.manage'))
+const userInfo = computed(() => ({
+  id: authStore.user?.userName ?? 'User',
+  name: [authStore.user?.firstName, authStore.user?.lastName].filter(Boolean).join(' ') || authStore.user?.userName || 'User',
+}))
 
 const handleLogout = async () => {
   // Use authStore logout method to clear all auth data

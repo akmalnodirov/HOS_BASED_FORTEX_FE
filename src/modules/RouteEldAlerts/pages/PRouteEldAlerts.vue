@@ -11,10 +11,10 @@
         <Select v-model="alertType">
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="station">Station alerts</SelectItem>
-            <SelectItem value="alpr">ALPR camera alerts</SelectItem>
-            <SelectItem value="violation">Violation alerts</SelectItem>
-            <SelectItem value="speed">Speed alerts</SelectItem>
+            <SelectItem v-if="permittedTypes.includes('station')" value="station">Station alerts</SelectItem>
+            <SelectItem v-if="permittedTypes.includes('alpr')" value="alpr">ALPR camera alerts</SelectItem>
+            <SelectItem v-if="permittedTypes.includes('violation')" value="violation">Violation alerts</SelectItem>
+            <SelectItem v-if="permittedTypes.includes('speed')" value="speed">Speed alerts</SelectItem>
           </SelectContent>
         </Select>
         <div class="relative w-64">
@@ -543,7 +543,7 @@ import { useRoute } from 'vue-router'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { getCompanyId } from '@/utils/company'
+import { hasPermission } from '@/router/permissions'
 import type { RouteEldCompaniesResponse } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
@@ -570,7 +570,12 @@ const { latestWeighStationAlert, latestAlprCameraAlert } = useRouteEldAlertSocke
 
 const api = useApi()
 const authStore = useAuthStore()
-const selectedCompanyId = computed(() => authStore.companyId ?? getCompanyId())
+const permittedTypes = computed<RouteEldAlertType[]>(() =>
+  (['station', 'alpr', 'violation', 'speed'] as RouteEldAlertType[]).filter((type) =>
+    hasPermission(authStore.token, `route_eld.alerts.${type}`)
+  )
+)
+const selectedCompanyId = computed(() => authStore.companyId)
 const requestCompanyId = ref<string | null>(null)
 const selectedCompanyName = ref<string | null>(null)
 const companyError = ref<string | null>(null)
@@ -582,6 +587,8 @@ const alertType = ref<RouteEldAlertType>(
     ? requestedAlertType
     : 'station'
 )
+if (!permittedTypes.value.includes(alertType.value) && permittedTypes.value.length)
+  alertType.value = permittedTypes.value[0]
 const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
@@ -839,7 +846,7 @@ watch(alertType, async (value) => {
 watch(
   () => route.query.type,
   (value) => {
-    if (value === 'station' || value === 'alpr' || value === 'violation' || value === 'speed') {
+    if ((value === 'station' || value === 'alpr' || value === 'violation' || value === 'speed') && permittedTypes.value.includes(value)) {
       alertType.value = value
     }
   }

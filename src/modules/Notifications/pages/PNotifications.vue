@@ -47,10 +47,10 @@
           <SelectTrigger class="h-9 w-44"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            <SelectItem value="station">Weight stations</SelectItem>
-            <SelectItem value="alpr">ALPR cameras</SelectItem>
-            <SelectItem value="violation">Violations</SelectItem>
-            <SelectItem value="speed">Speed</SelectItem>
+            <SelectItem v-if="allowed('route_eld.alerts.station')" value="station">Weight stations</SelectItem>
+            <SelectItem v-if="allowed('route_eld.alerts.alpr')" value="alpr">ALPR cameras</SelectItem>
+            <SelectItem v-if="allowed('route_eld.alerts.violation')" value="violation">Violations</SelectItem>
+            <SelectItem v-if="allowed('route_eld.alerts.speed')" value="speed">Speed</SelectItem>
           </SelectContent>
         </Select>
         <Select v-model="statusFilter">
@@ -230,6 +230,7 @@ import CNotificationDetailsModal from '../components/CNotificationDetailsModal.v
 import { useNotifications } from '../composables/useNotifications'
 import type { NotificationItem, NotificationType } from '../types'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 
 const {
   notifications,
@@ -252,6 +253,7 @@ const {
 } = useNotifications()
 const selected = ref<NotificationItem | null>(null)
 const authStore = useAuthStore()
+const allowed = (code: string) => hasPermission(authStore.token, code)
 const cards = computed(() => [
   { label: 'Total notifications', value: notifications.value.length, className: '' },
   { label: 'Unread', value: unreadCount.value, className: 'text-blue-600' },

@@ -17,10 +17,10 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
   const connectionState = ref<ConnectionState>('disconnected')
   const latestWeighStationAlert = ref<RouteEldWeighStationApproachMessage | null>(null)
   const latestAlprCameraAlert = ref<RouteEldAlprCameraApproachMessage | null>(null)
-  const companyId = computed(() => authStore.companyId ?? localStorage.getItem('companyId'))
+  const companyId = computed(() => authStore.companyId)
   const token = computed(() => authStore.getTokens())
   const shouldConnect = computed(() => authStore.loggedIn && !!token.value)
-  const connectionScope = computed(() => `${token.value ?? ''}:${companyId.value ?? ''}`)
+  const connectionScope = computed(() => `${shouldConnect.value}:${token.value ?? ''}:${companyId.value ?? ''}`)
 
   let socket: WebSocket | null = null
   let handshakeComplete = false

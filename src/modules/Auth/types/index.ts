@@ -21,6 +21,7 @@ export interface User {
   lastName: string
   email: string | null
   phoneNumber: string | null
+  clientId?: string | null
   carriersCount?: number
   driversCount?: number
   state?: number

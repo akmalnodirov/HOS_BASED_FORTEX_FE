@@ -9,14 +9,16 @@ import type {
   RouteEldCompanyResponse,
 } from '@/types/company'
 import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
 
 const pageSize = 25
 
 export function useCompanySwitcher() {
   const api = useApi()
+  const authStore = useAuthStore()
   const companies = ref<RouteEldCompany[]>([])
   const selectedCompany = ref<RouteEldCompany | null>(null)
-  const selectedCompanyId = ref(localStorage.getItem('companyId'))
+  const selectedCompanyId = ref(authStore.companyId)
   const searchQuery = ref('')
   const debouncedSearch = useDebounce(searchQuery, 300)
   const pageNumber = ref(1)
@@ -97,6 +99,9 @@ export function useCompanySwitcher() {
       await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
       setCompanyId(company.id)
       setCompanyTimeZoneId('UTC')
+      await authStore.fetchCurrentUser()
+      if (authStore.companyId !== company.id)
+        throw new Error('The selected company could not be verified.')
       localStorage.setItem('companyName', company.name)
       selectedCompanyId.value = company.id
       selectedCompany.value = company
@@ -112,6 +117,10 @@ export function useCompanySwitcher() {
   }
 
   watch(debouncedSearch, () => loadCompanies())
+  watch(() => authStore.companyId, (id) => {
+    selectedCompanyId.value = id
+    if (!id) selectedCompany.value = null
+  })
   loadSelectedCompany()
 
   return {

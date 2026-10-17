@@ -9,12 +9,13 @@ export interface RoleResponse {
   name: string
   type: number
   permissions: PermissionResponse[]
+  canManage: boolean
 }
 
 export interface RoleRequest {
   name: string
   type: number
-  clientId: string
+  clientId: string | null
   permissionIds: string[]
 }
 
@@ -46,4 +47,5 @@ export interface Role {
   permission: number
   type?: number
   permissions?: PermissionResponse[]
+  canManage?: boolean
 }

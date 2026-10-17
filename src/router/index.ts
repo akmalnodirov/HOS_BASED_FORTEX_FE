@@ -65,6 +65,11 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/forbidden',
+      name: 'Forbidden',
+      component: () => import('@/pages/PForbidden.vue'),
+    },
     ...AuthRoutes,
     {
       path: '/share/route-eld/:token',

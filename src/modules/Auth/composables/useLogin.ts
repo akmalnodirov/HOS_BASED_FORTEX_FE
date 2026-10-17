@@ -15,7 +15,6 @@ export function useLogin() {
   const api = useApi()
   const authStore = useAuthStore()
 
-  // State
   const username = ref('')
   const password = ref('')
   const isLoading = ref(false)
@@ -24,7 +23,6 @@ export function useLogin() {
     password: '',
   })
 
-  // Validation
   const validateForm = (): boolean => {
     errors.value = {
       username: '',
@@ -49,12 +47,10 @@ export function useLogin() {
     return isValid
   }
 
-  // Clear error for specific field
   const clearError = (field: keyof LoginErrors): void => {
     errors.value[field] = ''
   }
 
-  // Clear all errors
   const clearAllErrors = (): void => {
     errors.value = {
       username: '',
@@ -62,14 +58,12 @@ export function useLogin() {
     }
   }
 
-  // Reset form
   const resetForm = (): void => {
     username.value = ''
     password.value = ''
     clearAllErrors()
   }
 
-  // Login API call
   const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
       const response = await api.post<LoginResponse>('/api/auth/login', credentials)
@@ -77,22 +71,19 @@ export function useLogin() {
       const { successResult } = response.data
       const { token, refreshToken, user } = successResult
 
-      // Save tokens
+      authStore.clearSelectedCompany()
       authStore.setTokens(token, refreshToken)
 
-      // Save user data
       if (user) {
         authStore.setUser(user)
       }
 
       return response.data
     } catch (error: unknown) {
-      // Error will be handled by axios interceptor
       throw error
     }
   }
 
-  // Handle form submit
   const handleSubmit = async (): Promise<void> => {
     if (!validateForm()) {
       return
@@ -101,33 +92,26 @@ export function useLogin() {
     isLoading.value = true
 
     try {
-      // Call login API
       await login({ username: username.value, password: password.value })
 
       toast.success('Login Successful', {
         description: 'Welcome back!',
         position: 'top-right',
+        duration: 3_000,
       })
 
-      // Try to fetch current user to get full user data
-      // If it fails, continue with user data from login response
       try {
         await authStore.fetchCurrentUser()
       } catch (error) {
-        // If fetchCurrentUser fails, user data from login is already saved
-        // Continue with login flow
         console.warn('Could not fetch current user, using login data:', error)
       }
 
-      // Redirect to Companies page (use replace to avoid redirect in history)
       await router.replace('/initial/companies')
 
-      // Reset form after successful login
       resetForm()
     } catch (error: unknown) {
       console.error('Login error:', error)
 
-      // Set field errors if validation errors exist
       if (error && typeof error === 'object' && 'response' in error) {
         const apiError = error as {
           response?: { data?: { errors?: Record<string, string | string[]> } }
@@ -147,20 +131,17 @@ export function useLogin() {
         }
       }
 
-      // Generic error toast is already shown by axios interceptor
     } finally {
       isLoading.value = false
     }
   }
 
   return {
-    // State
     username,
     password,
     isLoading,
     errors,
 
-    // Methods
     validateForm,
     clearError,
     clearAllErrors,

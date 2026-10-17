@@ -6,6 +6,7 @@ import { useApi } from '@/composables/useAxiosService'
 import { usePagination } from '@/composables/usePagination'
 import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
 import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
 
 export type SortKey = 'name' | 'dotNumber' | 'isActive'
 export type SortOrder = 'asc' | 'desc'
@@ -13,6 +14,7 @@ export type SortOrder = 'asc' | 'desc'
 export function useCompanies() {
   const api = useApi()
   const router = useRouter()
+  const authStore = useAuthStore()
   const companies = ref<RouteEldCompany[]>([])
   const isLoading = ref(false)
   const selectingCompanyId = ref<string | null>(null)
@@ -66,6 +68,9 @@ export function useCompanies() {
       await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
       setCompanyId(company.id)
       setCompanyTimeZoneId('UTC')
+      await authStore.fetchCurrentUser()
+      if (authStore.companyId !== company.id)
+        throw new Error('The selected company could not be verified.')
       await router.push('/eld/logs')
       return true
     } catch (exception: any) {

@@ -23,6 +23,7 @@ defineProps<{
   itemsPerPage: number
   sortKey: DotInspectionSortKey
   sortOrder: SortOrder
+  canManage: boolean
 }>()
 
 const emit = defineEmits<{
@@ -83,7 +84,7 @@ function formatDateTime(value: string) {
               <SortIcon class="h-4 w-4" />
             </button>
           </TableHead>
-          <TableHead class="w-28">Actions</TableHead>
+          <TableHead v-if="canManage" class="w-28">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -115,7 +116,7 @@ function formatDateTime(value: string) {
             </span>
           </TableCell>
           <TableCell class="p-2">{{ formatDateTime(inspection.createdAt) }}</TableCell>
-          <TableCell class="p-2">
+          <TableCell v-if="canManage" class="p-2">
             <div class="flex items-center gap-1">
               <Button
                 variant="ghost"

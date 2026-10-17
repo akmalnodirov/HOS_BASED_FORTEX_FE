@@ -10,7 +10,9 @@
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
       :rollback-blocked="Boolean(session?.isRollbackBlocked)"
-      :can-manage-tabs="session?.status === 'DRAFT'"
+      :can-manage-tabs="session?.status === 'DRAFT' && allowed('route_eld.log_details.tabs.manage')"
+      :allow-submit="allowed('route_eld.log_details.submit')"
+      :allow-rollback="allowed('route_eld.log_details.rollback')"
       :submit-loading="sessionActionLoading"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
@@ -101,7 +103,7 @@
               <span class="truncate">{{ event.eventName }} · {{ formatGraphEventTime(event.timestamp) }}</span>
             </button>
             <Button
-              v-if="rangeBoostSelectedEvents.length === 2"
+              v-if="rangeBoostSelectedEvents.length === 2 && allowed('route_eld.log_details.boost')"
               size="sm"
               class="h-6 px-2 text-xs"
               :disabled="Boolean(rangeBoostSelectionError)"
@@ -120,7 +122,7 @@
               <X class="h-3.5 w-3.5" />
             </Button>
           </div>
-          <span v-else class="text-xs text-muted-foreground">Right-click two graph segments to Boost time</span>
+          <span v-else-if="allowed('route_eld.log_details.boost')" class="text-xs text-muted-foreground">Right-click two graph segments to Boost time</span>
         </template>
       </CBoostGraph>
     </section>
@@ -132,6 +134,7 @@
         </div>
         <div class="flex items-center gap-2">
           <Button
+            v-if="allowed('route_eld.log_details.events.insert')"
             variant="outline"
             size="sm"
             :disabled="!canEditSession"
@@ -210,9 +213,11 @@
         :highlighted-event-id="highlightedEventId"
         :selected-row-ids="selectedRowIds"
         :show-driver-column="coDriverRenderEnabled && Boolean(latestPeriodCoDriver)"
-        :can-edit-profile="canEditSession"
+        :can-edit-profile="canEditSession && allowed('route_eld.log_details.profile_forms.edit')"
         :drag-drop-enabled="dragDropEnabled && canEditSession"
-        :can-edit-events="canEditSession"
+        :can-edit-events="canEditSession && allowed('route_eld.log_details.events.edit')"
+        :can-insert-events="canEditSession && allowed('route_eld.log_details.events.insert')"
+        :can-delete-events="canEditSession && allowed('route_eld.log_details.events.delete')"
         :column-visibility="eventTableColumnVisibility"
         :time-zone="workspaceTimeZone"
         :camera-matches="alprAnalysis?.matches ?? []"
@@ -230,7 +235,13 @@
 
     <CBoostActions
       :drag-drop-enabled="dragDropEnabled && canEditSession"
-      :can-edit="canEditSession"
+      :can-edit="canEditSession && allowed('route_eld.log_details.events.edit')"
+      :can-delete="allowed('route_eld.log_details.events.delete')"
+      :can-multi-update="allowed('route_eld.log_details.events.multi_update')"
+      :can-boost="allowed('route_eld.log_details.boost')"
+      :can-normalize="allowed('route_eld.log_details.normalize')"
+      :can-certification="allowed('route_eld.log_details.certification_fix')"
+      :can-reassign="allowed('route_eld.log_details.reassign_replicate')"
       :delete-disabled="!selectedRowIds.length || !canEditSession"
       :duration-disabled="
         selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
@@ -463,6 +474,8 @@ import {
 } from '@/components/ui/dialog'
 import { getApiErrorMessage, useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart'
 import type {
   RouteEldAiAdvice,
@@ -505,6 +518,8 @@ import {
 } from '../composables/useScheduleBoost'
 
 const api = useApi()
+const authStore = useAuthStore()
+const allowed = (code: string) => hasPermission(authStore.token, code)
 const boost = useScheduleBoost()
 const {
   store,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +15,11 @@ import CreateDotModal from '@/modules/Tools/DotInspection/components/CDotInsModa
 import DotInspectionTable from '@/modules/Tools/DotInspection/components/CDotInsTable.vue'
 import { useDotIns } from '@/modules/Tools/DotInspection/composables/useDotIns'
 import type { DotInspection } from '@/modules/Tools/DotInspection/types'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
+
+const authStore = useAuthStore()
+const canManage = computed(() => hasPermission(authStore.token, 'route_eld.dot_inspections.manage'))
 
 const {
   drivers,
@@ -88,7 +94,7 @@ function toggleStatus(inspection: DotInspection) {
           <RefreshCw :class="['mr-2 h-4 w-4', isRefreshing && 'animate-spin']" />
           Refresh
         </Button>
-        <Button @click="openCreateModal()">
+        <Button v-if="canManage" @click="openCreateModal()">
           <Plus class="mr-2 h-4 w-4" />
           Create
         </Button>
@@ -114,6 +120,7 @@ function toggleStatus(inspection: DotInspection) {
       :items-per-page="itemsPerPage"
       :sort-key="sortKey"
       :sort-order="sortOrder"
+      :can-manage="canManage"
       @sort="handleSort"
       @toggle-status="toggleStatus"
       @delete="openConfirmModal('delete', $event)"

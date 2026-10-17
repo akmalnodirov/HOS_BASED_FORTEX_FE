@@ -45,7 +45,7 @@
           <Sparkles class="mr-2 h-4 w-4" /> AI Advice
         </Button> -->
         <Button
-          v-if="primarySessionAction"
+          v-if="primarySessionAction && (primarySessionAction === 'submit' ? allowSubmit : allowRollback)"
           size="sm"
           :class="[
             'h-9 px-5 text-xs font-semibold shadow-sm transition-colors',
@@ -162,6 +162,8 @@ const props = withDefaults(
     pendingRollbackCount?: number
     rollbackBlocked?: boolean
     canManageTabs?: boolean
+    allowSubmit?: boolean
+    allowRollback?: boolean
     freeTimes?: BoostFreeTime[]
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
@@ -176,6 +178,8 @@ const props = withDefaults(
     pendingRollbackCount: 0,
     rollbackBlocked: false,
     canManageTabs: false,
+    allowSubmit: false,
+    allowRollback: false,
     freeTimes: () => [],
     tabs: () => [],
     selectedTab: null,

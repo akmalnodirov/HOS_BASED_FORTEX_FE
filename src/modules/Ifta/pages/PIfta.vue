@@ -35,7 +35,7 @@
           <RefreshCw :class="['mr-2 h-4 w-4', isRefreshing && 'animate-spin']" />
           Refresh
         </Button>
-        <Button class="h-10" :disabled="!companyId" @click="generateOpen = true">
+        <Button v-if="canGenerate" class="h-10" :disabled="!companyId" @click="generateOpen = true">
           <Plus class="mr-2 h-4 w-4" />
           Generate report(s)
         </Button>
@@ -315,9 +315,13 @@ import CIftaMultiSelect from '@/modules/Ifta/components/CIftaMultiSelect.vue'
 import CIftaDownloadDialog from '@/modules/Ifta/components/CIftaDownloadDialog.vue'
 import CIftaBulkDownloadDialog from '@/modules/Ifta/components/CIftaBulkDownloadDialog.vue'
 import { useIfta } from '@/modules/Ifta/composables/useIfta'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import type { IftaApiResponse } from '@/modules/Ifta/types'
 
 const companyId = getCompanyId() || ''
+const authStore = useAuthStore()
+const canGenerate = computed(() => hasPermission(authStore.token, 'route_eld.ifta_reports.generate'))
 const { companies } = useCompanies()
 
 const companyName = computed(

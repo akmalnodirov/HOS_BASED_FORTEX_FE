@@ -20,7 +20,7 @@
             :driver-name="boostWorkspace?.session.driverName"
             :external-driver-id="boostSchedule?.externalDriverId"
             :company-name="boostWorkspace?.session.companyName"
-            :can-edit="boostWorkspace?.session.status === 'DRAFT' && boostWorkspace?.canEdit && boostWorkspaceStore.activeTab?.kind === 'WORKING'"
+            :can-edit="canEditProfile && boostWorkspace?.session.status === 'DRAFT' && boostWorkspace?.canEdit && boostWorkspaceStore.activeTab?.kind === 'WORKING'"
             :time-zone="boostWorkspace?.events[0]?.event.timeZone ?? 'CT'"
             @edit="boostWorkspaceStore.requestProfileFormEdit"
           />
@@ -63,12 +63,16 @@ import CLogTabs from '../[Id]/components/detail/CLogTabs.vue'
 import { useRouteEldLogDetail } from '../[Id]/composables/useRouteEldLogDetail'
 import CBoostDailyLogCard from '../Boost/components/CBoostDailyLogCard.vue'
 import { useBoostWorkspaceStore } from '../Boost/store/boostWorkspace'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 
 const logDetail = useRouteEldLogDetail()
 const route = useRoute()
 const isTrackingPage = computed(() => route.name === 'ELDTracking')
 const isBoostPage = computed(() => route.name === 'ELDBoost')
 const boostWorkspaceStore = useBoostWorkspaceStore()
+const authStore = useAuthStore()
+const canEditProfile = computed(() => hasPermission(authStore.token, 'route_eld.log_details.profile_forms.edit'))
 const {
   workspace: boostWorkspace,
   profileForms: boostProfileForms,

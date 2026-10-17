@@ -140,11 +140,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, type Component } from 'vue'
+import { ref, watch, computed, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { FileBarChart2, LogOut, ChevronDown, Scale } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { canAccessPath } from '@/router/permissions'
 
 interface MenuItem {
   id: string
@@ -165,7 +166,7 @@ const route = useRoute()
 
 const expandedMenus = ref<string[]>([])
 
-const menuItems: MenuItem[] = [
+const allMenuItems: MenuItem[] = [
   {
     id: 'operations',
     label: 'Operations',
@@ -362,6 +363,16 @@ const navigateTo = (path?: string) => {
 }
 
 const authStore = useAuthStore()
+
+const visibleMenuItem = (item: MenuItem): MenuItem | null => {
+  if (item.children) {
+    const children = item.children.map(visibleMenuItem).filter((child): child is MenuItem => child !== null)
+    return children.length ? { ...item, children } : null
+  }
+  return item.path && canAccessPath(item.path, authStore.token) ? item : null
+}
+
+const menuItems = computed(() => allMenuItems.map(visibleMenuItem).filter((item): item is MenuItem => item !== null))
 
 const handleLogout = async () => {
   await authStore.logout()

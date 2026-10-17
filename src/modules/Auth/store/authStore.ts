@@ -3,6 +3,7 @@ import router from '@/router'
 import { useApi } from '@/composables/useAxiosService'
 import type { User, CurrentUserResponse, CurrentUserCompany } from '@/modules/Auth/types'
 import { setApiTimeZone, clearApiTimeZone } from '@/composables/useTimezone'
+import { getCompanyId, removeCompanyId, removeCompanyTimeZoneId } from '@/utils/company'
 
 export const useAuthStore = defineStore('authStore', {
   state: () => ({
@@ -18,8 +19,10 @@ export const useAuthStore = defineStore('authStore', {
     getCompany: (state) => state.company,
     // Get companyId from carrier object
     companyId: (state) => state.company?.id || null,
-    // Get clientId from carrier.provider object
-    clientId: (state) => state.company?.client?.id || null,
+    clientId: (state) => {
+      const id = state.user?.clientId ?? state.company?.client?.id
+      return id && id !== '00000000-0000-0000-0000-000000000000' ? id : null
+    },
   },
   actions: {
     // Initialize auth state from localStorage
@@ -51,11 +54,16 @@ export const useAuthStore = defineStore('authStore', {
       this.token = null
       this.refreshToken = null
       this.user = null
-      this.company = null
+      this.clearSelectedCompany()
       this.loggedIn = false
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
-      // Clear API timezone on logout
+    },
+    clearSelectedCompany() {
+      this.company = null
+      removeCompanyId()
+      removeCompanyTimeZoneId()
+      localStorage.removeItem('companyName')
       clearApiTimeZone()
     },
     setUser(user: User) {
@@ -67,11 +75,21 @@ export const useAuthStore = defineStore('authStore', {
     },
     async fetchCurrentUser() {
       try {
-        const companyId = localStorage.getItem('companyId')
+        const companyId = getCompanyId()
         const url = companyId
           ? `/api/users/current-user?companyId=${companyId}`
           : '/api/users/current-user'
-        const res = await useApi().get<CurrentUserResponse>(url)
+        let res: { data: CurrentUserResponse }
+        try {
+          res = await useApi().get<CurrentUserResponse>(url, {
+            _skipErrorToast: !!companyId,
+          })
+        } catch (error) {
+          const status = (error as { response?: { status?: number } })?.response?.status
+          if (!companyId || (status !== 400 && status !== 403)) throw error
+          this.clearSelectedCompany()
+          res = await useApi().get<CurrentUserResponse>('/api/users/current-user')
+        }
 
         // Current-user API returns successResult with user and carrier objects
         const result = res.data?.successResult
@@ -82,12 +100,14 @@ export const useAuthStore = defineStore('authStore', {
           const company = result.carrier
             ? { ...result.carrier, client: result.carrier.provider }
             : null
-          if (company) this.setCompany(company)
+          this.setCompany(company)
 
           // Save carrier timezone from API response (highest priority)
           if (company?.timeZoneInfo?.ianaId) {
             setApiTimeZone(company.timeZoneInfo.ianaId)
             console.log('Company timezone set from API:', company.timeZoneInfo.ianaId)
+          } else if (!company) {
+            clearApiTimeZone()
           }
 
           return result.user
