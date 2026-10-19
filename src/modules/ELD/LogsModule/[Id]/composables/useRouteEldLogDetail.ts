@@ -486,7 +486,7 @@ function mapEvent(
     locationOrigin: event.positioning === 'AUTOMATIC' ? 1 : 2,
     totalVehicleMiles: event.odometerMiles,
     totalEngineHours: event.engineHours,
-    recordOrigin: recordOrigin(event.recordOrigin),
+    recordOrigin: event.recordOrigin,
     recordStatus: recordStatus(event.recordStatus),
     annotation: event.notes,
     vehicleUnit: event.vehicleName,

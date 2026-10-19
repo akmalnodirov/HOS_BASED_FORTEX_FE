@@ -173,7 +173,7 @@
                   {{ getEngineHours(event) }}
                 </td>
                 <td v-if="isColumnVisible('recordOrigin')" class="px-4 py-3 text-center">
-                  {{ getRecordOrigin(event) }}
+                  {{ event.recordOrigin }}
                 </td>
                 <td v-if="isColumnVisible('recordStatus')" class="px-4 py-3 text-center">
                   {{ getRecordStatus(event) }}
@@ -486,17 +486,6 @@ const getOdometer = (event: any): string => {
 const getEngineHours = (event: any): string => {
   const hours = event.totalEngineHours || event.engineHours
   return hours ? hours.toFixed(1) : '---'
-}
-
-const getRecordOrigin = (event: any): string => {
-  const recordOrigin = event.recordOrigin
-  if (recordOrigin === 1) return 'Auto'
-  if (recordOrigin === 2) return 'Manual'
-  if (recordOrigin === 3) return 'Edited'
-  if (recordOrigin === 4) return 'Exempt'
-  if (event.isAutomatic) return 'Auto'
-  if (event.origin) return event.origin
-  return 'Manual'
 }
 
 const getRecordStatus = (event: any): string => {

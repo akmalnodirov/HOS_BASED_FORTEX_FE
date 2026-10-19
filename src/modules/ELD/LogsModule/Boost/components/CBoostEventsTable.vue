@@ -512,11 +512,43 @@
                   </div>
 
                   <div v-if="isColumnVisible('trailer')" class="text-sm text-foreground">
-                    {{ event.trailerNumber || '-' }}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate" :title="event.trailerNumber || undefined">
+                        {{ event.trailerNumber || '-' }}
+                      </span>
+                      <button
+                        v-if="event.trailerNumber?.trim()"
+                        type="button"
+                        class="ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Copy trailers"
+                        aria-label="Copy trailers"
+                        draggable="false"
+                        @click.stop="copyCellValue(event.trailerNumber, 'Trailers')"
+                        @dragstart.stop.prevent
+                      >
+                        <Copy class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div v-if="isColumnVisible('document')" class="text-sm text-foreground">
-                    {{ event.shippingDocument || '-' }}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate" :title="event.shippingDocument || undefined">
+                        {{ event.shippingDocument || '-' }}
+                      </span>
+                      <button
+                        v-if="event.shippingDocument?.trim()"
+                        type="button"
+                        class="ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Copy documents"
+                        aria-label="Copy documents"
+                        draggable="false"
+                        @click.stop="copyCellValue(event.shippingDocument, 'Documents')"
+                        @dragstart.stop.prevent
+                      >
+                        <Copy class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div
@@ -753,6 +785,15 @@ const emit = defineEmits<{
 const copyLocationCoordinates = async (latitude: number, longitude: number) => {
   await copyCoordinates(latitude, longitude)
   toast.success('Coordinates copied')
+}
+
+const copyCellValue = async (value: string, label: string) => {
+  try {
+    await navigator.clipboard.writeText(value.trim())
+    toast.success(`${label} copied`)
+  } catch {
+    toast.error(`Unable to copy ${label.toLowerCase()}`)
+  }
 }
 
 const openItems = ref<string[]>([])
