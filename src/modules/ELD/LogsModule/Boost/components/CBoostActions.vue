@@ -12,7 +12,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="deleteDisabled"
+            :disabled="deleteDisabled || deleteLoading || actionPending"
             @click="showDeleteConfirm = true"
           >
             <svg
@@ -40,7 +40,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="deleteDisabled"
+            :disabled="deleteDisabled || actionPending"
             @click="$emit('multi-update-click')"
           >
             <span>Multi Update{{ selectedSuffix }}</span>
@@ -53,7 +53,7 @@
             <Checkbox
               id="toggle-2"
               :model-value="dragDropEnabled"
-              :disabled="!canEdit"
+              :disabled="!canEdit || actionPending"
               @update:model-value="canEdit && $emit('dragdrop-change', $event === true)"
               class="border-[#DBDBDB] data-[state=checked]:border-black data-[state=checked]:bg-black data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
             />
@@ -67,7 +67,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="durationDisabled"
+            :disabled="durationDisabled || actionPending"
             :title="durationTitle || 'Expand or reduce the selected event'"
             @click="$emit('duration-click')"
           >
@@ -79,7 +79,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="normalizeDisabled"
+            :disabled="normalizeDisabled || actionPending"
             @click="$emit('normalize-click')"
           >
             <span>Normalize</span>
@@ -90,6 +90,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
+            :disabled="actionPending"
             @click="$emit('certification-click')"
           >
             <span>Certification</span>
@@ -100,7 +101,7 @@
             variant="outline"
             size="sm"
             class="h-9.5 px-4 text-sm"
-            :disabled="reassignDisabled"
+            :disabled="reassignDisabled || actionPending"
             @click="$emit('reassign-click')"
           >
             <span>Reassign / Replicate{{ selectedSuffix }}</span>
@@ -110,7 +111,7 @@
     </div>
   </div>
 
-  <Dialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
+  <Dialog :open="showDeleteConfirm" @update:open="(open) => { if (open || !deleteLoading) showDeleteConfirm = open }">
     <DialogContent class="sm:max-w-[400px]">
       <DialogHeader>
         <DialogTitle>Delete Events</DialogTitle>
@@ -120,8 +121,8 @@
         {{ selectedCount === 1 ? 'event' : 'events' }}?
       </p>
       <DialogFooter class="gap-2">
-        <Button variant="outline" @click="showDeleteConfirm = false">Cancel</Button>
-        <Button variant="destructive" @click="confirmDelete">Delete</Button>
+        <Button variant="outline" :disabled="deleteLoading" @click="showDeleteConfirm = false">Cancel</Button>
+        <Button variant="destructive" :disabled="deleteLoading || actionPending" @click="confirmDelete">Delete</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -142,6 +143,7 @@ import {
 const props = withDefaults(
   defineProps<{
     dragDropEnabled?: boolean
+    actionPending?: boolean
     canEdit?: boolean
     canDelete?: boolean
     canMultiUpdate?: boolean
@@ -150,6 +152,7 @@ const props = withDefaults(
     canCertification?: boolean
     canReassign?: boolean
     deleteDisabled?: boolean
+    deleteLoading?: boolean
     reassignDisabled?: boolean
     durationDisabled?: boolean
     durationTitle?: string
@@ -158,6 +161,7 @@ const props = withDefaults(
   }>(),
   {
     dragDropEnabled: false,
+    actionPending: false,
     canEdit: false,
     canDelete: false,
     canMultiUpdate: false,
@@ -166,6 +170,7 @@ const props = withDefaults(
     canCertification: false,
     canReassign: false,
     deleteDisabled: false,
+    deleteLoading: false,
     reassignDisabled: false,
     durationDisabled: false,
     durationTitle: '',

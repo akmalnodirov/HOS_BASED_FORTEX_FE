@@ -13,6 +13,7 @@
       :can-manage-tabs="session?.status === 'DRAFT' && allowed('route_eld.log_details.tabs.manage')"
       :allow-submit="allowed('route_eld.log_details.submit')"
       :allow-rollback="allowed('route_eld.log_details.rollback')"
+      :actions-pending="store.isMutating || store.isLoading"
       :submit-loading="sessionActionLoading"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
@@ -218,6 +219,9 @@
         :can-edit-events="canEditSession && allowed('route_eld.log_details.events.edit')"
         :can-insert-events="canEditSession && allowed('route_eld.log_details.events.insert')"
         :can-delete-events="canEditSession && allowed('route_eld.log_details.events.delete')"
+        :mutation-pending="store.isMutating || store.isLoading"
+        :can-retry-delivery="canRetryDelivery"
+        :retrying-event-id="retryingEventId"
         :column-visibility="eventTableColumnVisibility"
         :time-zone="workspaceTimeZone"
         :camera-matches="alprAnalysis?.matches ?? []"
@@ -229,11 +233,13 @@
         @revert-event="revertBoostEvent"
         @view-event="openEventViewer"
         @edit-profile="openEditDailyForm"
-        @drop-property="dropProperty"
+        @drop-property="handleDropProperty"
+        @retry-delivery="retryEventDelivery"
       />
     </section>
 
     <CBoostActions
+      :action-pending="store.isMutating || store.isLoading"
       :drag-drop-enabled="dragDropEnabled && canEditSession"
       :can-edit="canEditSession && allowed('route_eld.log_details.events.edit')"
       :can-delete="allowed('route_eld.log_details.events.delete')"
@@ -243,6 +249,7 @@
       :can-certification="allowed('route_eld.log_details.certification_fix')"
       :can-reassign="allowed('route_eld.log_details.reassign_replicate')"
       :delete-disabled="!selectedRowIds.length || !canEditSession"
+      :delete-loading="deletingSelectedEvents"
       :duration-disabled="
         selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
       "
@@ -317,6 +324,8 @@
     <CBoostMultiUpdateModal
       v-model:open="multiUpdateModalOpen"
       :events="selectedEventsForUpdate"
+      :source-events="selectedSourceEvents"
+      :session="session"
       :loading="isMultiUpdateLoading"
       @submit="submitMultiUpdateEvents"
     />
@@ -326,7 +335,6 @@
       :loading="isEditDailyFormLoading"
       @update:form="updateEditDailyForm"
       @submit="submitDailyForm"
-      @revert="revertDailyForm"
     />
     <CBoostAiAdviceModal
       v-model:open="aiAdviceOpen"
@@ -429,6 +437,34 @@
       </DialogContent>
     </Dialog>
 
+    <Dialog :open="deleteProgressOpen" @update:open="(open) => { if (open || !deletingSelectedEvents) deleteProgressOpen = open }">
+      <DialogContent
+        class="sm:max-w-md"
+        :show-close="!deletingSelectedEvents"
+        @pointer-down-outside="(event) => deletingSelectedEvents && event.preventDefault()"
+        @escape-key-down="(event) => deletingSelectedEvents && event.preventDefault()"
+      >
+        <DialogHeader>
+          <DialogTitle>{{ deletingSelectedEvents ? 'Deleting selected events' : 'Delete complete' }}</DialogTitle>
+          <DialogDescription>The selected events are processed in the active workspace tab.</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-3 py-2">
+          <div class="h-2 overflow-hidden rounded-full bg-muted">
+            <div class="h-full bg-primary transition-[width] duration-300" :style="{ width: `${deleteProgress.total ? deleteProgress.completed / deleteProgress.total * 100 : 0}%` }" />
+          </div>
+          <div class="grid grid-cols-4 gap-2 text-center text-xs">
+            <div class="rounded-md border p-2"><strong class="block text-base">{{ deleteProgress.total }}</strong>Total</div>
+            <div class="rounded-md border p-2"><strong class="block text-base text-emerald-600">{{ deleteProgress.deleted }}</strong>Deleted</div>
+            <div class="rounded-md border p-2"><strong class="block text-base">{{ deleteProgress.skipped }}</strong>Skipped</div>
+            <div class="rounded-md border p-2"><strong class="block text-base text-destructive">{{ deleteProgress.failed }}</strong>Failed</div>
+          </div>
+        </div>
+        <DialogFooter v-if="!deletingSelectedEvents">
+          <Button variant="outline" @click="deleteProgressOpen = false">Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <CBoostCertificationModal
       v-model:open="certificationOpen"
       :report="certificationReport"
@@ -444,6 +480,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Camera,
   ChevronDown,
@@ -518,6 +555,8 @@ import {
 } from '../composables/useScheduleBoost'
 
 const api = useApi()
+const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const allowed = (code: string) => hasPermission(authStore.token, code)
 const boost = useScheduleBoost()
@@ -553,6 +592,9 @@ const {
   selectedRowIds,
   selectedEventsForUpdate,
   dragDropEnabled,
+  deleteProgressOpen,
+  deletingSelectedEvents,
+  deleteProgress,
   reassignModalOpen,
   multiUpdateModalOpen,
   showEditEventModal,
@@ -573,7 +615,6 @@ const {
   updateEditDailyForm,
   openEditDailyForm,
   submitDailyForm,
-  revertDailyForm,
   selectTab,
   addNewTab,
   removeTab,
@@ -622,12 +663,19 @@ const alprRouteOpen = ref(false)
 const highlightedEventId = ref('')
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
 const sessionProgressOpen = ref(false)
+const retryingEventId = ref('')
+const canRetryDelivery = computed(() =>
+  !store.isLoading && (
+  store.activeTab?.kind === 'ROLLBACK'
+    ? allowed('route_eld.log_details.rollback')
+    : store.activeTab?.kind === 'FINAL' && allowed('route_eld.log_details.submit'))
+)
 const sessionActionLoading = ref(false)
 const sessionOperationType = ref<'submit' | 'rollback'>('submit')
 const sessionOperation = ref<RouteEldSessionOperation | null>(null)
 const sessionOperationError = ref('')
 const canEditSession = computed(
-  () => session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
+  () => !store.isLoading && session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
 )
 const {
   visibility: eventTableColumnVisibility,
@@ -661,6 +709,11 @@ const eventCount = computed(
 )
 const graphEvents = computed(() =>
   (workspace.value?.events ?? []).filter((item) => !item.isDeleted).map((item) => item.event)
+)
+const selectedSourceEvents = computed(() =>
+  (workspace.value?.events ?? [])
+    .filter((item) => !item.isDeleted && selectedRowIds.value.includes(item.event.id))
+    .map((item) => item.event)
 )
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
@@ -1059,6 +1112,9 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
       sessionOperation.value = { ...operation, failures: [...(operation.failures ?? [])] }
     })
     if (result) sessionOperation.value = result
+    if (store.activeTabId && route.query.tabId !== store.activeTabId) {
+      await router.replace({ query: { ...route.query, tabId: store.activeTabId } })
+    }
     if (result?.failed)
       toast.warning(
         `${result.failed} event${result.failed === 1 ? '' : 's'} could not be processed`
@@ -1074,6 +1130,19 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
     toast.error(sessionOperationError.value)
   } finally {
     sessionActionLoading.value = false
+  }
+}
+
+const retryEventDelivery = async (eventId: string) => {
+  if (!canRetryDelivery.value || retryingEventId.value) return
+  retryingEventId.value = eventId
+  try {
+    const tabKind = await store.retryEventDelivery(eventId)
+    toast.success(tabKind === 'ROLLBACK' ? 'Event rolled back successfully' : 'Event synchronized with Route ELD')
+  } catch (error: any) {
+    toast.error(getApiErrorMessage(error, 'Event delivery could not be retried'))
+  } finally {
+    retryingEventId.value = ''
   }
 }
 
@@ -1104,7 +1173,7 @@ const onGraphBoostSelect = (eventId: string) => {
   if (!event) return
   if (
     event.recordStatus.toUpperCase() !== 'ACTIVE' ||
-    !['OFF', 'SB', 'D', 'ON'].includes(event.eventCategory)
+    !['OFF', 'SB', 'D', 'ON', 'PC', 'YM'].includes(event.eventCategory)
   ) {
     toast.error('Boost boundaries must be active duty events')
     return
@@ -1185,6 +1254,9 @@ const onTableEventSelect = (eventId: string) => {
   getSelectedEvent(eventId)
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
+const handleDropProperty = async (...args: Parameters<typeof dropProperty>) => {
+  if (await dropProperty(...args)) alprAnalysis.value = null
+}
 const handleErrorWarningRowClick = (eventId: string) => {
   highlightEventRow(eventId)
   getSelectedEvent(eventId)
@@ -1233,7 +1305,7 @@ const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   boostGraphRef.value?.scrollToEventSegment?.(freeTime.eventId)
 }
 const openEditableEvent = async (eventId: string) => {
-  if (!canEditSession.value) return
+  if (!canEditSession.value || !allowed('route_eld.log_details.events.edit')) return
   eventEditorReadonly.value = false
   await openEditEvent(eventId)
 }
@@ -1293,8 +1365,7 @@ const openEventViewer = async (eventId: string) => {
   showEditEventModal.value = true
 }
 const deleteEventFromEditor = async (eventId: string) => {
-  await deleteBoostEvent(eventId)
-  showEditEventModal.value = false
+  if (await deleteBoostEvent(eventId)) showEditEventModal.value = false
 }
 
 const analyzeAiAdvice = async (adviceType: string) => {
@@ -1412,11 +1483,7 @@ const applyCertificationFix = async () => {
   if (!canEditSession.value || !session.value || !store.activeTabId) return
   certificationFixing.value = true
   try {
-    await api.post(
-      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX(session.value.id, store.activeTabId),
-      null
-    )
-    await store.refreshWorkspace()
+    await store.applyCertificationFix()
     await openCertification()
     toast.success('Certification fix applied')
   } catch (error: any) {

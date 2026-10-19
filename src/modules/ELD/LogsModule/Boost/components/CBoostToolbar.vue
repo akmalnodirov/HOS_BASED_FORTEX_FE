@@ -5,6 +5,7 @@
         <div v-if="tabs.length > 0 || canManageTabs" class="flex items-center gap-1 flex-wrap">
           <button
             v-for="(tab, i) in tabs"
+            :disabled="submitLoading || actionsPending"
             :key="tab.id"
             class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
             :class="
@@ -26,6 +27,7 @@
 
           <button
             v-if="canManageTabs"
+            :disabled="submitLoading || actionsPending"
             class="flex items-center justify-center w-7 h-7 rounded-md border border-border bg-background hover:bg-muted transition-colors"
             @click="$emit('new-click')"
           >
@@ -53,7 +55,7 @@
               ? 'bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500'
               : 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500',
           ]"
-          :disabled="submitDisabled || submitLoading || (primarySessionAction === 'rollback' && rollbackBlocked)"
+          :disabled="submitDisabled || submitLoading || actionsPending || (primarySessionAction === 'rollback' && rollbackBlocked)"
           @click="$emit('session-action', primarySessionAction)"
         >
           <span v-if="submitLoading" class="flex items-center gap-1.5">
@@ -72,7 +74,7 @@
         variant="outline"
         size="sm"
         class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#E74C3C]/10 hover:text-[#AF4B4B/20] disabled:opacity-40 disabled:cursor-not-allowed"
-        :disabled="errorCount + warningCount === 0"
+        :disabled="errorCount + warningCount === 0 || actionsPending || submitLoading"
         @click="$emit('error-warning-click')"
       >
         <span class="text-red-600">Errors: {{ errorCount }}</span>
@@ -115,6 +117,7 @@
         variant="outline"
         size="sm"
         class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#AF4B4B]/10 hover:text-[#AF4B4B/20]"
+        :disabled="actionsPending || submitLoading"
         @click="$emit('violation-click')"
       >
         <span>Violation</span>
@@ -131,7 +134,7 @@
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" @click="showDeleteConfirm = false">Cancel</Button>
-          <Button variant="destructive" @click="confirmRemoveTab">Delete</Button>
+          <Button variant="destructive" :disabled="actionsPending || submitLoading" @click="confirmRemoveTab">Delete</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -157,6 +160,7 @@ const props = withDefaults(
   defineProps<{
     submitDisabled?: boolean
     submitLoading?: boolean
+    actionsPending?: boolean
     sessionStatus?: string
     pendingSubmissionCount?: number
     pendingRollbackCount?: number
@@ -173,6 +177,7 @@ const props = withDefaults(
   {
     submitDisabled: false,
     submitLoading: false,
+    actionsPending: false,
     sessionStatus: 'DRAFT',
     pendingSubmissionCount: 0,
     pendingRollbackCount: 0,
@@ -226,11 +231,13 @@ const showDeleteConfirm = ref(false)
 const pendingRemoveTabId = ref<string | null>(null)
 
 const requestRemoveTab = (tabId: string) => {
+  if (props.actionsPending || props.submitLoading) return
   pendingRemoveTabId.value = tabId
   showDeleteConfirm.value = true
 }
 
 const confirmRemoveTab = () => {
+  if (props.actionsPending || props.submitLoading) return
   if (pendingRemoveTabId.value) {
     emit('remove-tab', pendingRemoveTabId.value)
   }

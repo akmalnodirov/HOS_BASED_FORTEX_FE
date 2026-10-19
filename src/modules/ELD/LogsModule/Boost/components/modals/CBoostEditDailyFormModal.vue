@@ -1,6 +1,11 @@
 <template>
-  <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[480px]">
+  <Dialog :open="open" @update:open="onOpenChange">
+    <DialogContent
+      class="sm:max-w-[480px]"
+      @escape-key-down="loading && $event.preventDefault()"
+      @interact-outside="loading && $event.preventDefault()"
+      @pointer-down-outside="loading && $event.preventDefault()"
+    >
       <DialogHeader>
         <DialogTitle>Edit Profile Form</DialogTitle>
       </DialogHeader>
@@ -76,17 +81,8 @@
         </div>
 
         <DialogFooter class="flex gap-2">
-          <Button
-            v-if="form.dailyFormId"
-            type="button"
-            variant="destructive"
-            :disabled="loading"
-            @click="$emit('revert', form)"
-          >
-            Revert
-          </Button>
           <div class="flex gap-2 ml-auto">
-            <Button type="button" variant="secondary" @click="$emit('update:open', false)">
+            <Button type="button" variant="secondary" :disabled="loading" @click="onOpenChange(false)">
               Cancel
             </Button>
             <Button type="submit" :disabled="loading || Boolean(cargoError)">
@@ -131,7 +127,6 @@ const props = withDefaults(defineProps<Props>(), { loading: false })
 const emit = defineEmits<{
   'update:open': [value: boolean]
   submit: [form: BoostEventEditProfile]
-  revert: [form: BoostEventEditProfile]
   'update:form': [form: Partial<BoostEventEditProfile>]
 }>()
 
@@ -140,14 +135,20 @@ function patch(partial: Partial<BoostEventEditProfile>) {
 }
 
 const cargoError = computed(() => {
-  const trailers = (props.form.trailer ?? '').split(/[,\s]+/).filter(Boolean)
-  const documents = (props.form.shippingDocs ?? '').split(/[,\s]+/).filter(Boolean)
+  const trailers = (props.form.trailer ?? '').split(',').map((item) => item.trim()).filter(Boolean)
+  const documents = (props.form.shippingDocs ?? '').split(',').map((item) => item.trim()).filter(Boolean)
   return !trailers.length && documents.length
     ? 'Shipping documents require at least one trailer.'
     : ''
 })
 
 function handleSubmit() {
+  if (props.loading || cargoError.value) return
   emit('submit', props.form)
+}
+
+function onOpenChange(open: boolean) {
+  if (!open && props.loading) return
+  emit('update:open', open)
 }
 </script>

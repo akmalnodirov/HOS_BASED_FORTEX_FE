@@ -293,7 +293,7 @@
                       : '',
                     selectedRowIds.includes(event.eventId) ? 'bg-blue-50 dark:bg-blue-900/20' : '',
                   ]"
-                  @click="handleRowClick(event.eventId)"
+                  @click="handleRowClick(event.eventId, $event)"
                 >
                   <div class="flex items-center" @click.stop>
                     <CCustomCheckbox
@@ -321,20 +321,30 @@
                           </span>
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent class="max-w-64 text-xs">
-                        <div
-                          v-for="(error, index) in event.errorTitles"
-                          :key="`e-${index}-${error}`"
-                          class="text-red-600"
-                        >
-                          Error: {{ error }}
-                        </div>
-                        <div
-                          v-for="(warning, index) in event.warningTitles"
-                          :key="`w-${index}-${warning}`"
-                          class="text-amber-600"
-                        >
-                          Warning: {{ warning }}
+                      <TooltipContent
+                        side="top"
+                        align="start"
+                        :side-offset="8"
+                        arrow-class="bg-popover fill-popover"
+                        class="z-[70] w-80 max-w-[calc(100vw-2rem)] border border-border bg-popover p-2 text-left text-popover-foreground shadow-md"
+                      >
+                        <div class="space-y-1.5">
+                          <div
+                            v-for="(error, index) in event.errorTitles"
+                            :key="`e-${index}-${error}`"
+                            class="flex items-start gap-1.5 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium leading-4 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                          >
+                            <CircleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span class="min-w-0 break-words">{{ error }}</span>
+                          </div>
+                          <div
+                            v-for="(warning, index) in event.warningTitles"
+                            :key="`w-${index}-${warning}`"
+                            class="flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium leading-4 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300"
+                          >
+                            <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span class="min-w-0 break-words">{{ warning }}</span>
+                          </div>
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -396,9 +406,17 @@
                             </span>
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent class="max-w-72">
-                          <div class="font-medium">Matched ALPR cameras</div>
-                          <div class="mt-1 text-xs">
+                        <TooltipContent
+                          side="top"
+                          :side-offset="8"
+                          arrow-class="bg-popover fill-popover"
+                          class="z-[70] max-w-72 border border-border bg-popover p-3 text-left text-popover-foreground shadow-md"
+                        >
+                          <div class="flex items-center gap-2 text-xs font-semibold">
+                            <Camera class="h-3.5 w-3.5 text-red-500" />
+                            Matched ALPR cameras
+                          </div>
+                          <div class="mt-2 break-words text-xs leading-5 text-muted-foreground">
                             {{ cameraNames(event.eventId) }}
                           </div>
                         </TooltipContent>
@@ -423,24 +441,21 @@
 
                   <div
                     v-if="isColumnVisible('location')"
-                    class="text-sm text-foreground wrap-break-word"
+                    class="text-sm text-foreground"
                     :class="
                       dragDropEnabled && event.actionState !== 4 && event.actionState !== 8
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="
-                      draggableAttrs('location', event, {
-                        positioning: event.manualLocation ? 'MANUAL' : 'AUTOMATIC',
-                        locationOrigin: event.locationOrigin,
-                        calculatedLocation: event.calculatedLocation,
-                        manualLocation: event.manualLocation,
-                        latitude: event.latitude,
-                        longitude: event.longitude,
-                      })
-                    "
+                    v-bind="draggableAttrs('location', event)"
                   >
-                    {{ event.calculatedLocation || event.manualLocation || 'N/A' }}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate" :title="displayLocation(event)">{{ displayLocation(event) }}</span>
+                      <span
+                        v-if="hasManualLocationNote(event)"
+                        class="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                      >manual</span>
+                    </div>
                   </div>
 
                   <div v-if="isColumnVisible('system')" class="text-sm text-foreground">
@@ -455,7 +470,7 @@
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="draggableAttrs('odometer', event, event.vehicleMiles ?? null)"
+                    v-bind="draggableAttrs('odometer', event)"
                   >
                     {{ event.vehicleMiles != null ? Math.round(event.vehicleMiles) : '-' }}
                   </div>
@@ -468,7 +483,7 @@
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="draggableAttrs('engine_hours', event, event.engineHours ?? null)"
+                    v-bind="draggableAttrs('engine_hours', event)"
                   >
                     {{ event.engineHours ?? '-' }}
                   </div>
@@ -525,7 +540,7 @@
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
-                      :disabled="event.actionState === 4 || event.actionState === 8"
+                      :disabled="event.actionState === 4 || event.actionState === 8 || mutationPending"
                       @click="$emit('edit-event', event.eventId)"
                     >
                       <Pencil class="h-3.5 w-3.5" />
@@ -535,7 +550,7 @@
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
-                      :disabled="event.actionState === 4 || event.actionState === 8"
+                      :disabled="event.actionState === 4 || event.actionState === 8 || mutationPending"
                       @click="$emit('copy-event', event.eventId)"
                     >
                       <Copy class="h-3.5 w-3.5" />
@@ -546,7 +561,7 @@
                       size="icon"
                       class="h-7 w-7 text-blue-600"
                       title="Revert change"
-                      :disabled="event.actionState === 8"
+                      :disabled="event.actionState === 8 || mutationPending"
                       @click="$emit('revert-event', event.eventId)"
                     >
                       <Undo2 class="h-3.5 w-3.5" />
@@ -562,11 +577,23 @@
                       <Eye class="h-3.5 w-3.5" />
                     </Button>
                     <Button
+                      v-if="canRetryDelivery && (event.deliveryStatus === 'SUBMISSION_PENDING' || event.deliveryStatus === 'ROLLBACK_PENDING' || (event.deliveryStatus === 'SUBMITTED' && event.eventType === 4 && event.changeStatus?.toUpperCase() === 'CHANGED'))"
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7 text-blue-600"
+                      :title="event.deliveryStatus === 'ROLLBACK_PENDING' ? 'Retry rollback' : event.deliveryStatus === 'SUBMITTED' ? 'Recheck certification event on Route ELD' : 'Retry submission'"
+                      :disabled="mutationPending || Boolean(retryingEventId)"
+                      @click="$emit('retry-delivery', event.eventId)"
+                    >
+                      <LoaderCircle v-if="retryingEventId === event.eventId" class="h-3.5 w-3.5 animate-spin" />
+                      <RotateCcw v-else class="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
                       v-if="canDeleteEvents"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
-                      :disabled="event.actionState === 4 || event.actionState === 8"
+                      :disabled="event.actionState === 4 || event.actionState === 8 || mutationPending"
                       @click="$emit('delete-event', event.eventId)"
                     >
                       <Trash2 class="h-3.5 w-3.5" />
@@ -597,6 +624,10 @@ import {
   Eye,
   Undo2,
   Camera,
+  CircleAlert,
+  TriangleAlert,
+  RotateCcw,
+  LoaderCircle,
 } from 'lucide-vue-next'
 import {
   Accordion,
@@ -616,7 +647,7 @@ import type {
   BoostEventTableColumnVisibility,
 } from '../composables/useBoostEventTableColumns'
 import { findEventByTypeAndCode } from '@/utils/events.ts'
-import { useDragDrop, type DragColumnType, type DragPayload } from '../composables/useDragDrop.ts'
+import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
 
 const RECORD_ORIGIN_LABELS: Record<number, string> = {
   1: 'ELD',
@@ -655,6 +686,9 @@ interface Props {
   canEditEvents?: boolean
   canInsertEvents?: boolean
   canDeleteEvents?: boolean
+  mutationPending?: boolean
+  canRetryDelivery?: boolean
+  retryingEventId?: string
   dragDropEnabled?: boolean
   columnVisibility?: BoostEventTableColumnVisibility
   timeZone?: string | null
@@ -672,6 +706,9 @@ const props = withDefaults(defineProps<Props>(), {
   canEditEvents: false,
   canInsertEvents: false,
   canDeleteEvents: false,
+  mutationPending: false,
+  canRetryDelivery: false,
+  retryingEventId: '',
   dragDropEnabled: false,
   columnVisibility: () => ({
     duration: true,
@@ -709,7 +746,8 @@ const emit = defineEmits<{
   'toggle-selection': [eventId: string]
   'update:selected-row-ids': [ids: string[]]
   'edit-profile': [date: string]
-  'drop-property': [column: DragColumnType, targetEventId: string, data: DragPayload['data']]
+  'drop-property': [column: DragColumnType, targetEventId: string, sourceEventId: string]
+  'retry-delivery': [eventId: string]
 }>()
 
 const openItems = ref<string[]>([])
@@ -830,22 +868,41 @@ function onKeyUp(e: KeyboardEvent) {
   if (e.key === 'Shift') isShiftPressed.value = false
 }
 
-const { setup: setupDragDrop, cleanup: cleanupDragDrop } = useDragDrop(
-  (column, targetEventId, data) => emit('drop-property', column, targetEventId, data)
+const { setup: setupDragDrop, cleanup: cleanupDragDrop, suppressClick } = useDragDrop(
+  (column, targetEventId, sourceEventId) =>
+    emit('drop-property', column, targetEventId, sourceEventId)
 )
 
-function draggableAttrs(
-  column: DragColumnType,
-  event: BoostUiEventRow,
-  payload: DragPayload['data']
-) {
-  if (!props.dragDropEnabled || event.actionState === 4 || event.actionState === 8) return {}
+function draggableAttrs(column: DragColumnType, event: BoostUiEventRow) {
+  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.changeStatus === 'CO_DRIVER') return {}
+  const hasValue = column === 'location'
+    ? hasDraggableLocation(event)
+    : column === 'odometer'
+      ? event.vehicleMiles != null
+      : event.engineHours != null
   return {
-    draggable: true,
-    'data-draggable': 'true',
-    'data-column': column,
-    'data-payload': JSON.stringify(payload),
+    draggable: hasValue,
+    'data-drag-field': column,
+    'data-drop-enabled': event.actionState === 8 || props.mutationPending ? 'false' : 'true',
   }
+}
+
+function hasManualLocationNote(event: BoostUiEventRow) {
+  return event.positioning === 'MANUAL' && Boolean(event.manualLocation?.trim())
+}
+
+function displayLocation(event: BoostUiEventRow) {
+  if (event.positioning === 'AUTOMATIC') {
+    return event.calculatedLocation?.trim() || event.manualLocation?.trim() || 'N/A'
+  }
+  return event.manualLocation?.trim() || event.calculatedLocation?.trim() || 'N/A'
+}
+
+function hasDraggableLocation(event: BoostUiEventRow) {
+  if (event.positioning === 'MANUAL' || event.manualLocation?.trim()) {
+    return Boolean(event.manualLocation?.trim() || event.calculatedLocation?.trim())
+  }
+  return Boolean(event.calculatedLocation?.trim() || event.latitude != null || event.longitude != null)
 }
 watch(
   scrollContainer,
@@ -905,7 +962,8 @@ function toggleRow(eventId: string) {
 
 import ToggleEventsWorker from '../workers/toggleEvents.worker.ts?worker'
 
-function handleRowClick(eventId: string) {
+function handleRowClick(eventId: string, clickEvent: MouseEvent) {
+  if (suppressClick(clickEvent)) return
   const event = allEvents.value.find((e) => e.eventId === eventId)
   if (event?.actionState === 4) return
   emit('toggle-selection', eventId)

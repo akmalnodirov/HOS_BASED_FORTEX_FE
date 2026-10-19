@@ -3,8 +3,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getApiErrorMessage, useApi } from '@/composables/useAxiosService'
-import { ApiEndpoints } from '@/api/endpoints'
+import { getApiErrorMessage } from '@/composables/useAxiosService'
 import type {
   BoostFreeTime,
   DailyDictionarySummaryResponse,
@@ -25,7 +24,7 @@ import type {
 } from '../types/boost'
 import { useBoostWorkspaceStore } from '../store/boostWorkspace'
 import { useChartStore } from '@/modules/ELD/LogsModule/[Id]/store/chart'
-import type { DragColumnType, LocationTransfer } from './useDragDrop'
+import type { DragColumnType } from './useDragDrop'
 
 export interface BoostUiEventRow {
   eventId: string
@@ -38,6 +37,7 @@ export interface BoostUiEventRow {
   eventName?: string
   calculatedLocation?: string
   manualLocation?: string
+  positioning?: string | null
   locationOrigin?: number | null
   latitude?: number | null
   longitude?: number | null
@@ -306,6 +306,15 @@ function asOrigin(value?: string | null) {
   return 4
 }
 
+function editableOrigin(value?: string | null) {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'ELD') return 1
+  if (normalized === 'DRIVER') return 2
+  if (normalized === 'OTHER_USER') return 3
+  if (normalized === 'UNIDENTIFIED_DRIVER') return 4
+  return null
+}
+
 function normalizedStatus(value?: string | null) {
   return String(value || 'ACTIVE')
     .trim()
@@ -352,7 +361,6 @@ function groupByDate<T extends { date: string }>(values: T[]) {
 export function useScheduleBoost() {
   const route = useRoute()
   const router = useRouter()
-  const api = useApi()
   const store = useBoostWorkspaceStore()
   const chartStore = useChartStore()
   const {
@@ -399,6 +407,9 @@ export function useScheduleBoost() {
   const showEditEventModal = ref(false)
   const showEditDailyFormModal = ref(false)
   const isActionLoading = ref(false)
+  const deleteProgressOpen = ref(false)
+  const deletingSelectedEvents = ref(false)
+  const deleteProgress = ref({ total: 0, completed: 0, deleted: 0, skipped: 0, failed: 0 })
   const headerDate = ref<[Dayjs, Dayjs]>([dayjs().subtract(9, 'day'), dayjs()])
 
   const tabs = computed<TabResponse[]>(() =>
@@ -555,6 +566,7 @@ export function useScheduleBoost() {
         eventName: event.eventName,
         calculatedLocation: event.location || undefined,
         manualLocation: event.driverLocationDescription || undefined,
+        positioning: event.positioning,
         locationOrigin: event.driverLocationDescription ? 2 : 1,
         latitude: event.latitude,
         longitude: event.longitude,
@@ -567,7 +579,7 @@ export function useScheduleBoost() {
         shippingDocument: workspaceEvent.documents.join(', ') || undefined,
         actionState: workspaceEvent.isDeleted
           ? 4
-          : event.isFrozen || !workspace.value?.canEdit
+          : event.isFrozen || !workspace.value?.canEdit || (session.value && !isRouteEldEventWithinSession(event, session.value))
             ? 8
             : 1,
         changeStatus: workspaceEvent.changeStatus,
@@ -595,6 +607,7 @@ export function useScheduleBoost() {
         eventName: event.eventName,
         calculatedLocation: event.location || undefined,
         manualLocation: event.driverLocationDescription || undefined,
+        positioning: event.positioning,
         locationOrigin: event.driverLocationDescription ? 2 : 1,
         latitude: event.latitude,
         longitude: event.longitude,
@@ -650,14 +663,12 @@ export function useScheduleBoost() {
             ? {
                 id: form?.logDate ?? dailyLog!.logDate,
                 formDate: form?.logDate ?? dailyLog!.logDate,
-                trailers: form?.trailers.length ? form.trailers : (dailyLog?.trailers ?? []),
-                shippingDocuments: form?.shippingDocuments.length
-                  ? form.shippingDocuments
-                  : (dailyLog?.shippingDocuments ?? []),
-                coDriver: form?.coDriverName ?? dailyLog?.coDriverName ?? null,
-                isCertified: Boolean(
-                  form?.signatureFileName || form?.signatureUrl || dailyLog?.signature
-                ),
+                trailers: form ? form.trailers : (dailyLog?.trailers ?? []),
+                shippingDocuments: form ? form.shippingDocuments : (dailyLog?.shippingDocuments ?? []),
+                coDriver: form ? (form.coDriverName ?? null) : (dailyLog?.coDriverName ?? null),
+                isCertified: form
+                  ? Boolean(form.signatureFileName || form.signatureUrl)
+                  : Boolean(dailyLog?.signature),
                 isEdited: form?.isModified ?? false,
               }
             : null,
@@ -998,7 +1009,9 @@ export function useScheduleBoost() {
       sequenceId: sequenceIdHexToDecimal(event.sequenceId),
       event: { eventType, eventCode },
       eventCodeId: event.eventCode,
-      origin: asOrigin(event.recordOrigin),
+      originalEventCode: event.eventCode,
+      originalIsEditable: event.isEditable,
+      origin: editableOrigin(event.recordOrigin),
       recordStatus: event.recordStatus,
       vehicleId: event.vehicleId ?? null,
       vehicleUnit: event.vehicleName ?? null,
@@ -1033,42 +1046,49 @@ export function useScheduleBoost() {
     const localDate = dayjs(
       `${form.startDate}T${String(form.time.hours).padStart(2, '0')}:${String(form.time.minutes).padStart(2, '0')}:${String(form.time.seconds).padStart(2, '0')}`
     )
+    const localDateTime = localDate.format('YYYY-MM-DDTHH:mm:ss')
+    const eventCode =
+      form.eventCodeId ??
+      NUMERIC_TO_EVENT_CODE[`${form.event.eventType}:${form.event.eventCode}`] ??
+      event?.eventCode ??
+      'DS_OFF'
+    const requestedRecordOrigin =
+      form.origin === 1
+        ? 'ELD'
+        : form.origin === 2
+          ? 'DRIVER'
+          : form.origin === 3
+            ? 'OTHER_USER'
+            : form.origin === 4
+              ? 'UNIDENTIFIED_DRIVER'
+              : (event?.recordOrigin ?? null)
     return {
       sequenceId: sequenceIdDecimalToHex(form.sequenceId),
-      timestamp: timestampFromRouteEldZonedLocal(
-        localDate.format('YYYY-MM-DDTHH:mm:ss'),
-        event?.timeZone ?? workspaceTimeZone.value
-      ),
-      logDate: form.startDate,
-      eventCode:
-        form.eventCodeId ??
-        NUMERIC_TO_EVENT_CODE[`${form.event.eventType}:${form.event.eventCode}`] ??
-        event?.eventCode ??
-        'DS_OFF',
+      timestamp: event && localDateTime === zonedDateTime(event.timestamp, event.timeZone)
+        ? event.timestamp
+        : timestampFromRouteEldZonedLocal(localDateTime, event?.timeZone ?? workspaceTimeZone.value),
+      logDate: form.startDate.replaceAll('-', '/'),
+      eventCode,
       recordOrigin:
-        form.origin === 1
-          ? 'ELD'
-          : form.origin === 2
-            ? 'DRIVER'
-            : form.origin === 3
-              ? 'OTHER_USER'
-              : form.origin === 4
-                ? 'UNIDENTIFIED_DRIVER'
-                : (event?.recordOrigin ?? 'OTHER_USER'),
+        event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
+          ? 'OTHER_USER'
+          : requestedRecordOrigin,
       recordStatus: form.recordStatus,
       vehicleId: form.vehicleId,
       odometerMiles: form.odometer,
       engineHours: form.engineHours,
       eldId: form.eldId,
       positioning: form.positioning,
-      driverLocationDescription: form.locationNote,
-      notes: form.notes,
-      latitude: form.latitude === '' ? null : Number(form.latitude),
-      longitude: form.longitude === '' ? null : Number(form.longitude),
-      location: form.location,
-      dateToCertify: form.certifiedDate,
-      trailers: form.trailer ? form.trailer.split(/[,\s]+/).filter(Boolean) : [],
-      documents: form.doc ? form.doc.split(/[,\s]+/).filter(Boolean) : [],
+      driverLocationDescription: form.locationNote?.trim() || null,
+      notes: form.notes?.trim() || null,
+      latitude: form.latitude == null || form.latitude === '' ? null : Number(form.latitude),
+      longitude: form.longitude == null || form.longitude === '' ? null : Number(form.longitude),
+      location: form.location?.trim() || null,
+      dateToCertify: /^DR_CERT_/.test(eventCode) && form.certifiedDate
+        ? form.certifiedDate.replaceAll('-', '/')
+        : null,
+      trailers: form.trailer ? form.trailer.split(',').map((item) => item.trim()).filter(Boolean) : [],
+      documents: form.doc ? form.doc.split(',').map((item) => item.trim()).filter(Boolean) : [],
     }
   }
 
@@ -1149,8 +1169,8 @@ export function useScheduleBoost() {
     Object.assign(editDailyForm, {
       date: form?.logDate ?? date,
       dailyFormId: form?.isModified ? form.logDate : null,
-      coDriver: form?.coDriverId ?? dailyLog?.coDriverId ?? null,
-      coDriverName: form?.coDriverName ?? dailyLog?.coDriverName ?? null,
+      coDriver: form ? (form.coDriverId ?? null) : (dailyLog?.coDriverId ?? null),
+      coDriverName: form ? (form.coDriverName ?? null) : (dailyLog?.coDriverName ?? null),
       coDrivers: coDrivers.value.map((driver) => {
         const parts = driver.name.split(' ')
         return {
@@ -1159,17 +1179,12 @@ export function useScheduleBoost() {
           lastName: parts.slice(1).join(' '),
         }
       }),
-      trailer: (form?.trailers.length ? form.trailers : dailyLog?.trailers)?.join(', ') ?? null,
-      shippingDocs:
-        (form?.shippingDocuments.length
-          ? form.shippingDocuments
-          : dailyLog?.shippingDocuments
-        )?.join(', ') ?? null,
-      signature: signatureFileName(form?.signatureFileName ?? dailyLog?.signature),
-      signaturePaths:
-        form?.signatureFileName || dailyLog?.signature
-          ? [signatureFileName(form?.signatureFileName ?? dailyLog!.signature!)!]
-          : [],
+      trailer: (form ? form.trailers : dailyLog?.trailers)?.join(', ') ?? null,
+      shippingDocs: (form ? form.shippingDocuments : dailyLog?.shippingDocuments)?.join(', ') ?? null,
+      signature: signatureFileName(form ? form.signatureFileName : dailyLog?.signature),
+      signaturePaths: form
+        ? (form.signatureFileName ? [signatureFileName(form.signatureFileName)!] : [])
+        : (dailyLog?.signature ? [signatureFileName(dailyLog.signature)!] : []),
       assignedVehicleIds: [],
     })
     showEditDailyFormModal.value = true
@@ -1213,13 +1228,13 @@ export function useScheduleBoost() {
           null,
         trailers: form.trailer
           ? form.trailer
-              .split(/[,\s]+/)
+              .split(',')
               .map((value) => value.trim())
               .filter(Boolean)
           : [],
         shippingDocuments: form.shippingDocs
           ? form.shippingDocs
-              .split(/[,\s]+/)
+              .split(',')
               .map((value) => value.trim())
               .filter(Boolean)
           : [],
@@ -1240,38 +1255,25 @@ export function useScheduleBoost() {
     }
   }
 
-  async function revertDailyForm() {
-    if (!session.value || !editDailyForm.date) return
-    if (session.value.status !== 'DRAFT' || !workspace.value?.canEdit || store.activeTab?.kind !== 'WORKING') return
-    isActionLoading.value = true
-    try {
-      await api.post(
-        `${ApiEndpoints.ROUTE_ELD_EVENT_SESSION(session.value.id)}/rollback/profile-form`,
-        null,
-        { params: { logDate: editDailyForm.date } }
-      )
-      await store.fetchProfileForms(session.value.id, activeTabId.value)
-      showEditDailyFormModal.value = false
-      toast.success('Profile form reverted')
-    } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message || error?.message || 'Failed to revert profile form'
-      )
-    } finally {
-      isActionLoading.value = false
-    }
-  }
-
   async function selectTab(tab: TabResponse) {
-    await store.selectTab(tab.id)
-    selectedRowIds.value = []
-    await router.replace({ query: { ...route.query, tabId: tab.id } })
+    try {
+      await store.selectTab(tab.id)
+      selectedRowIds.value = []
+      selectedEventId.value = ''
+      await router.replace({ query: { ...route.query, tabId: tab.id } })
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to load tab')
+    }
   }
 
   async function addNewTab() {
     try {
       const value = await store.createTab()
-      if (value) await router.replace({ query: { ...route.query, tabId: value.tabId } })
+      if (value) {
+        selectedRowIds.value = []
+        selectedEventId.value = ''
+        await router.replace({ query: { ...route.query, tabId: value.tabId } })
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to create tab')
     }
@@ -1280,7 +1282,11 @@ export function useScheduleBoost() {
   async function removeTab(tabId: string) {
     try {
       const value = await store.deleteTab(tabId)
-      if (value) await router.replace({ query: { ...route.query, tabId: value.tabId } })
+      if (value) {
+        selectedRowIds.value = []
+        selectedEventId.value = ''
+        await router.replace({ query: { ...route.query, tabId: value.tabId } })
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to delete tab')
     }
@@ -1297,23 +1303,62 @@ export function useScheduleBoost() {
   }
 
   async function deleteBoostEvent(eventId: string) {
+    const item = sourceEvent(eventId)
+    if (!item || !session.value || !workspace.value?.canEdit) return false
+    if (!isRouteEldEventWithinSession(item.event, session.value)) {
+      toast.error('Events outside the session period cannot be deleted')
+      return false
+    }
+    if (item.event.isFrozen) {
+      toast.error('DOT-inspected events cannot be deleted')
+      return false
+    }
     try {
-      await store.deleteEvents([eventId])
+      await store.deleteEvent(eventId)
       selectedRowIds.value = selectedRowIds.value.filter((id) => id !== eventId)
       toast.success('Event deleted')
+      return true
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to delete event')
+      return false
     }
   }
 
   async function deleteSelectedBoostEvents() {
-    if (!selectedRowIds.value.length) return
-    try {
-      await store.deleteEvents(selectedRowIds.value)
+    if (deletingSelectedEvents.value || !selectedRowIds.value.length) return
+    const eventIds = [...new Set(selectedRowIds.value)]
+    const availableIds = eventIds.filter((id) => {
+      const item = sourceEvent(id)
+      return item && !item.isDeleted && !item.event.isFrozen && session.value &&
+        isRouteEldEventWithinSession(item.event, session.value)
+    })
+    const skipped = eventIds.length - availableIds.length
+    deleteProgress.value = { total: eventIds.length, completed: skipped, deleted: 0, skipped, failed: 0 }
+    deleteProgressOpen.value = true
+    if (!availableIds.length) {
       selectedRowIds.value = []
-      toast.success('Selected events deleted')
+      toast.info(`${skipped} unavailable event${skipped === 1 ? ' was' : 's were'} skipped`)
+      return
+    }
+    deletingSelectedEvents.value = true
+    try {
+      await store.deleteEvents(availableIds)
+      deleteProgress.value = {
+        total: eventIds.length, completed: eventIds.length,
+        deleted: availableIds.length, skipped, failed: 0,
+      }
+      selectedRowIds.value = []
+      toast.success(`${availableIds.length} event${availableIds.length === 1 ? '' : 's'} marked for deletion`)
+      if (skipped) toast.info(`${skipped} unavailable event${skipped === 1 ? ' was' : 's were'} skipped`)
     } catch (error: any) {
+      deleteProgress.value = {
+        total: eventIds.length, completed: eventIds.length,
+        deleted: 0, skipped, failed: availableIds.length,
+      }
+      selectedRowIds.value = availableIds
       toast.error(error?.response?.data?.message || error?.message || 'Failed to delete events')
+    } finally {
+      deletingSelectedEvents.value = false
     }
   }
 
@@ -1328,6 +1373,16 @@ export function useScheduleBoost() {
   }
 
   async function revertBoostEvent(eventId: string) {
+    const item = sourceEvent(eventId)
+    if (!item || !session.value || !workspace.value?.canEdit) return
+    if (!isRouteEldEventWithinSession(item.event, session.value)) {
+      toast.error('Events outside the session period cannot be reverted')
+      return
+    }
+    if (item.event.isFrozen) {
+      toast.error('DOT-inspected events cannot be changed')
+      return
+    }
     try {
       await store.revertEvent(eventId)
       toast.success('Event change reverted')
@@ -1350,6 +1405,7 @@ export function useScheduleBoost() {
     try {
       await store.boostEvents(selectedRowIds.value, payload.reversed ? -seconds : seconds)
       boostModalOpen.value = false
+      selectedRowIds.value = []
       toast.success('Events boosted')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to boost events')
@@ -1370,6 +1426,7 @@ export function useScheduleBoost() {
         payload.mode,
         payload.ensurePti
       )
+      selectedRowIds.value = []
       toast.success('Event duration updated')
     } catch (error: any) {
       toast.error(getApiErrorMessage(error, 'Failed to update event duration'))
@@ -1396,63 +1453,98 @@ export function useScheduleBoost() {
   }
 
   async function submitMultiUpdateEvents(payload: {
-    trailer: string | null
-    doc: string | null
-    shiftedTimes: number | null
+    trailers: string[] | null
+    documents: string[] | null
+    deltaSeconds: number | null
+    odometerMiles: number | null
+    odometerOffset: boolean
   }) {
+    if (isActionLoading.value) return
+    isActionLoading.value = true
     try {
+      const currentSession = session.value
+      const selectedEvents = selectedRowIds.value.map((id) => sourceEvent(id)?.event)
+      if (!currentSession || !selectedEvents.length || selectedEvents.some((event) => !event)) {
+        throw new Error('The selected events are not available in the active tab.')
+      }
+      if (selectedEvents.some((event) => event!.isFrozen || !isRouteEldEventWithinSession(event!, currentSession))) {
+        throw new Error('Frozen events and events outside the session period cannot be updated.')
+      }
+      if (payload.deltaSeconds != null && selectedEvents.some((event) =>
+        !isRouteEldTimestampWithinSession(event!.timestamp + payload.deltaSeconds! * 1000, event!.timeZone, currentSession)
+      )) {
+        throw new Error('The adjusted event times must remain within the session period.')
+      }
       await store.updateEvents({
         eventIds: selectedRowIds.value,
-        trailers: payload.trailer ? [payload.trailer] : null,
-        documents: payload.doc ? [payload.doc] : null,
-        deltaSeconds: payload.shiftedTimes,
-        odometerMiles: null,
-        odometerOffset: false,
+        trailers: payload.trailers,
+        documents: payload.documents,
+        deltaSeconds: payload.deltaSeconds,
+        odometerMiles: payload.odometerMiles,
+        odometerOffset: payload.odometerOffset,
       })
       multiUpdateModalOpen.value = false
+      selectedRowIds.value = []
       toast.success('Events updated')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to update events')
+    } finally {
+      isActionLoading.value = false
     }
   }
 
   async function dropProperty(
     column: DragColumnType,
     targetEventId: string,
-    data: string | number | null | LocationTransfer
+    sourceEventId: string
   ) {
-    const source = sourceEvent(targetEventId)
-    if (!source) return
-    if (column === 'trailer' || column === 'doc' || column === 'odometer') {
-      await store.updateEvents({
-        eventIds: [targetEventId],
-        trailers: column === 'trailer' ? (data ? [String(data)] : []) : null,
-        documents: column === 'doc' ? (data ? [String(data)] : []) : null,
-        deltaSeconds: null,
-        odometerMiles: column === 'odometer' ? Number(data) : null,
-        odometerOffset: false,
-      })
-      return
-    }
-    if (column === 'engine_hours') {
-      await store.updateEvent(targetEventId, {
-        ...currentEventPayload(source),
-        engineHours: data == null ? null : Number(data),
-      })
-      return
-    }
-    if (column === 'location' && typeof data === 'object' && data) {
-      const manual = data.positioning === 'MANUAL' || Boolean(data.manualLocation?.trim())
-      await store.updateEvent(targetEventId, {
-        ...currentEventPayload(source),
-        positioning: manual ? 'MANUAL' : 'AUTOMATIC',
-        latitude: manual ? (source.event.latitude ?? null) : (data.latitude ?? null),
-        longitude: manual ? (source.event.longitude ?? null) : (data.longitude ?? null),
-        location: manual ? (source.event.location ?? null) : (data.calculatedLocation ?? null),
-        driverLocationDescription: manual
-          ? data.manualLocation?.trim() || data.calculatedLocation?.trim() || null
-          : null,
-      })
+    const source = sourceEvent(sourceEventId)
+    const target = sourceEvent(targetEventId)
+    if (!source || !target || source.isDeleted || target.isDeleted || sourceEventId === targetEventId) return false
+    try {
+      if (!session.value || !isRouteEldEventWithinSession(target.event, session.value) || target.event.isFrozen) {
+        throw new Error('Frozen events and events outside the session period cannot be updated.')
+      }
+      const sourceValue = source.event
+      const targetValue = target.event
+      const payload = currentEventPayload(target)
+      if (column === 'location') {
+        const manual = sourceValue.positioning === 'MANUAL' || Boolean(sourceValue.driverLocationDescription?.trim())
+        if (manual) {
+          const description = sourceValue.driverLocationDescription?.trim() || sourceValue.location?.trim() || null
+          if (!description) return false
+          if (targetValue.positioning === 'MANUAL' && targetValue.driverLocationDescription === description) return false
+          payload.positioning = 'MANUAL'
+          payload.driverLocationDescription = description
+        } else {
+          if (!sourceValue.location?.trim() && sourceValue.latitude == null && sourceValue.longitude == null) return false
+          if (
+            targetValue.positioning === 'AUTOMATIC' &&
+            !targetValue.driverLocationDescription &&
+            targetValue.latitude === sourceValue.latitude &&
+            targetValue.longitude === sourceValue.longitude &&
+            targetValue.location === sourceValue.location
+          ) return false
+          payload.positioning = 'AUTOMATIC'
+          payload.driverLocationDescription = null
+          payload.latitude = sourceValue.latitude
+          payload.longitude = sourceValue.longitude
+          payload.location = sourceValue.location
+        }
+      } else if (column === 'odometer') {
+        if (sourceValue.odometerMiles == null || sourceValue.odometerMiles === targetValue.odometerMiles) return false
+        payload.odometerMiles = sourceValue.odometerMiles
+      } else if (column === 'engine_hours') {
+        if (sourceValue.engineHours == null || sourceValue.engineHours === targetValue.engineHours) return false
+        payload.engineHours = sourceValue.engineHours
+      } else return false
+
+      await store.updateEvent(targetEventId, payload)
+      toast.success(`${column === 'location' ? 'Location' : column === 'odometer' ? 'Odometer' : 'Engine hours'} copied to the selected event`)
+      return true
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to copy event value')
+      return false
     }
   }
 
@@ -1485,9 +1577,16 @@ export function useScheduleBoost() {
         }
       }
       selectedRowIds.value = []
+      dragDropEnabled.value = false
     },
     { immediate: true }
   )
+
+  watch(activeTabId, () => {
+    selectedRowIds.value = []
+    selectedEventId.value = ''
+    dragDropEnabled.value = false
+  })
 
   let coDriverRequestVersion = 0
   watch(
@@ -1552,6 +1651,9 @@ export function useScheduleBoost() {
     selectedEventsForUpdate,
     selectedMoveEventsCount,
     dragDropEnabled,
+    deleteProgressOpen,
+    deletingSelectedEvents,
+    deleteProgress,
     boostModalOpen,
     reassignModalOpen,
     multiUpdateModalOpen,
@@ -1576,7 +1678,6 @@ export function useScheduleBoost() {
     updateEditDailyForm,
     openEditDailyForm,
     submitDailyForm,
-    revertDailyForm,
     selectTab,
     addNewTab,
     removeTab,

@@ -121,16 +121,16 @@ const headerCoDriverName = computed(() => {
   if (isBoostPage.value) {
     const from = boostWorkspace.value?.session.fromDate ?? ''
     const to = boostWorkspace.value?.session.toDate ?? ''
-    const names = [
-      ...(boostSchedule.value?.dailyLogs ?? []).map((log) => ({
-        date: log.logDate.replaceAll('/', '-').slice(0, 10),
-        name: log.coDriverName?.trim() || '',
-      })),
-      ...(boostProfileForms.value ?? []).map((form) => ({
-        date: form.logDate.replaceAll('/', '-').slice(0, 10),
-        name: form.coDriverName?.trim() || '',
-      })),
-    ]
+    const namesByDate = new Map(
+      (boostSchedule.value?.dailyLogs ?? []).map((log) => [
+        log.logDate.replaceAll('/', '-').slice(0, 10),
+        log.coDriverName?.trim() || '',
+      ])
+    )
+    for (const form of boostProfileForms.value) {
+      namesByDate.set(form.logDate.replaceAll('/', '-').slice(0, 10), form.coDriverName?.trim() || '')
+    }
+    const names = Array.from(namesByDate, ([date, name]) => ({ date, name }))
       .filter((item) => item.name && item.date >= from && item.date <= to)
       .sort((first, second) => first.date.localeCompare(second.date))
     return Array.from(new Set(names.map((item) => item.name))).join(', ') || null

@@ -142,29 +142,19 @@
         <Detail label="DOT number" :value="selectedLog?.dotNumber || '—'" />
         <Detail
           label="Co-driver"
-          :value="selectedForm.coDriverName || selectedLog?.coDriverName || '—'"
+          :value="selectedForm.coDriverName || '—'"
         />
         <Detail
           label="Co-driver ID"
-          :value="selectedForm.coDriverId || selectedLog?.coDriverId || '—'"
+          :value="selectedForm.coDriverId || '—'"
         />
         <Detail
           label="Trailers"
-          :value="
-            joined(
-              selectedForm.trailers.length ? selectedForm.trailers : selectedLog?.trailers || []
-            )
-          "
+          :value="joined(selectedForm.trailers)"
         />
         <Detail
           label="Shipping documents"
-          :value="
-            joined(
-              selectedForm.shippingDocuments.length
-                ? selectedForm.shippingDocuments
-                : selectedLog?.shippingDocuments || []
-            )
-          "
+          :value="joined(selectedForm.shippingDocuments)"
         />
         <Detail
           label="ELD serial / MAC"
@@ -187,7 +177,7 @@
         />
         <Detail
           label="Signature file"
-          :value="displayFileName(selectedForm.signatureFileName || selectedLog?.signature)"
+          :value="displayFileName(selectedForm.signatureFileName)"
         />
         <Detail label="Change state" :value="selectedForm.isModified ? 'Modified' : 'Unchanged'" />
         <Detail
@@ -305,13 +295,9 @@ const displayForms = computed<RouteEldProfileForm[]>(() => {
     forms.set(key, {
       ...log,
       ...form,
-      coDriverId: form.coDriverId ?? log?.coDriverId ?? null,
-      coDriverName: form.coDriverName ?? log?.coDriverName ?? null,
-      trailers: form.trailers.length ? form.trailers : (log?.trailers ?? []),
-      shippingDocuments: form.shippingDocuments.length
-        ? form.shippingDocuments
-        : (log?.shippingDocuments ?? []),
-      signatureFileName: form.signatureFileName ?? log?.signatureFileName ?? null,
+      coDriverId: form.coDriverId ?? null,
+      coDriverName: form.coDriverName ?? null,
+      signatureFileName: form.signatureFileName ?? null,
     })
   }
   return Array.from(forms.values()).sort((left, right) =>

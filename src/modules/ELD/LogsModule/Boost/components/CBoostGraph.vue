@@ -498,7 +498,7 @@ const dayWidth = computed(() => Math.max(baseDayWidth, viewportWidth.value) * zo
 const plotWidth = computed(() => Math.max(days.value.length, 1) * dayWidth.value)
 const totalHours = computed(() => days.value.length * 24)
 const graphTimeZone = computed(() => props.timeZone || props.events[0]?.timeZone || 'CT')
-const chartHeight = 190
+const chartHeight = 200
 const periodEndTimestamp = computed(() => {
   if (!props.toDate) return Date.now()
   return zonedTimestamp(`${nextDate(props.toDate)}T00:00:00`, graphTimeZone.value)
@@ -748,12 +748,8 @@ function selectEvent(eventId: string) {
 function boostSelect(eventId: string) {
   emit('boost-select', eventId)
 }
-function markerIsExpanded(marker: { compact: boolean; eventId: string; key: string }) {
-  return (
-    !marker.compact ||
-    marker.eventId === props.selectedEventId ||
-    expandedMarkerKeys.value.has(marker.key)
-  )
+function markerIsExpanded(marker: { compact: boolean; key: string }) {
+  return !marker.compact || expandedMarkerKeys.value.has(marker.key)
 }
 function revealMarker(key: string) {
   const timer = markerExpansionTimers.get(key)
@@ -762,6 +758,8 @@ function revealMarker(key: string) {
   expandedMarkerKeys.value = new Set(expandedMarkerKeys.value).add(key)
 }
 function hideMarkerLater(key: string) {
+  const existing = markerExpansionTimers.get(key)
+  if (existing) clearTimeout(existing)
   const timer = setTimeout(() => {
     const next = new Set(expandedMarkerKeys.value)
     next.delete(key)

@@ -238,7 +238,7 @@ export class ApiEndpoints {
     sessionId: string,
     tabId: string,
     eventId: string
-  ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/${eventId}`
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/${encodeURIComponent(eventId)}`
   static readonly ROUTE_ELD_EVENT_SESSION_DELETE_EVENTS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_EVENTS(sessionId, tabId)}/delete`
   static readonly ROUTE_ELD_EVENT_SESSION_DELETE_EVENT = (
@@ -281,6 +281,10 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
   static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/submit`
+  static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT_EVENT = (sessionId: string, eventId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_SUBMIT(sessionId)}/events/${encodeURIComponent(eventId)}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ROLLBACK_EVENT = (sessionId: string, eventId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/rollback/events/${encodeURIComponent(eventId)}`
   static readonly ROUTE_ELD_EVENT_SESSION_START_SUBMIT = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/submit`
   static readonly ROUTE_ELD_EVENT_SESSION_START_ROLLBACK = (sessionId: string) =>

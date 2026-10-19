@@ -1,6 +1,11 @@
 <template>
-  <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+  <Dialog :open="open" @update:open="onOpenChange">
+    <DialogContent
+      class="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+      @escape-key-down="loading && $event.preventDefault()"
+      @interact-outside="loading && $event.preventDefault()"
+      @pointer-down-outside="loading && $event.preventDefault()"
+    >
       <DialogHeader>
         <DialogTitle>
           {{ readonly ? 'Event details' : form.eventId ? 'Edit HOS event' : 'Insert HOS event' }}
@@ -104,19 +109,30 @@
                 <SelectContent>
                   <SelectItem value="1">ELD</SelectItem>
                   <SelectItem value="2">Driver</SelectItem>
-                  <SelectItem value="3">User</SelectItem>
+                  <SelectItem value="3">Other user</SelectItem>
                   <SelectItem value="4">Unidentified driver</SelectItem>
                 </SelectContent>
               </Select>
+              <p v-if="requiresOtherUserOrigin" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
+                Origin changed to Other user because this provider-generated event type was modified.
+              </p>
             </div>
           </div>
 
-          <template v-if="isCertifiedVisible">
-            <div class="space-y-1">
-              <label class="text-sm font-medium">Date to certify</label>
-              <Input type="date" :model-value="certifiedDateStr" @input="onCertifiedDateInput" />
-            </div>
-          </template>
+          <div v-if="isCertifiedVisible" class="space-y-1">
+            <label class="text-sm font-medium">Date to certify</label>
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button type="button" variant="outline" class="w-full justify-start font-normal">
+                  <CalendarIcon class="mr-2 h-4 w-4 text-muted-foreground" />
+                  {{ formattedCertifyDate }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="start">
+                <Calendar v-model="certifyCalendarDate" initial-focus />
+              </PopoverContent>
+            </Popover>
+          </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
@@ -258,7 +274,6 @@
                 :model-value="form.latitude ?? ''"
                 @input="onNumberInput('latitude', $event)"
                 placeholder="Latitude"
-                :disabled="form.positioning === 'MANUAL'"
               />
             </div>
             <div class="space-y-1">
@@ -269,26 +284,26 @@
                 :model-value="form.longitude ?? ''"
                 @input="onNumberInput('longitude', $event)"
                 placeholder="Longitude"
-                :disabled="form.positioning === 'MANUAL'"
               />
             </div>
           </div>
 
           <div class="space-y-1">
-            <label class="text-sm font-medium">Location</label>
-            <Input
-              :model-value="form.location ?? ''"
-              disabled
-              class="bg-muted"
-              :placeholder="isReverseGeocoding ? 'Calculating location…' : 'Calculated location'"
-            />
+            <label class="text-sm font-medium">Calculated location</label>
+            <div class="relative">
+              <Input :model-value="form.location ?? ''" readonly placeholder="Calculated location" />
+              <LoaderCircle
+                v-if="isReverseGeocoding"
+                class="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground"
+              />
+            </div>
             <p v-if="geocodeError" class="text-xs text-red-600">{{ geocodeError }}</p>
           </div>
 
         </fieldset>
 
           <div class="grid grid-cols-3 gap-2">
-            <Button type="button" variant="outline" class="gap-2" @click="copyCoords">
+            <Button type="button" variant="outline" class="gap-2" :disabled="form.latitude == null || form.longitude == null" @click="copyCoords">
               <Copy class="w-4 h-4" /> Copy
             </Button>
             <Button type="button" variant="outline" class="gap-2" :disabled="readonly" @click="pasteCoords">
@@ -308,7 +323,7 @@
               @input="onStringInput('locationNote', $event)"
               placeholder="Location note"
               maxlength="100"
-              :disabled="form.positioning === 'AUTOMATIC'"
+              :disabled="form.positioning !== 'MANUAL'"
             />
           </div>
 
@@ -347,7 +362,7 @@
           >
             <Trash2 class="mr-2 h-4 w-4" /> Delete event
           </Button>
-          <Button type="button" variant="secondary" @click="$emit('update:open', false)">
+          <Button type="button" variant="secondary" :disabled="loading" @click="onOpenChange(false)">
             {{ readonly ? 'Close' : 'Cancel' }}
           </Button>
           <Button v-if="!readonly" type="submit" :disabled="isSubmitDisabled || loading">
@@ -360,8 +375,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Calendar as CalendarIcon, Copy, ClipboardPaste, MapPin, Trash2 } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { Calendar as CalendarIcon, Copy, ClipboardPaste, LoaderCircle, MapPin, Trash2 } from 'lucide-vue-next'
 import { CalendarDate } from '@internationalized/date'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
@@ -450,50 +465,80 @@ let geocodeTimer: ReturnType<typeof setTimeout> | null = null
 let geocodeVersion = 0
 const isReverseGeocoding = ref(false)
 const geocodeError = ref('')
-watch(
-  () => [props.form.latitude, props.form.longitude],
-  ([lat, lng]) => {
-    if (
-      lat === null ||
-      lat === '' ||
-      lng === null ||
-      lng === '' ||
-      props.form.positioning === 'MANUAL'
-    )
-      return
-    if (geocodeTimer) clearTimeout(geocodeTimer)
-    geocodeTimer = setTimeout(async () => {
-      const latitude = Number(lat)
-      const longitude = Number(lng)
-      const version = ++geocodeVersion
-      isReverseGeocoding.value = true
-      geocodeError.value = ''
-      try {
-        const response = await api.get<{ label?: string | null }>(
-          ApiEndpoints.ALPR_GEOCODE_REVERSE,
-          {
-            params: { latitude, longitude, relative: true },
-          }
-        )
-        if (version !== geocodeVersion) return
-        const address = response.data?.label?.trim().replace(/, United States$/i, '')
-        if (!address) throw new Error('Location was not resolved')
-        patch({
-          positioning: 'AUTOMATIC',
-          location: address,
-          locationNote: null,
-        })
-      } catch {
-        if (version === geocodeVersion)
-          geocodeError.value = 'The coordinates could not be reverse geocoded.'
-      } finally {
-        if (version === geocodeVersion) isReverseGeocoding.value = false
-      }
-    }, 450)
+
+function coordinateValue(value: number | string | null): number | null {
+  if (value === null || value === '') return null
+  const coordinate = Number(value)
+  return Number.isFinite(coordinate) ? coordinate : null
+}
+
+function cancelReverseGeocode() {
+  if (geocodeTimer) clearTimeout(geocodeTimer)
+  geocodeTimer = null
+  geocodeVersion += 1
+  isReverseGeocoding.value = false
+}
+
+function scheduleReverseGeocode(latitude: number | null, longitude: number | null) {
+  cancelReverseGeocode()
+  geocodeError.value = ''
+  if (
+    !props.open ||
+    props.readonly ||
+    latitude === null ||
+    longitude === null ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) return
+
+  const version = geocodeVersion
+  const eventId = props.form.eventId
+  geocodeTimer = setTimeout(async () => {
+    geocodeTimer = null
+    const isCurrent = () =>
+      version === geocodeVersion &&
+      props.open &&
+      !props.readonly &&
+      props.form.eventId === eventId &&
+      coordinateValue(props.form.latitude) === latitude &&
+      coordinateValue(props.form.longitude) === longitude
+    if (!isCurrent()) return
+
+    isReverseGeocoding.value = true
+    try {
+      const response = await api.get<{ label?: string | null }>(
+        ApiEndpoints.ALPR_GEOCODE_REVERSE,
+        { params: { latitude, longitude, relative: true } }
+      )
+      if (!isCurrent()) return
+      const address = response.data?.label?.trim().replace(/, United States$/i, '')
+      if (!address) throw new Error('Location was not resolved')
+      if (props.form.positioning === 'AUTOMATIC') patch({ location: address })
+      else if (props.form.positioning === 'MANUAL') patch({ locationNote: address })
+    } catch {
+      if (isCurrent()) geocodeError.value = 'The coordinates could not be reverse geocoded.'
+    } finally {
+      if (version === geocodeVersion) isReverseGeocoding.value = false
+    }
+  }, 450)
+}
+
+watch(() => props.open, (open) => {
+  if (!open) {
+    cancelReverseGeocode()
+    geocodeError.value = ''
   }
-)
+})
+onBeforeUnmount(cancelReverseGeocode)
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
+const requiresOtherUserOrigin = computed(() =>
+  Boolean(
+    props.form.eventId &&
+    props.form.originalIsEditable === false &&
+    selectedEventKey.value !== props.form.originalEventCode
+  )
+)
 const dateWithinSession = computed(
   () =>
     (!props.fromDate || props.form.startDate >= props.fromDate) &&
@@ -603,11 +648,27 @@ const selectedEvent = computed(() => editableEvents.find((e) => e.id === selecte
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
-  patch({ event: { eventType: ev.eventType, eventCode: ev.eventCode }, eventCodeId: ev.id })
+  patch({
+    event: { eventType: ev.eventType, eventCode: ev.eventCode },
+    eventCodeId: ev.id,
+    ...(props.form.eventId && props.form.originalIsEditable === false &&
+      ev.id !== props.form.originalEventCode && props.form.origin === 1
+      ? { origin: 3 }
+      : {}),
+  })
 }
 
-const certifiedDateStr = computed(() =>
-  props.form.certifiedDate ? dayjs(props.form.certifiedDate).format('YYYY-MM-DD') : ''
+const certifyCalendarDate = computed<CalendarDate | undefined>({
+  get: () => {
+    const value = props.form.certifiedDate?.replaceAll('/', '-')
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+    const [year, month, day] = value.split('-').map(Number)
+    return new CalendarDate(year, month, day)
+  },
+  set: (value) => patch({ certifiedDate: value?.toString() ?? null }),
+})
+const formattedCertifyDate = computed(() =>
+  certifyCalendarDate.value ? dayjs(certifyCalendarDate.value.toString()).format('MM/DD/YYYY') : 'Select date'
 )
 
 const eventCalendarDate = computed({
@@ -632,11 +693,9 @@ const eventClock = computed({
     patch({ time: { hours, minutes, seconds } })
   },
 })
-function onCertifiedDateInput(e: Event) {
-  patch({ certifiedDate: (e.target as HTMLInputElement).value })
-}
 function onOriginChange(v: unknown) {
-  patch({ origin: Number(v) })
+  const origin = Number(v)
+  patch({ origin: requiresOtherUserOrigin.value && origin === 1 ? 3 : origin })
 }
 function onRecordStatusChange(v: unknown) {
   patch({ recordStatus: String(v) })
@@ -654,14 +713,21 @@ function onPositioningChange(v: unknown) {
   const value = String(v)
   patch({
     positioning: value === 'MANUAL' || value === 'AUTOMATIC' ? value : null,
+    ...(value === 'MANUAL' ? {} : { locationNote: null }),
   })
 }
 
 function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
   const raw = (e.target as HTMLInputElement).value
   const value = raw === '' ? null : parseFloat(raw)
-  if ((field === 'latitude' || field === 'longitude') && props.form.positioning !== 'MANUAL') {
-    patch({ [field]: value, positioning: 'AUTOMATIC' } as Partial<BoostEventStatusForm>)
+  if (field === 'latitude' || field === 'longitude') {
+    const coordinate = value !== null && Number.isFinite(value) ? value : null
+    if (coordinate === coordinateValue(props.form[field])) return
+    patch({ [field]: coordinate } as Partial<BoostEventStatusForm>)
+    scheduleReverseGeocode(
+      field === 'latitude' ? coordinate : coordinateValue(props.form.latitude),
+      field === 'longitude' ? coordinate : coordinateValue(props.form.longitude)
+    )
     return
   }
   patch({ [field]: value } as Partial<BoostEventStatusForm>)
@@ -675,6 +741,8 @@ const isSubmitDisabled = computed(() => {
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
+  // Certification events do not require location data; the provider discards it on update.
+  if (isCertifiedVisible.value) return false
   const { positioning, latitude, longitude, locationNote } = props.form
   if (
     positioning === 'AUTOMATIC' &&
@@ -693,8 +761,15 @@ async function copyCoords() {
 }
 
 async function pasteCoords() {
+  const eventId = props.form.eventId
   const coordinates = await readCoordinates()
-  if (coordinates) patch(coordinates)
+  if (!coordinates || !props.open || props.readonly || props.form.eventId !== eventId) return
+  if (
+    coordinateValue(props.form.latitude) === coordinates.latitude &&
+    coordinateValue(props.form.longitude) === coordinates.longitude
+  ) return
+  patch(coordinates)
+  scheduleReverseGeocode(coordinates.latitude, coordinates.longitude)
 }
 
 function openMap() {
@@ -715,7 +790,13 @@ function appendNote(note: string) {
 }
 
 function handleSubmit() {
-  if (props.readonly) return
+  if (props.readonly || props.loading || isSubmitDisabled.value) return
   emit('submit', props.form)
+}
+
+function onOpenChange(open: boolean) {
+  if (!open && props.loading) return
+  if (!open) cancelReverseGeocode()
+  emit('update:open', open)
 }
 </script>
