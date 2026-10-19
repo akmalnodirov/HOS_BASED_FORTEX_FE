@@ -484,6 +484,7 @@ export interface RouteEldSessionOperation {
   status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | string
   total: number
   completed: number
+  succeeded: number
   failed: number
   failures: RouteEldSessionOperationFailure[]
   error?: string | null

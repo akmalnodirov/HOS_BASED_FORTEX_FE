@@ -10,7 +10,7 @@
             <img src="/images/logo.svg" alt="Logo" class="dark:hidden" />
             <img src="/images/logo-white.svg" alt="Logo" class="hidden dark:block" />
           </div>
-          <h1 class="text-xl text-[#090909] dark:text-foreground">LLORA</h1>
+          <h1 class="text-xl text-[#090909] dark:text-foreground">L-LORA</h1>
         </div>
 
         <form class="space-y-5" @submit.prevent="handleSubmit">

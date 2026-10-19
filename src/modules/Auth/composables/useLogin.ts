@@ -97,7 +97,7 @@ export function useLogin() {
       toast.success('Login Successful', {
         description: 'Welcome back!',
         position: 'top-right',
-        duration: 3_000,
+        duration: 1_000,
       })
 
       try {

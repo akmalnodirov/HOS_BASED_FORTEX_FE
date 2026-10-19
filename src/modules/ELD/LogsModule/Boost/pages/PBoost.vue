@@ -394,7 +394,7 @@
               class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold"
               :class="sessionOperationPercent > 52 ? 'text-primary-foreground' : 'text-foreground'"
             >
-              {{ (sessionOperation?.completed ?? 0) + (sessionOperation?.failed ?? 0) }} /
+              {{ sessionOperation?.completed ?? 0 }} /
               {{ sessionOperation?.total ?? 0 }} · {{ sessionOperationPercent }}%
             </span>
           </div>
@@ -404,8 +404,8 @@
             </div>
             <div class="rounded-md border p-2">
               <strong class="block text-base text-emerald-600">{{
-                sessionOperation?.completed ?? 0
-              }}</strong>Completed
+                sessionOperation?.succeeded ?? 0
+              }}</strong>Succeeded
             </div>
             <div class="rounded-md border p-2">
               <strong class="block text-base text-destructive">{{
@@ -1255,7 +1255,7 @@ const sessionOperationPercent = computed(() => {
   if (!operation?.total) return operation?.status === 'COMPLETED' ? 100 : 0
   return Math.min(
     100,
-    Math.round(((operation.completed + operation.failed) / operation.total) * 100)
+    Math.round((operation.completed / operation.total) * 100)
   )
 })
 const sessionOperationTitle = computed(() => {
