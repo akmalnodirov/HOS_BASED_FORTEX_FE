@@ -577,7 +577,7 @@
                       <Eye class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canRetryDelivery && (event.deliveryStatus === 'SUBMISSION_PENDING' || event.deliveryStatus === 'ROLLBACK_PENDING' || (event.deliveryStatus === 'SUBMITTED' && event.eventType === 4 && event.changeStatus?.toUpperCase() === 'CHANGED'))"
+                      v-if="canRetryDelivery && (event.deliveryStatus === 'SUBMISSION_PENDING' || event.deliveryStatus === 'ROLLBACK_PENDING' || (event.deliveryStatus === 'SUBMITTED' && event.eventType === 4 && ['CHANGED', 'INSERTED'].includes(event.changeStatus?.toUpperCase() ?? '')))"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-blue-600"

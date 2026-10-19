@@ -107,6 +107,7 @@ export interface RouteEldLiveDriver {
   externalCompanyId: string
   externalDriverId: string
   driverName: string
+  isActive: boolean
   email: string | null
   phoneNumber: string | null
   vehicleId: string | null

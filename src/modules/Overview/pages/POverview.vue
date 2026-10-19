@@ -21,6 +21,16 @@
           <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input v-model="search" class="h-10 pl-9" placeholder="Search drivers or units" />
         </div>
+        <Select v-model="activityFilter">
+          <SelectTrigger class="h-10 w-full" aria-label="Filter drivers by activity">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active drivers</SelectItem>
+            <SelectItem value="inactive">Inactive drivers</SelectItem>
+            <SelectItem value="all">All drivers</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto p-3">
@@ -142,6 +152,7 @@ import { Navigation, RefreshCw, Search, Wifi } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import CMapControls from '@/components/custom/CMapControls.vue'
 import { mapStyles } from '@/utils/maps'
 import { useRouteEldOverviewDrivers } from '../composables/useRouteEldOverview'
@@ -149,6 +160,7 @@ import { useRouteEldOverviewDrivers } from '../composables/useRouteEldOverview'
 const router = useRouter()
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const search = ref('')
+const activityFilter = ref<'active' | 'inactive' | 'all'>('active')
 const statusFilter = ref('all')
 const mapType = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const mapCenter = { lat: 39.8283, lng: -98.5795 }
@@ -156,38 +168,43 @@ const mapContainer = ref<HTMLElement | null>(null)
 const rawMap = ref<any>(null)
 const isFullscreen = ref(false)
 const { drivers, isLoading, isRefreshing, error, load } = useRouteEldOverviewDrivers()
+const activityDrivers = computed(() =>
+  drivers.value.filter((driver) =>
+    activityFilter.value === 'all' || driver.isActive === (activityFilter.value === 'active')
+  )
+)
 
 const driverStatuses = computed(() => [
-  { id: 'all', label: 'All', count: drivers.value.length, colorClass: '' },
+  { id: 'all', label: 'All', count: activityDrivers.value.length, colorClass: '' },
   {
     id: 'offDuty',
     label: 'Off Duty',
-    count: drivers.value.filter((item) => dutyStatus(item.currentStatus) === 'offDuty').length,
+    count: activityDrivers.value.filter((item) => dutyStatus(item.currentStatus) === 'offDuty').length,
     colorClass: 'bg-red-500',
   },
   {
     id: 'sleeper',
     label: 'Sleep',
-    count: drivers.value.filter((item) => dutyStatus(item.currentStatus) === 'sleeper').length,
+    count: activityDrivers.value.filter((item) => dutyStatus(item.currentStatus) === 'sleeper').length,
     colorClass: 'bg-purple-500',
   },
   {
     id: 'driving',
     label: 'Driving',
-    count: drivers.value.filter((item) => dutyStatus(item.currentStatus) === 'driving').length,
+    count: activityDrivers.value.filter((item) => dutyStatus(item.currentStatus) === 'driving').length,
     colorClass: 'bg-green-500',
   },
   {
     id: 'onDuty',
     label: 'On Duty',
-    count: drivers.value.filter((item) => dutyStatus(item.currentStatus) === 'onDuty').length,
+    count: activityDrivers.value.filter((item) => dutyStatus(item.currentStatus) === 'onDuty').length,
     colorClass: 'bg-blue-500',
   },
 ])
 
 const filteredDrivers = computed(() => {
   const term = search.value.trim().toLowerCase()
-  return drivers.value.filter((driver) => {
+  return activityDrivers.value.filter((driver) => {
     if (statusFilter.value !== 'all' && dutyStatus(driver.currentStatus) !== statusFilter.value)
       return false
     if (!term) return true
