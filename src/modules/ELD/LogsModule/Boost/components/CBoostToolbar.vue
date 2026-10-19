@@ -117,10 +117,10 @@
         variant="outline"
         size="sm"
         class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#AF4B4B]/10 hover:text-[#AF4B4B/20]"
-        :disabled="actionsPending || submitLoading"
+        :disabled="actionsPending || submitLoading || violationsCount == 0"
         @click="$emit('violation-click')"
       >
-        <span>Violation</span>
+        <span>Violations</span>
       </Button>
     </div>
 
@@ -173,6 +173,7 @@ const props = withDefaults(
     selectedTab?: TabResponse | null
     errorCount?: number
     warningCount?: number
+    violationsCount?: number
   }>(),
   {
     submitDisabled: false,
@@ -190,6 +191,7 @@ const props = withDefaults(
     selectedTab: null,
     errorCount: 0,
     warningCount: 0,
+    violationsCount: 0
   }
 )
 

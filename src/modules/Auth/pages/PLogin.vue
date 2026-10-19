@@ -4,22 +4,17 @@
   >
     <CThemeToggle class="absolute right-5 top-5" />
     <div class="w-full max-w-[434px]">
-      <!-- Card -->
       <div class="bg-white dark:bg-card rounded-lg shadow-sm dark:shadow-lg border border-gray-200 dark:border-border p-8">
-        <!-- Logo and Title -->
         <div class="flex justify-center gap-2 items-center mb-5">
           <div class="w-[28px] h-[28px] rounded-lg flex items-center justify-center">
             <img src="/images/logo.svg" alt="Logo" class="dark:hidden" />
             <img src="/images/logo-white.svg" alt="Logo" class="hidden dark:block" />
           </div>
-          <h1 class="text-xl text-[#090909] dark:text-foreground">Unione</h1>
+          <h1 class="text-xl text-[#090909] dark:text-foreground">LLORA</h1>
         </div>
 
-        <!-- Form -->
         <form class="space-y-5" @submit.prevent="handleSubmit">
-          <!-- Username Field -->
           <div class="space-y-2">
-            <!--            <Label for="username" class="text-sm font-medium text-gray-700"> Username </Label>-->
             <Input
               id="username"
               v-model="username"
@@ -34,9 +29,7 @@
             </p>
           </div>
 
-          <!-- Password Field -->
           <div class="space-y-2">
-            <!--            <Label for="password" class="text-sm font-medium text-gray-700"> Password </Label>-->
             <div class="relative">
               <Input
                 id="password"
@@ -100,7 +93,6 @@
             </p>
           </div>
 
-          <!-- Submit Button -->
           <Button
             type="submit"
             :disabled="isLoading"
@@ -136,7 +128,7 @@
     </div>
   </div>
 </template>
-<!-- src/views/LoginView.vue -->
+
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from '@/components/ui/button/Button.vue'

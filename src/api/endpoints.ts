@@ -257,6 +257,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/location-finder`
   static readonly ROUTE_ELD_EVENT_SESSION_CAMERAS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/cameras`
+  static readonly ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/camera-presence`
   static readonly ROUTE_ELD_EVENT_SESSION_ALPR_ROUTES = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/alpr-routes`
   static readonly ROUTE_ELD_EVENT_SESSION_ALPR_ROUTE = (sessionId: string, routeId: string) =>

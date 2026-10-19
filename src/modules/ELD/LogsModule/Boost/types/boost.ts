@@ -704,6 +704,11 @@ export interface RouteEldEventCameraAnalysis {
   matches: RouteEldEventCameraMatch[]
 }
 
+export interface RouteEldEventCameraPresence {
+  eventId: string
+  hasCamera: boolean
+}
+
 export interface RouteEldProfileForm {
   logDate: string
   coDriverId?: string | null

@@ -152,8 +152,18 @@
                   {{ formatDuration(event) }}
                 </td>
                 <td v-if="isColumnVisible('location')" class="px-4 py-3 text-center">
-                  <div class="wrap-break-word whitespace-normal">
-                    {{ getLocation(event) }}
+                  <div class="flex items-center justify-center gap-1.5">
+                    <span class="wrap-break-word whitespace-normal">{{ getLocation(event) }}</span>
+                    <button
+                      v-if="event.latitude != null && event.longitude != null"
+                      type="button"
+                      class="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Copy latitude and longitude"
+                      aria-label="Copy latitude and longitude"
+                      @click.stop="copyLocationCoordinates(event.latitude, event.longitude)"
+                    >
+                      <Copy class="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </td>
                 <td v-if="isColumnVisible('odometer')" class="px-4 py-3 text-center font-normal">
@@ -208,8 +218,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
-import { CircleAlert, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { CircleAlert, Copy, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { copyCoordinates } from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -228,6 +240,11 @@ import type {
 } from '../../composables/useLogEventTableColumns'
 import { useApi } from '@/composables/useAxiosService.ts'
 import { ApiEndpoints } from '@/api/endpoints.ts'
+
+const copyLocationCoordinates = async (latitude: number, longitude: number) => {
+  await copyCoordinates(latitude, longitude)
+  toast.success('Coordinates copied')
+}
 
 const route = useRoute()
 const api = useApi()

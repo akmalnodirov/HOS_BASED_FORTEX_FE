@@ -16,7 +16,7 @@
           v-show="isOpen"
           class="text-xl font-semibold text-gray-900 dark:text-sidebar-foreground whitespace-nowrap"
         >
-          Unione ELD
+          LLORA
         </span>
       </div>
 

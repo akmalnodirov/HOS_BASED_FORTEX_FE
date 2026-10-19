@@ -278,20 +278,18 @@
                   :key="event.eventId"
                   :data-event-id="event.eventId"
                   class="boost-events-grid group grid gap-3 border-t bg-white px-4 py-3 hover:bg-muted/30 dark:bg-background cursor-pointer"
-                  :style="[
-                    gridStyle,
-                    highlightedEventId === event.eventId
-                      ? { backgroundColor: '#ECFDF5', boxShadow: 'inset 0 0 0 2px #10B981' }
-                      : event.errorTitles?.length || event.warningTitles?.length
-                        ? { backgroundColor: event.errorTitles?.length ? '#F7EDED' : '#FBF4EC' }
-                        : undefined,
-                  ]"
+                  :style="gridStyle"
                   :class="[
                     event.actionState === 4 ? 'opacity-55' : '',
                     highlightedEventId === event.eventId
-                      ? 'bg-emerald-50 dark:bg-emerald-950/25'
-                      : '',
-                    selectedRowIds.includes(event.eventId) ? 'bg-blue-50 dark:bg-blue-900/20' : '',
+                      ? '!bg-emerald-50 ring-2 ring-inset ring-emerald-500 dark:!bg-emerald-950/35'
+                      : selectedRowIds.includes(event.eventId)
+                        ? '!bg-blue-50 dark:!bg-blue-950/30'
+                        : event.errorTitles?.length
+                          ? '!bg-red-50 dark:!bg-red-950/35'
+                          : event.warningTitles?.length
+                            ? '!bg-amber-50 dark:!bg-amber-950/35'
+                            : '',
                   ]"
                   @click="handleRowClick(event.eventId, $event)"
                 >
@@ -388,7 +386,7 @@
                     <span v-else class="truncate text-xs text-muted-foreground">{{
                       event.eventName || '-'
                     }}</span>
-                    <TooltipProvider v-if="cameraMatchByEvent.get(event.eventId)">
+                    <TooltipProvider v-if="cameraEventIdSet.has(event.eventId)">
                       <Tooltip>
                         <TooltipTrigger as-child>
                           <Button
@@ -396,14 +394,9 @@
                             variant="ghost"
                             size="icon"
                             class="relative h-7 w-7 shrink-0 text-red-500 hover:text-red-600"
-                            @click.stop
+                            @click.stop="emit('open-camera-route', event.eventId)"
                           >
                             <Camera class="h-3.5 w-3.5" />
-                            <span
-                              class="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1 text-[8px] leading-3 text-white"
-                            >
-                              {{ cameraMatchByEvent.get(event.eventId)?.cameras.length }}
-                            </span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent
@@ -414,10 +407,10 @@
                         >
                           <div class="flex items-center gap-2 text-xs font-semibold">
                             <Camera class="h-3.5 w-3.5 text-red-500" />
-                            Matched ALPR cameras
+                            Camera near this event
                           </div>
                           <div class="mt-2 break-words text-xs leading-5 text-muted-foreground">
-                            {{ cameraNames(event.eventId) }}
+                            Click to inspect this event's route and cameras.
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -455,6 +448,18 @@
                         v-if="hasManualLocationNote(event)"
                         class="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
                       >manual</span>
+                      <button
+                        v-if="event.latitude != null && event.longitude != null"
+                        type="button"
+                        class="ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Copy latitude and longitude"
+                        aria-label="Copy latitude and longitude"
+                        draggable="false"
+                        @click.stop="copyLocationCoordinates(event.latitude!, event.longitude!)"
+                        @dragstart.stop.prevent
+                      >
+                        <Copy class="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
 
@@ -611,6 +616,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue'
+import { toast } from 'vue-sonner'
 import {
   Pencil,
   Copy,
@@ -641,13 +647,13 @@ import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'
 import { formatTime } from '@/utils/time.ts'
 import dayjs from 'dayjs'
 import type { BoostUiEventGroup, BoostUiEventRow } from '../composables/useScheduleBoost'
-import type { RouteEldEventCameraMatch } from '../types/boost'
 import type {
   BoostEventTableColumn,
   BoostEventTableColumnVisibility,
 } from '../composables/useBoostEventTableColumns'
 import { findEventByTypeAndCode } from '@/utils/events.ts'
 import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
+import { copyCoordinates } from '../utils/coordinateClipboard'
 
 const RECORD_ORIGIN_LABELS: Record<number, string> = {
   1: 'ELD',
@@ -692,7 +698,7 @@ interface Props {
   dragDropEnabled?: boolean
   columnVisibility?: BoostEventTableColumnVisibility
   timeZone?: string | null
-  cameraMatches?: RouteEldEventCameraMatch[]
+  cameraEventIds?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -725,17 +731,10 @@ const props = withDefaults(defineProps<Props>(), {
     actions: true,
   }),
   timeZone: 'CT',
-  cameraMatches: () => [],
+  cameraEventIds: () => [],
 })
 
-const cameraMatchByEvent = computed(
-  () => new Map(props.cameraMatches.map((match) => [String(match.eventId), match]))
-)
-const cameraNames = (eventId: string) =>
-  cameraMatchByEvent.value
-    .get(eventId)
-    ?.cameras.map((camera) => camera.displayName)
-    .join(', ') || 'Matched camera'
+const cameraEventIdSet = computed(() => new Set(props.cameraEventIds))
 
 const emit = defineEmits<{
   'edit-event': [eventId: string]
@@ -748,7 +747,13 @@ const emit = defineEmits<{
   'edit-profile': [date: string]
   'drop-property': [column: DragColumnType, targetEventId: string, sourceEventId: string]
   'retry-delivery': [eventId: string]
+  'open-camera-route': [eventId: string]
 }>()
+
+const copyLocationCoordinates = async (latitude: number, longitude: number) => {
+  await copyCoordinates(latitude, longitude)
+  toast.success('Coordinates copied')
+}
 
 const openItems = ref<string[]>([])
 const isColumnVisible = (column: BoostEventTableColumn) => props.columnVisibility[column]

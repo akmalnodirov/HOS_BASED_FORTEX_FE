@@ -15,6 +15,7 @@
       :allow-rollback="allowed('route_eld.log_details.rollback')"
       :actions-pending="store.isMutating || store.isLoading"
       :submit-loading="sessionActionLoading"
+      :violations-count="violations.length"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
       @session-action="runSessionAction"
@@ -146,17 +147,6 @@
           <Button
             variant="outline"
             size="sm"
-            :disabled="!hasAlprOrigin || alprLoading"
-            title="Find ALPR cameras along the active tab's event routes"
-            @click="analyzeAlpr"
-          >
-            <LoaderCircle v-if="alprLoading" class="mr-2 h-4 w-4 animate-spin" />
-            <Camera v-else class="mr-2 h-4 w-4" />
-            {{ alprLoading ? 'Finding ALPR…' : alprAnalysis ? 'Refresh ALPR' : 'Find ALPR' }}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             :disabled="!hasAlprOrigin"
             @click="alprRouteOpen = true"
           >
@@ -224,7 +214,7 @@
         :retrying-event-id="retryingEventId"
         :column-visibility="eventTableColumnVisibility"
         :time-zone="workspaceTimeZone"
-        :camera-matches="alprAnalysis?.matches ?? []"
+        :camera-event-ids="cameraEventIds"
         @toggle-selection="onTableEventSelect"
         @update:selected-row-ids="onSelectedRowIdsUpdate"
         @edit-event="openEditableEvent"
@@ -235,6 +225,7 @@
         @edit-profile="openEditDailyForm"
         @drop-property="handleDropProperty"
         @retry-delivery="retryEventDelivery"
+        @open-camera-route="openCameraRoute"
       />
     </section>
 
@@ -370,6 +361,16 @@
       :tab-id="store.activeTabId"
     />
 
+    <CBoostEventCameraDialog
+      v-if="cameraRouteOpen"
+      v-model:open="cameraRouteOpen"
+      :loading="cameraRouteLoading"
+      :error="cameraRouteError"
+      :events="graphEvents"
+      :selected-event-id="cameraRouteEventId"
+      :analysis="cameraRouteAnalysis"
+    />
+
     <Dialog v-model:open="sessionProgressOpen">
       <DialogContent
         class="sm:max-w-130"
@@ -478,11 +479,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Camera,
   ChevronDown,
   ChevronUp,
   LoaderCircle,
@@ -518,6 +518,7 @@ import type {
   RouteEldAiAdvice,
   RouteEldCertificationReport,
   RouteEldEventCameraAnalysis,
+  RouteEldEventCameraPresence,
   RouteEldHosEvent,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
@@ -553,6 +554,10 @@ import {
   resolveRouteEldScheduleTimeZone,
   useScheduleBoost,
 } from '../composables/useScheduleBoost'
+
+const CBoostEventCameraDialog = defineAsyncComponent(
+  () => import('../components/modals/CBoostEventCameraDialog.vue')
+)
 
 const api = useApi()
 const route = useRoute()
@@ -657,8 +662,12 @@ const durationOpen = ref(false)
 const durationFailureReason = ref('')
 const reassignTargetsLoading = ref(false)
 const eventEditorReadonly = ref(false)
-const alprLoading = ref(false)
-const alprAnalysis = ref<RouteEldEventCameraAnalysis | null>(null)
+const cameraRouteOpen = ref(false)
+const cameraRouteLoading = ref(false)
+const cameraRouteError = ref('')
+const cameraRouteEventId = ref('')
+const cameraRouteAnalysis = ref<RouteEldEventCameraAnalysis | null>(null)
+let cameraRouteRequestId = 0
 const alprRouteOpen = ref(false)
 const highlightedEventId = ref('')
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
@@ -693,6 +702,9 @@ onDeactivated(disableStableScrollbar)
 onBeforeUnmount(() => {
   disableStableScrollbar()
   if (highlightTimer) clearTimeout(highlightTimer)
+  if (cameraCheckTimer) clearTimeout(cameraCheckTimer)
+  cameraCheckQueue.length = 0
+  activeCameraCheck?.controller.abort()
 })
 
 watch(
@@ -709,6 +721,163 @@ const eventCount = computed(
 )
 const graphEvents = computed(() =>
   (workspace.value?.events ?? []).filter((item) => !item.isDeleted).map((item) => item.event)
+)
+type CameraSource = { eventId: string; signature: string }
+const cameraSources = computed<CameraSource[]>(() => {
+  if (!session.value || workspace.value?.session.id !== session.value.id ||
+      workspace.value.tabId !== store.activeTabId) return []
+  return workspace.value.events
+    .filter((item) => !item.isDeleted && item.event.recordStatus.toUpperCase() === 'ACTIVE' &&
+      item.event.latitude != null && item.event.longitude != null &&
+      Number.isFinite(item.event.latitude) && Number.isFinite(item.event.longitude))
+    .map((item) => ({
+      eventId: item.event.id,
+      signature: `${item.event.latitude}:${item.event.longitude}`,
+    }))
+})
+const cameraPresenceCache = reactive(new Map<string, {
+  signature: string
+  hasCamera: boolean
+  routeVerified?: boolean
+}>())
+const cameraChecksPending = new Map<string, string>()
+const cameraCheckQueue: Array<{
+  sessionId: string
+  tabId: string
+  sources: CameraSource[]
+  snapshot: CameraSource[]
+}> = []
+let cameraCheckWorkers = 0
+let activeCameraCheck: { sessionId: string; tabId: string; controller: AbortController } | null = null
+let cameraCheckErrorShown = false
+let cameraCheckTimer: ReturnType<typeof setTimeout> | null = null
+let lastCameraSourceContext = ''
+let lastCameraSources: CameraSource[] = []
+const forcedCameraEventIds = new Set<string>()
+const cameraCacheKey = (sessionId: string, tabId: string, eventId: string) =>
+  `${sessionId}:${tabId}:${eventId}`
+const cameraEventIds = computed(() => {
+  const sessionId = session.value?.id
+  const tabId = store.activeTabId
+  if (!sessionId || !tabId) return []
+  return cameraSources.value
+    .filter(({ eventId, signature }) => {
+      const cached = cameraPresenceCache.get(cameraCacheKey(sessionId, tabId, eventId))
+      return cached?.signature === signature && cached.hasCamera
+    })
+    .map(({ eventId }) => eventId)
+})
+const runCameraCheckQueue = () => {
+  while (cameraCheckWorkers < 1 && cameraCheckQueue.length) {
+    cameraCheckWorkers++
+    void (async () => {
+      try {
+        while (cameraCheckQueue.length) {
+          const batch = cameraCheckQueue.shift()!
+          const controller = new AbortController()
+          activeCameraCheck = { sessionId: batch.sessionId, tabId: batch.tabId, controller }
+          try {
+            const response = await api.post<
+              RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
+            >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
+              { eventIds: batch.sources.map((source) => source.eventId) },
+              { params: { radiusMetres: 150 }, signal: controller.signal })
+            const results = 'successResult' in response.data
+              ? response.data.successResult : response.data
+            cameraCheckErrorShown = false
+            const byId = new Map(results.map((result) => [result.eventId, result.hasCamera]))
+            for (const source of batch.snapshot) {
+              const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
+              const cached = cameraPresenceCache.get(key)
+              if (byId.has(source.eventId) &&
+                  !(cached?.routeVerified && cached.signature === source.signature))
+                cameraPresenceCache.set(key, { signature: source.signature, hasCamera: byId.get(source.eventId)! })
+            }
+            for (const source of batch.sources) {
+              const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
+              if (cameraChecksPending.get(key) === source.signature) cameraChecksPending.delete(key)
+            }
+          } catch (error: any) {
+            for (const source of batch.sources) {
+              const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
+              if (cameraChecksPending.get(key) === source.signature) cameraChecksPending.delete(key)
+            }
+            if (!controller.signal.aborted && !cameraCheckErrorShown) {
+              cameraCheckErrorShown = true
+              toast.error(getApiErrorMessage(error, 'Camera analysis could not be loaded'))
+            }
+          } finally {
+            if (activeCameraCheck?.controller === controller) activeCameraCheck = null
+          }
+        }
+      } finally {
+        cameraCheckWorkers--
+        if (cameraCheckQueue.length) runCameraCheckQueue()
+      }
+    })()
+  }
+}
+const dropQueuedCameraChecks = () => {
+  const sessionId = session.value?.id
+  const tabId = store.activeTabId
+  if (activeCameraCheck &&
+      (activeCameraCheck.sessionId !== sessionId || activeCameraCheck.tabId !== tabId))
+    activeCameraCheck.controller.abort()
+  for (let index = cameraCheckQueue.length - 1; index >= 0; index--) {
+    const batch = cameraCheckQueue[index]
+    if (batch.sessionId === sessionId && batch.tabId === tabId) continue
+    cameraCheckQueue.splice(index, 1)
+    for (const source of batch.sources) {
+      const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
+      if (cameraChecksPending.get(key) === source.signature) cameraChecksPending.delete(key)
+    }
+  }
+}
+watch(
+  () => `${session.value?.id}:${store.activeTabId}:${cameraSources.value.map(
+    ({ eventId, signature }) => `${eventId}=${signature}`
+  ).join('|')}`,
+  () => {
+    const context = `${session.value?.id}:${store.activeTabId}`
+    const currentSources = cameraSources.value
+    if (lastCameraSourceContext === context) {
+      const currentIds = new Set(currentSources.map((source) => source.eventId))
+      lastCameraSources.forEach((source, index) => {
+        if (currentIds.has(source.eventId)) return
+        for (const neighbor of [lastCameraSources[index - 1], lastCameraSources[index + 1]])
+          if (neighbor && currentIds.has(neighbor.eventId))
+            forcedCameraEventIds.add(neighbor.eventId)
+      })
+    } else {
+      forcedCameraEventIds.clear()
+    }
+    lastCameraSourceContext = context
+    lastCameraSources = currentSources
+    dropQueuedCameraChecks()
+    if (cameraCheckTimer) clearTimeout(cameraCheckTimer)
+    cameraCheckTimer = setTimeout(() => {
+      cameraCheckTimer = null
+      const sessionId = session.value?.id
+      const tabId = store.activeTabId
+      if (!sessionId || !tabId) return
+      const missing = cameraSources.value.filter(({ eventId, signature }) => {
+        const key = cameraCacheKey(sessionId, tabId, eventId)
+        return (forcedCameraEventIds.has(eventId) ||
+          cameraPresenceCache.get(key)?.signature !== signature) &&
+          cameraChecksPending.get(key) !== signature
+      })
+      if (!missing.length) return
+      for (const source of missing) forcedCameraEventIds.delete(source.eventId)
+      for (let index = 0; index < missing.length; index += 200) {
+        const sources = missing.slice(index, index + 200)
+        for (const source of sources)
+          cameraChecksPending.set(cameraCacheKey(sessionId, tabId, source.eventId), source.signature)
+        cameraCheckQueue.push({ sessionId, tabId, sources, snapshot: cameraSources.value })
+      }
+      runCameraCheckQueue()
+    }, 0)
+  },
+  { immediate: true, flush: 'post' }
 )
 const selectedSourceEvents = computed(() =>
   (workspace.value?.events ?? [])
@@ -1255,7 +1424,7 @@ const onTableEventSelect = (eventId: string) => {
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
 const handleDropProperty = async (...args: Parameters<typeof dropProperty>) => {
-  if (await dropProperty(...args)) alprAnalysis.value = null
+  await dropProperty(...args)
 }
 const handleErrorWarningRowClick = (eventId: string) => {
   highlightEventRow(eventId)
@@ -1274,32 +1443,46 @@ const handleLocationScrollToEvent = (eventId: string) => {
   getSelectedEvent(eventId)
   boostGraphRef.value?.scrollToEventSegment?.(eventId)
 }
-const analyzeAlpr = async () => {
-  if (!session.value || !store.activeTabId || !hasAlprOrigin.value) return
-  alprLoading.value = true
+const openCameraRoute = async (eventId: string) => {
+  if (!session.value || !store.activeTabId) return
+  const sessionId = session.value.id
+  const tabId = store.activeTabId
+  const requestId = ++cameraRouteRequestId
+  cameraRouteEventId.value = eventId
+  cameraRouteAnalysis.value = null
+  cameraRouteError.value = ''
+  cameraRouteOpen.value = true
+  cameraRouteLoading.value = true
   try {
     const response = await api.get<
       RouteEldEventCameraAnalysis | ApiEnvelope<RouteEldEventCameraAnalysis>
-    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERAS(session.value.id, store.activeTabId), {
-      params: { radiusMetres: 150 },
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERAS(sessionId, tabId), {
+      params: { radiusMetres: 150, eventId },
     })
-    alprAnalysis.value =
-      'successResult' in response.data ? response.data.successResult : response.data
-    toast.success(
-      alprAnalysis.value.matches.length
-        ? `${alprAnalysis.value.matches.length} events matched ALPR cameras`
-        : 'No ALPR cameras matched these event locations'
-    )
+    if (requestId === cameraRouteRequestId && cameraRouteOpen.value && cameraRouteEventId.value === eventId &&
+        session.value?.id === sessionId && store.activeTabId === tabId) {
+      cameraRouteAnalysis.value =
+        'successResult' in response.data ? response.data.successResult : response.data
+      const source = cameraSources.value.find((item) => item.eventId === eventId)
+      if (source) cameraPresenceCache.set(cameraCacheKey(sessionId, tabId, eventId), {
+        signature: source.signature,
+        hasCamera: Boolean(cameraRouteAnalysis.value.matches.find(
+          (match) => match.eventId === eventId && match.cameras.length > 0
+        )),
+        routeVerified: true,
+      })
+    }
   } catch (error: any) {
-    toast.error(
-      error?.response?.data?.message || error?.message || 'ALPR cameras could not be analyzed'
-    )
+    if (requestId === cameraRouteRequestId && cameraRouteOpen.value && cameraRouteEventId.value === eventId)
+      cameraRouteError.value = getApiErrorMessage(error, 'The event route could not be loaded')
   } finally {
-    alprLoading.value = false
+    if (requestId === cameraRouteRequestId) cameraRouteLoading.value = false
   }
 }
 watch([() => session.value?.id, () => store.activeTabId], () => {
-  alprAnalysis.value = null
+  cameraRouteRequestId++
+  cameraRouteOpen.value = false
+  cameraRouteAnalysis.value = null
 })
 const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
   boostGraphRef.value?.scrollToEventSegment?.(freeTime.eventId)
