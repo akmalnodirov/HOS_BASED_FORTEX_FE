@@ -1140,7 +1140,10 @@ const openRangeBoostModal = () => {
     toast.error(rangeBoostSelectionError.value)
     return
   }
-  rangeBoostSourceIndex.value = 0
+  const firstClickedId = rangeBoostSelectedIds.value[0]
+  rangeBoostSourceIndex.value = rangeBoostChronologicalEvents.value.findIndex(
+    (event) => event.id === firstClickedId
+  )
   rangeBoostFailureReason.value = ''
   rangeBoostModalOpen.value = true
 }
