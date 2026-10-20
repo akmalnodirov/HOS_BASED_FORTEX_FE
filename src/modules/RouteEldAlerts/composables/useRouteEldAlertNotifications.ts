@@ -1,4 +1,4 @@
-import { watch, ref } from 'vue'
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ApiEndpoints } from '@/api/endpoints'
@@ -12,8 +12,6 @@ import { useRouteEldAlertSocket } from './useRouteEldAlertSocket'
 function coordinates(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
-
-var companyName = ref<string>('')
 
 export function useRouteEldAlertNotifications() {
   const router = useRouter()
@@ -30,7 +28,6 @@ export function useRouteEldAlertNotifications() {
           item.id.toLowerCase() === companyId.toLowerCase()
         )
         if (!company) throw new Error('You do not have access to the alert company.')
-        companyName.value = company.name
 
         await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
         setCompanyId(company.id)
@@ -55,7 +52,7 @@ export function useRouteEldAlertNotifications() {
       alert.direction,
       `${alert.distanceMiles.toFixed(2)} mi away`,
       `Driver: ${alert.driverLocation || coordinates(alert.driverLatitude, alert.driverLongitude)}`,
-      `Company: ${companyName.value}`
+      `Company: ${localStorage.getItem('companyName')}`
     ]
       .filter(Boolean)
       .join(' · ')
@@ -82,7 +79,7 @@ export function useRouteEldAlertNotifications() {
       coordinates(alert.latitude, alert.longitude),
       `${alert.distanceMiles.toFixed(2)} mi away`,
       `Driver: ${alert.driverLocation || coordinates(alert.driverLatitude, alert.driverLongitude)}`,
-      `Company: ${companyName.value}`
+      `Company: ${localStorage.getItem('companyName')}`
     ].join(' · ')
 
     toast.warning(`${alert.driverName} is approaching ALPR camera`, {

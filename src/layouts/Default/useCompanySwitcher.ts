@@ -31,20 +31,26 @@ export function useCompanySwitcher() {
   let requestSequence = 0
 
   const selectedCompanyName = computed(
-    () => selectedCompany.value?.name || localStorage.getItem('companyName') || ''
+    () =>
+      authStore.company?.name ||
+      (selectedCompany.value?.id === authStore.companyId ? selectedCompany.value.name : '') ||
+      localStorage.getItem('companyName') ||
+      ''
   )
   const hasMore = computed(() => pageNumber.value < totalPages.value)
 
   const loadSelectedCompany = async () => {
-    if (!selectedCompanyId.value) return
+    const companyId = selectedCompanyId.value
+    if (!companyId) return
     try {
       const response = await api.get<RouteEldCompanyResponse>(
-        ApiEndpoints.ROUTE_ELD_COMPANY(selectedCompanyId.value)
+        ApiEndpoints.ROUTE_ELD_COMPANY(companyId)
       )
+      if (selectedCompanyId.value !== companyId) return
       selectedCompany.value = response.data.successResult
       localStorage.setItem('companyName', selectedCompany.value.name)
     } catch {
-      selectedCompany.value = null
+      if (selectedCompanyId.value === companyId) selectedCompany.value = null
     }
   }
 
@@ -119,7 +125,7 @@ export function useCompanySwitcher() {
   watch(debouncedSearch, () => loadCompanies())
   watch(() => authStore.companyId, (id) => {
     selectedCompanyId.value = id
-    if (!id) selectedCompany.value = null
+    selectedCompany.value = null
   })
   loadSelectedCompany()
 
