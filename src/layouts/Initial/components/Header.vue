@@ -6,11 +6,10 @@
           <img src="/images/logo.svg" alt="Logo" class="dark:hidden" />
           <img src="/images/logo-white.svg" alt="Logo" class="hidden dark:block" />
         </div>
-        <h1 class="text-xl text-gray-900 dark:text-gray-100">Unione</h1>
+        <h1 class="text-xl text-gray-900 dark:text-gray-100">L-LORA</h1>
       </div>
 
       <div class="flex items-center gap-4">
-        <!-- Tabs Navigation -->
         <Tabs :model-value="currentTab" @update:model-value="handleTabChange">
           <TabsList class="bg-[#F0F0F0] dark:bg-gray-800">
             <TabsTrigger
@@ -31,7 +30,6 @@
 
         <CThemeToggle />
 
-        <!-- Unione Team Button -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="secondary" class="cursor-pointer bg-[#F0F0F0] dark:bg-gray-800">
@@ -91,7 +89,6 @@ const userInfo = computed(() => ({
 }))
 
 const handleLogout = async () => {
-  // Use authStore logout method to clear all auth data
   await authStore.logout()
 }
 
