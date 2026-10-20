@@ -1,6 +1,7 @@
 <template>
   <div
-    class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background"
+    class="flex min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background"
+    :class="allCompanies ? 'h-[720px] rounded-lg border border-border' : 'h-[calc(100vh-65px)]'"
   >
     <div class="mb-4 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div>
@@ -8,6 +9,15 @@
         <p class="mt-1 text-sm text-muted-foreground">{{ pageDescription }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <Select v-if="allCompanies" v-model="companyFilter">
+          <SelectTrigger class="h-10 w-52"><SelectValue placeholder="All companies" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All companies</SelectItem>
+            <SelectItem v-for="company in companies" :key="company.id" :value="company.externalCompanyId">
+              {{ company.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Select v-model="alertType">
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -32,7 +42,7 @@
         <Button
           variant="outline"
           class="h-10"
-          :disabled="isRefreshing || !requestCompanyId"
+          :disabled="isRefreshing || (!allCompanies && !requestCompanyId)"
           @click="refresh"
         >
           <RefreshCw class="mr-2 h-4 w-4" :class="isRefreshing && 'animate-spin'" />
@@ -118,6 +128,7 @@
           <tr>
             <th class="h-12 w-14 px-3">No</th>
             <th class="px-3">Driver</th>
+            <th v-if="allCompanies" class="px-3">Company</th>
             <th class="px-3">Station</th>
             <th class="px-3">Driver location</th>
             <th class="px-3">Station location</th>
@@ -130,7 +141,7 @@
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td :colspan="allCompanies ? 11 : 10" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedStationAlerts"
@@ -140,6 +151,7 @@
           >
             <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
             <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
             <td class="px-3">
               <div class="font-medium">{{ alert.stationName }}</div>
               <div class="text-xs text-muted-foreground">{{ alert.stateCode || '—' }}</div>
@@ -214,7 +226,7 @@
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedStationAlerts.length === 0">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">
+            <td :colspan="allCompanies ? 11 : 10" class="h-28 text-center text-muted-foreground">
               No station notifications match the selected filters.
             </td>
           </tr>
@@ -229,10 +241,11 @@
           <tr>
             <th class="h-12 w-14 px-3">No</th>
             <th class="px-3">Driver</th>
+            <th v-if="allCompanies" class="px-3">Company</th>
             <th class="px-3">Camera</th>
             <th class="px-3">Driver location</th>
             <th class="px-3">Camera location</th>
-            <th class="px-3">Brand / operator</th>
+            <!-- <th class="px-3">Brand / operator</th> -->
             <th class="px-3">Distance</th>
             <th class="px-3">Occurred</th>
             <th class="px-3">Status</th>
@@ -241,7 +254,7 @@
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedAlprCameraAlerts"
@@ -251,6 +264,7 @@
           >
             <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
             <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
             <td class="px-3">
               <div class="font-medium">{{ alert.cameraName }}</div>
               <div class="text-xs text-muted-foreground">
@@ -283,10 +297,10 @@
                 </span>
               </a>
             </td>
-            <td class="px-3">
+            <!-- <td class="px-3">
               <div>{{ alert.brand || '—' }}</div>
               <div class="text-xs text-muted-foreground">{{ alert.operator || '—' }}</div>
-            </td>
+            </td> -->
             <td class="whitespace-nowrap px-3">{{ alert.distanceMiles.toFixed(2) }} mi</td>
             <td class="whitespace-nowrap px-3">{{ formatDate(alert.occurredAt) }}</td>
             <td class="px-3">
@@ -330,7 +344,7 @@
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedAlprCameraAlerts.length === 0">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">
+            <td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">
               No ALPR camera notifications match the selected filters.
             </td>
           </tr>
@@ -345,6 +359,7 @@
           <tr>
             <th class="h-12 w-14 px-3">No</th>
             <th class="px-3">Driver</th>
+            <th v-if="allCompanies" class="px-3">Company</th>
             <th class="px-3">Speed</th>
             <th class="px-3">Limit</th>
             <th class="px-3">Over limit</th>
@@ -357,7 +372,7 @@
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td :colspan="allCompanies ? 11 : 10" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedSpeedAlerts"
@@ -367,6 +382,7 @@
           >
             <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
             <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
             <td class="px-3 font-medium text-red-600">{{ Math.round(alert.speed) }} mph</td>
             <td class="px-3">{{ alert.speedLimit }} mph</td>
             <td class="px-3 font-medium text-orange-600">{{ speedOverLimit(alert) }} mph</td>
@@ -398,7 +414,7 @@
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedSpeedAlerts.length === 0">
-            <td colspan="10" class="h-28 text-center text-muted-foreground">
+            <td :colspan="allCompanies ? 11 : 10" class="h-28 text-center text-muted-foreground">
               No speed notifications match the selected filters.
             </td>
           </tr>
@@ -410,6 +426,7 @@
           <tr>
             <th class="h-12 w-14 px-3">No</th>
             <th class="px-3">Driver</th>
+            <th v-if="allCompanies" class="px-3">Company</th>
             <th class="px-3">Log date</th>
             <th class="px-3">Violations</th>
             <th class="px-3">Note</th>
@@ -421,7 +438,7 @@
         </thead>
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="9" class="h-28 text-center text-muted-foreground">Loading…</td>
+            <td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">Loading…</td>
           </tr>
           <tr
             v-for="(alert, index) in paginatedViolationAlerts"
@@ -431,6 +448,7 @@
           >
             <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
             <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
             <td class="whitespace-nowrap px-3">{{ formatLogDate(alert.logDate) }}</td>
             <td class="px-3 font-medium text-red-600">{{ alert.violationCount }}</td>
             <td class="max-w-96 px-3">
@@ -453,7 +471,7 @@
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedViolationAlerts.length === 0">
-            <td colspan="9" class="h-28 text-center text-muted-foreground">
+            <td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">
               No violation notifications match the selected filters.
             </td>
           </tr>
@@ -544,11 +562,15 @@ import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
-import type { RouteEldCompaniesResponse } from '@/types/company'
+import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
 import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
+const props = withDefaults(defineProps<{
+  allCompanies?: boolean
+  companies?: RouteEldCompany[]
+}>(), { allCompanies: false, companies: () => [] })
 const { formatToTimeZone } = useTimeZoneHelper()
 const route = useRoute()
 const {
@@ -566,7 +588,7 @@ const {
   markStationRead,
   markAlprCameraRead,
 } = useRouteEldAlerts()
-const { latestWeighStationAlert, latestAlprCameraAlert } = useRouteEldAlertSocket()
+const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -579,6 +601,17 @@ const selectedCompanyId = computed(() => authStore.companyId)
 const requestCompanyId = ref<string | null>(null)
 const selectedCompanyName = ref<string | null>(null)
 const companyError = ref<string | null>(null)
+const companyFilter = ref('all')
+const companyName = (companyId: string | null) =>
+  props.companies.find((company) => company.externalCompanyId === companyId)?.name ?? companyId ?? '—'
+const matchesAlertCompany = (companyId: string | null) => {
+  if (!companyId) return false
+  if (!props.allCompanies) return selectedCompanyId.value?.toLowerCase() === companyId.toLowerCase()
+  return companyFilter.value === 'all' || props.companies.some((company) =>
+    company.id.toLowerCase() === companyId.toLowerCase() &&
+    company.externalCompanyId === companyFilter.value
+  )
+}
 const requestedAlertType = route.query.type
 const alertType = ref<RouteEldAlertType>(
   requestedAlertType === 'alpr' ||
@@ -841,7 +874,15 @@ watch(alertType, async (value) => {
   search.value = ''
   statusFilter.value = 'all'
   pageNumber.value = 1
-  if (requestCompanyId.value) await ensureAlerts(value, requestCompanyId.value)
+  if (props.allCompanies || requestCompanyId.value) await ensureAlerts(value, requestCompanyId.value)
+})
+watch(companyFilter, async () => {
+  if (!props.allCompanies) return
+  requestCompanyId.value = companyFilter.value === 'all' ? null : companyFilter.value
+  mapSelection.value = null
+  pageNumber.value = 1
+  resetAlerts()
+  await fetchAlerts(alertType.value, requestCompanyId.value)
 })
 watch(
   () => route.query.type,
@@ -851,15 +892,20 @@ watch(
     }
   }
 )
-watch(latestWeighStationAlert, () => {
-  if (alertType.value === 'station' && requestCompanyId.value)
+watch(latestWeighStationAlert, (alert) => {
+  if (alertType.value === 'station' && matchesAlertCompany(alert?.companyId ?? null))
     void fetchAlerts('station', requestCompanyId.value, true)
 })
-watch(latestAlprCameraAlert, () => {
-  if (alertType.value === 'alpr' && requestCompanyId.value)
+watch(latestAlprCameraAlert, (alert) => {
+  if (alertType.value === 'alpr' && matchesAlertCompany(alert?.companyId ?? null))
     void fetchAlerts('alpr', requestCompanyId.value, true)
 })
+watch(latestGenericAlert, (alert) => {
+  if (alert?.notificationKey === alertType.value && matchesAlertCompany(alert.companyId))
+    void fetchAlerts(alertType.value, requestCompanyId.value, true)
+})
 watch(selectedCompanyId, async () => {
+  if (props.allCompanies) return
   mapSelection.value = null
   search.value = ''
   statusFilter.value = 'all'
@@ -888,6 +934,11 @@ async function resolveSelectedCompany() {
   requestCompanyId.value = null
   selectedCompanyName.value = null
   companyError.value = null
+  if (props.allCompanies) {
+    requestCompanyId.value = companyFilter.value === 'all' ? null : companyFilter.value
+    await ensureAlerts(alertType.value, requestCompanyId.value)
+    return
+  }
   const companyId = selectedCompanyId.value
   if (!companyId) {
     companyError.value = 'Select a company before opening notifications.'
@@ -910,7 +961,8 @@ async function resolveSelectedCompany() {
 }
 
 function refresh() {
-  if (requestCompanyId.value) void fetchAlerts(alertType.value, requestCompanyId.value, true)
+  if (props.allCompanies || requestCompanyId.value)
+    void fetchAlerts(alertType.value, requestCompanyId.value, true)
 }
 
 function viewStationMap(alert: StationAlert) {
@@ -919,7 +971,7 @@ function viewStationMap(alert: StationAlert) {
     reason: `Approaching ${alert.stationName}`,
     detail: `${alert.distanceMiles.toFixed(2)} mi away · ${stationLocation(alert)}`,
     driverRows: [
-      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
       { label: 'Location', value: stationDriverLocation(alert) },
       { label: 'Time', value: formatDate(alert.occurredAt) },
       { label: 'Distance', value: `${alert.distanceMiles.toFixed(2)} mi` },
@@ -943,7 +995,7 @@ function viewAlprMap(alert: AlprCameraAlert) {
     reason: `Approaching ALPR camera ${alert.cameraName}`,
     detail: `${alert.distanceMiles.toFixed(2)} mi away · ${alert.brand || alert.operator || 'Camera'}`,
     driverRows: [
-      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
       { label: 'Location', value: alprDriverLocation(alert) },
       { label: 'Time', value: formatDate(alert.occurredAt) },
       { label: 'Distance', value: `${alert.distanceMiles.toFixed(2)} mi` },
@@ -967,7 +1019,7 @@ function viewSpeedMap(alert: SpeedAlert) {
     reason: `Speed ${Math.round(alert.speed)} mph in a ${alert.speedLimit} mph zone`,
     detail: speedLocation(alert),
     driverRows: [
-      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
       { label: 'Location', value: speedLocation(alert) },
       { label: 'Time', value: formatDate(alert.occurredAt) },
       { label: 'Speed', value: `${alert.speed} mph` },
@@ -988,7 +1040,7 @@ function viewViolationMap(alert: ViolationAlert) {
     reason: `${alert.violationCount} HOS violation${alert.violationCount === 1 ? '' : 's'}`,
     detail: `${formatLogDate(alert.logDate)} · ${alert.note || 'No additional details'} · Last known driver position, not necessarily the violation site.`,
     driverRows: [
-      { label: 'Company', value: selectedCompanyName.value },
+      { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
       { label: 'Last location', value: alert.driverLocation || formatCoordinates(alert.driverLatitude, alert.driverLongitude) },
       { label: 'Time', value: formatDate(alert.occurredAt) },
       { label: 'Log date', value: formatLogDate(alert.logDate) },

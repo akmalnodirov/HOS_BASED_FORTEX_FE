@@ -7,7 +7,7 @@
   >
     <div class="flex flex-col h-full w-[248px]">
       <!-- Logo -->
-      <div class="flex items-center gap-3 px-4 h-[65px] flex-shrink-0">
+      <button type="button" class="flex w-full items-center gap-3 px-4 h-[65px] flex-shrink-0 text-left cursor-pointer" aria-label="Select company" @click="router.push('/initial/companies')">
         <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
           <img src="/images/logo.svg" alt="Logo" class="w-5 h-5 dark:hidden" />
           <img src="/images/logo-white.svg" alt="Logo" class="w-5 h-5 hidden dark:block" />
@@ -18,7 +18,7 @@
         >
           L-LORA
         </span>
-      </div>
+      </button>
 
       <Separator class="bg-gray-300 dark:bg-sidebar-border" />
 

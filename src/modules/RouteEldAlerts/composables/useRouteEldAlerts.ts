@@ -70,16 +70,12 @@ export function useRouteEldAlerts() {
   }
 
   async function fetchAlerts(type: RouteEldAlertType, companyId: string | null, silent = false) {
-    if (!companyId) {
-      error.value = 'The selected company could not be resolved.'
-      return
-    }
     const version = ++requestVersion
     if (silent) isRefreshing.value = true
     else isLoading.value = true
     error.value = null
     try {
-      const params = { companyId }
+      const params = companyId ? { companyId } : {}
       if (type === 'station') {
         const response = await api.get<StationAlert[] | ApiEnvelope<StationAlert[]>>(
           ApiEndpoints.ROUTE_ELD_STATION_ALERTS,

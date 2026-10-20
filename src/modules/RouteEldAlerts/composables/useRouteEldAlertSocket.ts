@@ -3,6 +3,7 @@ import { createGlobalState } from '@vueuse/core'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type {
   RouteEldAlprCameraApproachMessage,
+  RouteEldGenericAlertMessage,
   RouteEldWeighStationApproachMessage,
 } from '../types'
 
@@ -17,6 +18,7 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
   const connectionState = ref<ConnectionState>('disconnected')
   const latestWeighStationAlert = ref<RouteEldWeighStationApproachMessage | null>(null)
   const latestAlprCameraAlert = ref<RouteEldAlprCameraApproachMessage | null>(null)
+  const latestGenericAlert = ref<RouteEldGenericAlertMessage | null>(null)
   const companyId = computed(() => authStore.companyId)
   const token = computed(() => authStore.getTokens())
   const shouldConnect = computed(() => authStore.loggedIn && !!token.value)
@@ -57,13 +59,13 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
   }
 
   function publishWeighStationAlert(message: RouteEldWeighStationApproachMessage) {
-    if (!companyId.value || message.companyId?.toLowerCase() !== companyId.value.toLowerCase()) return
+    if (!message.companyId) return
     if (!message.alertId || !rememberAlert('station', message.alertId)) return
     latestWeighStationAlert.value = message
   }
 
   function publishAlprCameraAlert(message: RouteEldAlprCameraApproachMessage) {
-    if (!companyId.value || message.companyId?.toLowerCase() !== companyId.value.toLowerCase()) return
+    if (!message.companyId) return
     if (!message.alertId || !rememberAlert('alpr', message.alertId)) return
     latestAlprCameraAlert.value = message
   }
@@ -99,6 +101,10 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
         publishWeighStationAlert(message.arguments[0] as RouteEldWeighStationApproachMessage)
       } else if (message.target === 'RouteEldAlprCameraApproach') {
         publishAlprCameraAlert(message.arguments[0] as RouteEldAlprCameraApproachMessage)
+      } else if (message.target === 'ReceiveNotification') {
+        const alert = message.arguments[0] as RouteEldGenericAlertMessage
+        if (alert?.companyId && (alert.notificationKey === 'speed' || alert.notificationKey === 'violation'))
+          latestGenericAlert.value = alert
       }
       return
     }
@@ -206,6 +212,7 @@ const _useRouteEldAlertSocket = createGlobalState(() => {
     connectionState,
     latestWeighStationAlert,
     latestAlprCameraAlert,
+    latestGenericAlert,
     connect,
     disconnect,
   }

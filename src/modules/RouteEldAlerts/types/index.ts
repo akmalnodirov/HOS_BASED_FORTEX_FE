@@ -1,5 +1,11 @@
 export type RouteEldAlertType = 'station' | 'alpr' | 'violation' | 'speed'
 
+export interface RouteEldGenericAlertMessage {
+  companyId: string
+  notificationKey: string
+  message: string
+}
+
 export interface RouteEldAlertCompany {
   id: string
   name: string
@@ -8,6 +14,7 @@ export interface RouteEldAlertCompany {
 }
 
 export interface StationAlert {
+  companyId: string
   id: string
   driverId: string
   driverName: string
@@ -30,6 +37,7 @@ export interface StationAlert {
 }
 
 export interface AlprCameraAlert {
+  companyId: string
   id: string
   driverId: string
   driverName: string
@@ -89,6 +97,7 @@ export interface RouteEldAlprCameraApproachMessage {
 }
 
 export interface SpeedAlert {
+  companyId: string | null
   id: string
   driverName: string
   speed: number
@@ -102,6 +111,7 @@ export interface SpeedAlert {
 }
 
 export interface ViolationAlert {
+  companyId: string | null
   id: string
   driverName: string
   logDate: string

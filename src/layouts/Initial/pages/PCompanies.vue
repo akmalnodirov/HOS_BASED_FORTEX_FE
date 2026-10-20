@@ -10,9 +10,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import SortIcon from '@/components/icons/SortIcon.vue'
+import PRouteEldAlerts from '@/modules/RouteEldAlerts/pages/PRouteEldAlerts.vue'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
+import { computed } from 'vue'
 import { useCompanies } from '@/layouts/Initial/composables/useCompanies'
 
 const {
+  companies,
   isLoading,
   selectingCompanyId,
   error,
@@ -32,6 +37,12 @@ const {
   selectCompany,
   handleSort,
 } = useCompanies()
+const authStore = useAuthStore()
+const canViewAlerts = computed(() =>
+  ['station', 'alpr', 'speed', 'violation'].some((type) =>
+    hasPermission(authStore.token, `route_eld.alerts.${type}`)
+  )
+)
 </script>
 
 <template>
@@ -188,5 +199,8 @@ const {
         </Button>
       </div>
     </div>
+    <section v-if="canViewAlerts" class="mt-6">
+      <PRouteEldAlerts :all-companies="true" :companies="companies" />
+    </section>
   </div>
 </template>

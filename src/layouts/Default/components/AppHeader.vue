@@ -93,6 +93,9 @@
             </div>
 
             <div class="p-4 bg-background dark:bg-card">
+              <button type="button" class="mb-3 w-full rounded border border-border px-3 py-2 text-left text-sm font-medium hover:bg-muted" @click="isDropdownOpen = false; router.push('/initial/companies')">
+                All Companies
+              </button>
               <!-- Companies List -->
               <div class="max-h-[320px] overflow-y-auto pr-1 flex flex-col gap-3">
                 <div

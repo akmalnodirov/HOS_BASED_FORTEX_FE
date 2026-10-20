@@ -8,10 +8,12 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { Toaster } from '@/components/ui/sonner'
 import { useDarkMode } from '@/composables/useDarkMode'
+import { useRouteEldAlertNotifications } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
 import 'vue-sonner/style.css'
 import '@/assets/toast-styles.css'
 
 const { initDarkMode } = useDarkMode()
+useRouteEldAlertNotifications()
 
 // Initialize dark mode when app starts
 onMounted(() => {
