@@ -17,7 +17,7 @@ export function useRouteEldAlertNotifications() {
   const router = useRouter()
   const api = useApi()
   const authStore = useAuthStore()
-  const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
+  const { latestWeighStationAlert, latestGenericAlert } = useRouteEldAlertSocket()
 
   async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'speed' | 'violation', alertId?: string) {
     if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type}`)) return
@@ -65,31 +65,6 @@ export function useRouteEldAlertNotifications() {
       action: {
         label: 'View alerts',
         onClick: () => void viewAlerts(alert.companyId, 'station', alert.alertId),
-      },
-    })
-  })
-
-  watch(latestAlprCameraAlert, (alert) => {
-    if (!alert) return
-    if (!hasPermission(authStore.token, 'route_eld.alerts.alpr')) return
-
-    // const cameraDetails = [alert.brand, alert.operator].filter(Boolean).join(' · ')
-    const details = [
-      // cameraDetails ||
-      coordinates(alert.latitude, alert.longitude),
-      `${alert.distanceMiles.toFixed(2)} mi away`,
-      `Driver: ${alert.driverLocation || coordinates(alert.driverLatitude, alert.driverLongitude)}`,
-      `Company: ${localStorage.getItem('companyName')}`
-    ].join(' · ')
-
-    toast.warning(`${alert.driverName} is approaching ALPR camera`, {
-      id: `route-eld-alpr-${alert.alertId}`,
-      description: details,
-      duration: 10_000,
-      position: 'top-right',
-      action: {
-        label: 'View alerts',
-        onClick: () => void viewAlerts(alert.companyId, 'alpr', alert.alertId),
       },
     })
   })
