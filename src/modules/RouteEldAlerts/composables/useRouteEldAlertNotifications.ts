@@ -17,7 +17,7 @@ export function useRouteEldAlertNotifications() {
   const router = useRouter()
   const api = useApi()
   const authStore = useAuthStore()
-  const { latestWeighStationAlert, latestGenericAlert } = useRouteEldAlertSocket()
+  const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
 
   async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'speed' | 'violation', alertId?: string) {
     if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type}`)) return
@@ -65,6 +65,23 @@ export function useRouteEldAlertNotifications() {
       action: {
         label: 'View alerts',
         onClick: () => void viewAlerts(alert.companyId, 'station', alert.alertId),
+      },
+    })
+  })
+
+  watch(latestAlprCameraAlert, (alert) => {
+    if (!alert) return
+    if (!hasPermission(authStore.token, 'route_eld.alerts.alpr')) return
+
+    toast.info(`${alert.driverName} · ALPR camera ${alert.distanceMiles.toFixed(1)} mi ahead`, {
+      id: `route-eld-alpr-${alert.driverId}`,
+      description: alert.driverLocation ?? undefined,
+      duration: 5_000,
+      position: 'bottom-right',
+      class: 'toast-compact',
+      action: {
+        label: 'View',
+        onClick: () => void viewAlerts(alert.companyId, 'alpr', alert.alertId),
       },
     })
   })
