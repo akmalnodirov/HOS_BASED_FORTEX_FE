@@ -224,6 +224,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_FULL_VEHICLE_REPORT = `${this.ROUTE_ELD_VEHICLE_REPORT}/full`
   static readonly ROUTE_ELD_COMPANIES_PAGE = `${this.ROUTE_ELD_COMPANIES}/page`
   static readonly ROUTE_ELD_COMPANY = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}`
+  static readonly ROUTE_ELD_COMPANY_PROFILE = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}/profile`
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
   static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
