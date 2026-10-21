@@ -477,7 +477,23 @@
                     "
                     v-bind="draggableAttrs('odometer', event)"
                   >
-                    {{ event.vehicleMiles != null ? Math.round(event.vehicleMiles) : '-' }}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate">
+                        {{ event.vehicleMiles != null ? Math.round(event.vehicleMiles) : '-' }}
+                      </span>
+                      <button
+                        v-if="event.vehicleMiles != null"
+                        type="button"
+                        class="ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Copy odometer"
+                        aria-label="Copy odometer"
+                        draggable="false"
+                        @click.stop="copyCellValue(String(Math.round(event.vehicleMiles)), 'Odometer')"
+                        @dragstart.stop.prevent
+                      >
+                        <Copy class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div
