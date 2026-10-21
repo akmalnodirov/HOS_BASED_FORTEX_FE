@@ -220,7 +220,7 @@ const selectedCamera = ref<RouteEldMatchedCamera | null>(null)
 
 const locatedEvents = computed(() =>
   props.events.filter(
-    (event) => event.recordStatus === 'ACTIVE' && event.latitude != null && event.longitude != null
+    (event) => event.recordStatus.toUpperCase() === 'ACTIVE' && event.latitude != null && event.longitude != null
   )
 )
 const locatedEventSourceKey = computed(() =>

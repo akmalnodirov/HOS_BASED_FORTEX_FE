@@ -2,9 +2,8 @@
   <RouterView />
   <Toaster />
 </template>
-<!-- Example usage in App.vue or router view -->
+
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { Toaster } from '@/components/ui/sonner'
 import { useDarkMode } from '@/composables/useDarkMode'
@@ -15,8 +14,5 @@ import '@/assets/toast-styles.css'
 const { initDarkMode } = useDarkMode()
 useRouteEldAlertNotifications()
 
-// Initialize dark mode when app starts
-onMounted(() => {
-  initDarkMode()
-})
+if (typeof window !== 'undefined') initDarkMode()
 </script>

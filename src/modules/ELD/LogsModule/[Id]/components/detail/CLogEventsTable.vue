@@ -138,12 +138,20 @@
                 </td>
                 <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
                 <td v-if="isColumnVisible('event')" class="px-4 py-3 text-center">
+                  <div class="inline-flex items-center gap-1.5">
                   <span
                     class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
                     :class="getEventBadgeClass(event.eventType, event.eventCode)"
                   >
                     {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
                   </span>
+                  <button v-if="cameraEventIds.includes(String(event.id || event.eventId))"
+                    type="button" class="rounded p-1 text-destructive hover:bg-destructive/10"
+                    title="View event route and cameras" aria-label="View event route and cameras"
+                    @click.stop="emit('open-camera-route', String(event.id || event.eventId))">
+                    <Camera class="h-3.5 w-3.5" />
+                  </button>
+                  </div>
                 </td>
                 <td
                   v-if="isColumnVisible('duration')"
@@ -220,7 +228,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
-import { CircleAlert, Copy, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { Camera, CircleAlert, Copy, Pencil, TriangleAlert } from 'lucide-vue-next'
 import { copyCoordinates } from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'
@@ -251,6 +259,7 @@ const api = useApi()
 
 interface Props {
   events: any[]
+  cameraEventIds?: string[]
   eventIssues?: RouteEldEventIssue[]
   loading?: boolean
   selectedEventId?: string | null
@@ -269,6 +278,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   eventIssues: () => [],
+  cameraEventIds: () => [],
   loading: false,
   selectedEventId: null,
   selectable: false,
@@ -288,6 +298,7 @@ function isColumnVisible(column: LogEventTableColumn) {
 
 const emit = defineEmits<{
   'select-row': [event: any]
+  'open-camera-route': [eventId: string]
   'update:selectedEventId': [id: string | null]
   'row-select': [event: any]
   'edit-event': [event: any]

@@ -6,6 +6,10 @@
         <DialogDescription>
           {{ selectedEvent?.eventName || 'Selected event' }} · {{ selectedCameraCount }} route cameras
         </DialogDescription>
+        <p v-if="!loading && !error && analysis && selectedCameraCount === 0"
+          class="text-xs text-muted-foreground">
+          No camera matched the calculated road route for this event.
+        </p>
       </DialogHeader>
       <div v-if="loading" class="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle class="h-5 w-5 animate-spin" /> Loading route and cameras…

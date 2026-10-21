@@ -45,6 +45,7 @@
       <CLogEventsTable
         ref="eventsTable"
         :events="displayEvents"
+        :camera-event-ids="cameraEventIds"
         :event-issues="eventIssues"
         :column-visibility="eventTableColumnVisibility"
         :loading="isDailyEventsLoading"
@@ -58,6 +59,7 @@
         :chart-error="chartError"
         readonly
         @select-row="handleTableEvent"
+        @open-camera-route="openCameraRoute"
         @chart:container-update="getChartWidth"
       />
     </div>
@@ -91,12 +93,21 @@
       :current-status="detail?.hos?.currentStatus"
       :time-zone="detail?.timeZone"
     />
+    <CBoostEventCameraDialog
+      v-model:open="cameraRouteOpen"
+      :loading="cameraRouteLoading"
+      :error="cameraRouteError"
+      :events="cameraMapEvents"
+      :selected-event-id="cameraRouteEventId"
+      :analysis="cameraRouteAnalysis"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { inject, nextTick, ref } from 'vue'
+import { computed, inject, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { toast } from 'vue-sonner'
 import CLogGraph from '../components/detail/CLogGraph.vue'
 import CLogEventsTable from '../components/detail/CLogEventsTable.vue'
 import CLogSignature from '../components/detail/CLogSignature.vue'
@@ -104,10 +115,17 @@ import CLogProfileForm from '../components/detail/CLogProfileForm.vue'
 import CLogRouteEldTracking from '../components/detail/CLogRouteEldTracking.vue'
 import CLogEventIssues from '../components/detail/CLogEventIssues.vue'
 import CLogEventTableColumnSettings from '../components/detail/CLogEventTableColumnSettings.vue'
+import CBoostEventCameraDialog from '../../Boost/components/modals/CBoostEventCameraDialog.vue'
+import type { RouteEldEventCameraAnalysis, RouteEldEventCameraPresence, RouteEldHosEvent } from '../../Boost/types/boost'
+import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
+import type { RouteEldEvent } from '../types/routeEldDetail'
+import { ApiEndpoints } from '@/api/endpoints'
+import { useApi } from '@/composables/useAxiosService'
 import { useLogEventTableColumns } from '../composables/useLogEventTableColumns'
 import type { useRouteEldLogDetail } from '../composables/useRouteEldLogDetail'
 
 const route = useRoute()
+const api = useApi()
 const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 const eventsTable = ref<{ focusEvent: (eventId: string) => Promise<boolean> } | null>(null)
 const graphSection = ref<HTMLElement | null>(null)
@@ -144,6 +162,108 @@ const {
   driverDailyForm,
   signatureImageUrl,
 } = logDetail
+
+const cameraCache = cameraPresenceCache
+const cameraEvents = computed(() => (detail.value?.events ?? []).filter((event) =>
+  event.recordStatus.toUpperCase() === 'ACTIVE' && event.latitude != null &&
+  event.longitude != null && Number.isFinite(event.latitude) && Number.isFinite(event.longitude))
+  .sort((a, b) => a.timestamp - b.timestamp))
+const cameraSignature = (event: RouteEldEvent) => {
+  const index = cameraEvents.value.findIndex((item) => item.id === event.id)
+  return [cameraEvents.value[index - 1], event, cameraEvents.value[index + 1]]
+    .map((item) => item ? `${item.latitude}:${item.longitude}` : '').join('|')
+}
+const cameraCacheKey = (event: RouteEldEvent) => `all:${route.params.id}:${event.id}`
+const cameraEventIds = computed(() => cameraEvents.value.filter((event) => {
+  const cached = cameraCache.get(cameraCacheKey(event))
+  return cached?.signature === cameraSignature(event) && cached.hasCamera
+}).map((event) => event.id))
+const cameraMapEvents = computed<RouteEldHosEvent[]>(() => {
+  const events = [...(detail.value?.events ?? [])]
+  const previous = detail.value?.previousEvent
+  if (previous && !events.some((event) => event.id === previous.id)) events.push(previous)
+  return events.map((event) => ({ ...event, isEditable: false, trailers: [], documents: [] }))
+})
+const cameraRouteOpen = ref(false)
+const cameraRouteLoading = ref(false)
+const cameraRouteError = ref('')
+const cameraRouteEventId = ref('')
+const cameraRouteAnalysis = ref<RouteEldEventCameraAnalysis | null>(null)
+let cameraRouteRequestId = 0
+
+watch(() => `${route.params.id}:${headerDate.value.format('YYYY-MM-DD')}:${cameraEvents.value.map(
+  (event) => `${event.id}=${cameraSignature(event)}`).join('|')}`, (_key, _old, onCleanup) => {
+  const driverId = String(route.params.id || '')
+  const day = headerDate.value
+  const missing = cameraEvents.value.map((event) => ({ event, signature: cameraSignature(event) }))
+    .filter(({ event, signature }) => cameraCache.get(cameraCacheKey(event))?.signature !== signature)
+  if (!driverId || !missing.length) return
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
+  void (async () => {
+    for (let index = 0; index < missing.length && !controller.signal.aborted; index += 200) {
+      const batch = missing.slice(index, index + 200)
+      try {
+        const response = await api.post<RouteEldEventCameraPresence[] | { successResult: RouteEldEventCameraPresence[] }>(
+          ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERA_PRESENCE(driverId),
+          { eventIds: batch.map(({ event }) => event.id) },
+          { params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
+            toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 150 }, signal: controller.signal })
+        if (controller.signal.aborted) return
+        const results = 'successResult' in response.data ? response.data.successResult : response.data
+        const found = new Map(results.map((result) => [result.eventId, result.hasCamera]))
+        for (const { event, signature } of batch) {
+          const current = cameraEvents.value.find((item) => item.id === event.id)
+          if (!current || cameraSignature(current) !== signature) continue
+          const existing = cameraCache.get(cameraCacheKey(event))
+          if (existing?.routeVerified && existing.signature === signature) continue
+          cameraCache.set(cameraCacheKey(event), { signature, hasCamera: found.get(event.id) === true })
+        }
+      } catch {
+        if (controller.signal.aborted) return
+        toast.error('Camera checks could not be loaded')
+        break
+      }
+    }
+  })()
+}, { immediate: true })
+
+async function openCameraRoute(eventId: string) {
+  const driverId = String(route.params.id || '')
+  if (!driverId) return
+  const requestId = ++cameraRouteRequestId
+  const day = headerDate.value
+  cameraRouteEventId.value = eventId
+  cameraRouteAnalysis.value = null
+  cameraRouteError.value = ''
+  cameraRouteOpen.value = true
+  cameraRouteLoading.value = true
+  try {
+    const response = await api.get<RouteEldEventCameraAnalysis | { successResult: RouteEldEventCameraAnalysis }>(
+      ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERAS(driverId), {
+        params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
+          toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 150, eventId },
+      })
+    if (requestId !== cameraRouteRequestId || !cameraRouteOpen.value) return
+    cameraRouteAnalysis.value = 'successResult' in response.data ? response.data.successResult : response.data
+    const event = cameraEvents.value.find((item) => item.id === eventId)
+    if (event) cameraCache.set(cameraCacheKey(event), {
+      signature: cameraSignature(event),
+      hasCamera: Boolean(cameraRouteAnalysis.value.matches.find(
+        (match) => match.eventId === eventId && match.cameras.length > 0)),
+      routeVerified: true,
+    })
+  } catch (error: any) {
+    if (requestId === cameraRouteRequestId) cameraRouteError.value = error.response?.data?.message || 'The event route could not be loaded'
+  } finally {
+    if (requestId === cameraRouteRequestId) cameraRouteLoading.value = false
+  }
+}
+
+watch(() => [route.params.id, headerDate.value.format('YYYY-MM-DD')], () => {
+  cameraRouteRequestId++
+  cameraRouteOpen.value = false
+})
 
 async function handleGraphEvent(event: { eventId?: string; id?: string }) {
   const eventId = event?.eventId || event?.id

@@ -90,3 +90,16 @@
 [data-sonner-toast]:hover {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12) !important;
 }
+
+.dark [data-sonner-toast].route-eld-alert-toast {
+  background: #272a32 !important;
+  border-color: #454b56 !important;
+}
+
+.dark [data-sonner-toast].route-eld-alert-toast [data-title] {
+  color: #f9fafb !important;
+}
+
+.dark [data-sonner-toast].route-eld-alert-toast [data-description] {
+  color: #b6c0ce !important;
+}

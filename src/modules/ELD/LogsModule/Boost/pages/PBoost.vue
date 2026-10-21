@@ -479,7 +479,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -525,6 +525,7 @@ import type {
   RouteEldSessionOperation,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
+import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
 import CBoostGraph from '../components/CBoostGraph.vue'
 import CBoostEventsTable from '../components/CBoostEventsTable.vue'
 import CBoostActions from '../components/CBoostActions.vue'
@@ -726,34 +727,27 @@ type CameraSource = { eventId: string; signature: string }
 const cameraSources = computed<CameraSource[]>(() => {
   if (!session.value || workspace.value?.session.id !== session.value.id ||
       workspace.value.tabId !== store.activeTabId) return []
-  return workspace.value.events
+  const located = workspace.value.events
     .filter((item) => !item.isDeleted && item.event.recordStatus.toUpperCase() === 'ACTIVE' &&
       item.event.latitude != null && item.event.longitude != null &&
       Number.isFinite(item.event.latitude) && Number.isFinite(item.event.longitude))
-    .map((item) => ({
+    .sort((a, b) => a.event.timestamp - b.event.timestamp)
+  return located.map((item, index) => ({
       eventId: item.event.id,
-      signature: `${item.event.latitude}:${item.event.longitude}`,
+      signature: [located[index - 1]?.event, item.event, located[index + 1]?.event]
+        .map((event) => event ? `${event.latitude}:${event.longitude}` : '').join('|'),
     }))
 })
-const cameraPresenceCache = reactive(new Map<string, {
-  signature: string
-  hasCamera: boolean
-  routeVerified?: boolean
-}>())
 const cameraChecksPending = new Map<string, string>()
 const cameraCheckQueue: Array<{
   sessionId: string
   tabId: string
   sources: CameraSource[]
-  snapshot: CameraSource[]
 }> = []
 let cameraCheckWorkers = 0
 let activeCameraCheck: { sessionId: string; tabId: string; controller: AbortController } | null = null
 let cameraCheckErrorShown = false
 let cameraCheckTimer: ReturnType<typeof setTimeout> | null = null
-let lastCameraSourceContext = ''
-let lastCameraSources: CameraSource[] = []
-const forcedCameraEventIds = new Set<string>()
 const cameraCacheKey = (sessionId: string, tabId: string, eventId: string) =>
   `${sessionId}:${tabId}:${eventId}`
 const cameraEventIds = computed(() => {
@@ -786,12 +780,13 @@ const runCameraCheckQueue = () => {
               ? response.data.successResult : response.data
             cameraCheckErrorShown = false
             const byId = new Map(results.map((result) => [result.eventId, result.hasCamera]))
-            for (const source of batch.snapshot) {
+            for (const source of batch.sources) {
               const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
               const cached = cameraPresenceCache.get(key)
-              if (byId.has(source.eventId) &&
+              const current = cameraSources.value.find((item) => item.eventId === source.eventId)
+              if (current?.signature === source.signature &&
                   !(cached?.routeVerified && cached.signature === source.signature))
-                cameraPresenceCache.set(key, { signature: source.signature, hasCamera: byId.get(source.eventId)! })
+                cameraPresenceCache.set(key, { signature: source.signature, hasCamera: byId.get(source.eventId) === true })
             }
             for (const source of batch.sources) {
               const key = cameraCacheKey(batch.sessionId, batch.tabId, source.eventId)
@@ -838,21 +833,6 @@ watch(
     ({ eventId, signature }) => `${eventId}=${signature}`
   ).join('|')}`,
   () => {
-    const context = `${session.value?.id}:${store.activeTabId}`
-    const currentSources = cameraSources.value
-    if (lastCameraSourceContext === context) {
-      const currentIds = new Set(currentSources.map((source) => source.eventId))
-      lastCameraSources.forEach((source, index) => {
-        if (currentIds.has(source.eventId)) return
-        for (const neighbor of [lastCameraSources[index - 1], lastCameraSources[index + 1]])
-          if (neighbor && currentIds.has(neighbor.eventId))
-            forcedCameraEventIds.add(neighbor.eventId)
-      })
-    } else {
-      forcedCameraEventIds.clear()
-    }
-    lastCameraSourceContext = context
-    lastCameraSources = currentSources
     dropQueuedCameraChecks()
     if (cameraCheckTimer) clearTimeout(cameraCheckTimer)
     cameraCheckTimer = setTimeout(() => {
@@ -862,17 +842,15 @@ watch(
       if (!sessionId || !tabId) return
       const missing = cameraSources.value.filter(({ eventId, signature }) => {
         const key = cameraCacheKey(sessionId, tabId, eventId)
-        return (forcedCameraEventIds.has(eventId) ||
-          cameraPresenceCache.get(key)?.signature !== signature) &&
+        return cameraPresenceCache.get(key)?.signature !== signature &&
           cameraChecksPending.get(key) !== signature
       })
       if (!missing.length) return
-      for (const source of missing) forcedCameraEventIds.delete(source.eventId)
       for (let index = 0; index < missing.length; index += 200) {
         const sources = missing.slice(index, index + 200)
         for (const source of sources)
           cameraChecksPending.set(cameraCacheKey(sessionId, tabId, source.eventId), source.signature)
-        cameraCheckQueue.push({ sessionId, tabId, sources, snapshot: cameraSources.value })
+        cameraCheckQueue.push({ sessionId, tabId, sources })
       }
       runCameraCheckQueue()
     }, 0)

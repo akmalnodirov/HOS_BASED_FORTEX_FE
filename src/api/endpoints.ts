@@ -208,6 +208,10 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DRIVER = (id: string) => `${this.ROUTE_ELD_DRIVERS}/${id}`
   static readonly ROUTE_ELD_DRIVER_SCHEDULE = (id: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${id}/schedule`
+  static readonly ROUTE_ELD_DRIVER_SCHEDULE_CAMERAS = (id: string) =>
+    `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/cameras`
+  static readonly ROUTE_ELD_DRIVER_SCHEDULE_CAMERA_PRESENCE = (id: string) =>
+    `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/camera-presence`
   static readonly ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS = (id: string) =>
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/options`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE = (id: string) =>
