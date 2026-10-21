@@ -506,7 +506,21 @@
                     "
                     v-bind="draggableAttrs('engine_hours', event)"
                   >
-                    {{ event.engineHours ?? '-' }}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate">{{ event.engineHours ?? '-' }}</span>
+                      <button
+                        v-if="event.engineHours != null"
+                        type="button"
+                        class="ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Copy engine hours"
+                        aria-label="Copy engine hours"
+                        draggable="false"
+                        @click.stop="copyCellValue(String(event.engineHours), 'Engine hours')"
+                        @dragstart.stop.prevent
+                      >
+                        <Copy class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div
