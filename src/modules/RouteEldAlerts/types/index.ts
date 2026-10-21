@@ -4,6 +4,7 @@ export interface RouteEldGenericAlertMessage {
   companyId: string
   notificationKey: string
   message: string
+  alertId?: string | null
 }
 
 export interface RouteEldAlertCompany {

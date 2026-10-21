@@ -195,7 +195,7 @@
                       : 'bg-orange-100 text-orange-700'
                   "
                 >
-                  {{ alert.resolvedAt ? 'Resolved' : 'Active' }}
+                  {{ alert.resolvedAt ? 'Passed' : 'Nearby' }}
                 </span>
                 <span
                   v-if="!alert.isRead"
@@ -313,7 +313,7 @@
                       : 'bg-orange-100 text-orange-700'
                   "
                 >
-                  {{ alert.resolvedAt ? 'Resolved' : 'Active' }}
+                  {{ alert.resolvedAt ? 'Passed' : 'Nearby' }}
                 </span>
                 <span
                   v-if="!alert.isRead"
@@ -667,8 +667,8 @@ const statusOptions = computed(() => {
     return [
       { value: 'all', label: 'All statuses' },
       { value: 'unread', label: 'Unread' },
-      { value: 'active', label: 'Active' },
-      { value: 'resolved', label: 'Resolved' },
+      { value: 'active', label: 'Nearby' },
+      { value: 'resolved', label: 'Passed' },
     ]
   }
   return [
@@ -797,7 +797,7 @@ const summaryCards = computed(() => {
         className: 'text-orange-600',
       },
       {
-        label: 'Resolved',
+        label: 'Passed',
         value: stationAlerts.value.filter((alert) => !!alert.resolvedAt).length,
         className: 'text-green-600',
       },
@@ -817,7 +817,7 @@ const summaryCards = computed(() => {
         className: 'text-orange-600',
       },
       {
-        label: 'Resolved',
+        label: 'Passed',
         value: alprCameraAlerts.value.filter((alert) => !!alert.resolvedAt).length,
         className: 'text-green-600',
       },

@@ -1,7 +1,7 @@
-import { watch } from 'vue'
+import { defineComponent, h, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Camera, Gauge, Scale, ShieldAlert } from 'lucide-vue-next'
+import { Camera, Check, Eye, Gauge, Scale, ShieldAlert } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -9,6 +9,7 @@ import { hasPermission } from '@/router/permissions'
 import type { RouteEldCompaniesResponse } from '@/types/company'
 import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 import { useRouteEldAlertSocket } from './useRouteEldAlertSocket'
+import { useRouteEldNotificationCenter } from './useRouteEldNotificationCenter'
 
 function coordinates(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
@@ -27,22 +28,20 @@ function plainMessage(message: string) {
     ?.replace(/^[\s\p{Extended_Pictographic}\uFE0F]+/u, '').trim() || message
 }
 
-export function useRouteEldAlertNotifications() {
+export function useRouteEldAlertNavigation() {
   const router = useRouter()
   const api = useApi()
   const authStore = useAuthStore()
-  const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
-
   async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'speed' | 'violation', alertId?: string) {
     if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type}`)) return false
     try {
-      if (authStore.companyId?.toLowerCase() !== companyId.toLowerCase()) {
-        const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
-        const company = response.data.successResult.find((item) =>
-          item.id.toLowerCase() === companyId.toLowerCase()
-        )
-        if (!company) throw new Error('You do not have access to the alert company.')
-
+      const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
+      const company = response.data.successResult.find((item) =>
+        item.id.toLowerCase() === companyId.toLowerCase() ||
+        item.externalCompanyId.toLowerCase() === companyId.toLowerCase()
+      )
+      if (!company) throw new Error('You do not have access to the alert company.')
+      if (authStore.companyId?.toLowerCase() !== company.id.toLowerCase()) {
         await api.post(ApiEndpoints.ROUTE_ELD_SELECT_COMPANY(company.id))
         setCompanyId(company.id)
         setCompanyTimeZoneId('UTC')
@@ -59,20 +58,51 @@ export function useRouteEldAlertNotifications() {
     }
   }
 
+  return { viewAlerts }
+}
+
+export function useRouteEldAlertNotifications() {
+  const { viewAlerts } = useRouteEldAlertNavigation()
+  const { enabledTypes, markRead, refresh } = useRouteEldNotificationCenter()
+  const authStore = useAuthStore()
+  const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+  async function readAlert(alert: RouteEldAlertToast, toastId: string) {
+    if (!alert.alertId) return
+    try {
+      await markRead({ id: alert.alertId, type: alert.type })
+      toast.dismiss(toastId)
+    } catch {
+      toast.error('Could not mark alert as read')
+    }
+  }
+
   function showAlert(alert: RouteEldAlertToast, id: string) {
+    if (!enabledTypes.value.includes(alert.type)) return
     const icons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
-    toast.warning(alert.title, {
+    const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-background text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
+    const content = defineComponent({
+      setup: () => () => h('div', { class: 'flex w-full items-start gap-3' }, [
+        h(icons[alert.type], { class: 'mt-0.5 h-5 w-5 shrink-0 text-amber-500' }),
+        h('div', { class: 'min-w-0 flex-1' }, [
+          h('div', { class: 'text-sm font-semibold text-foreground' }, alert.title),
+          h('div', { class: 'mt-1 text-xs text-muted-foreground' }, alert.description),
+        ]),
+        h('div', { class: 'flex shrink-0 gap-1' }, [
+          h('button', { type: 'button', class: iconButton, title: 'View alerts', 'aria-label': 'View alerts', onClick: () => { toast.dismiss(id); void viewAlerts(alert.companyId, alert.type, alert.alertId) } }, [h(Eye, { class: 'h-4 w-4' })]),
+          h('button', { type: 'button', class: iconButton, title: 'Mark as read', 'aria-label': 'Mark as read', disabled: !alert.alertId, onClick: () => void readAlert(alert, id) }, [h(Check, { class: 'h-4 w-4' })]),
+        ]),
+      ]),
+    })
+    toast.custom(content, {
       id,
-      description: alert.description,
-      icon: icons[alert.type],
-      duration: 5_000,
+      duration: 1_500,
       position: 'top-right',
       class: 'route-eld-alert-toast',
-      action: {
-        label: 'View alerts',
-        onClick: () => void viewAlerts(alert.companyId, alert.type, alert.alertId),
-      },
     })
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => { refreshTimer = null; void refresh() }, 400)
   }
 
   watch(latestWeighStationAlert, (alert) => {
@@ -111,7 +141,7 @@ export function useRouteEldAlertNotifications() {
     if (!alert || (alert.notificationKey !== 'speed' && alert.notificationKey !== 'violation')) return
     if (!hasPermission(authStore.token, `route_eld.alerts.${alert.notificationKey}`)) return
     showAlert({ type: alert.notificationKey, title: alert.notificationKey === 'speed' ? 'Speed alert' : 'Violation alert',
-      description: plainMessage(alert.message), companyId: alert.companyId },
+      description: plainMessage(alert.message), companyId: alert.companyId, alertId: alert.alertId || undefined },
     `route-eld-${alert.notificationKey}-${alert.companyId}-${alert.message}`)
   })
 }

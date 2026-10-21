@@ -318,7 +318,11 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_ALPR_CAMERA_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
+  static readonly ROUTE_ELD_SPEED_ALERT_READ = (id: string) =>
+    `${this.ROUTE_ELD_SPEED_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_VIOLATION_ALERTS = `${this.BASE_URL}/route-eld/violation-alerts`
+  static readonly ROUTE_ELD_VIOLATION_ALERT_READ = (id: string) =>
+    `${this.ROUTE_ELD_VIOLATION_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS = (driverId: string) =>
     `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points`

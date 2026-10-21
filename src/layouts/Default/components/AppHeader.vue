@@ -3,11 +3,8 @@
     class="fixed top-0 right-0 h-16.25 bg-background border-b border-gray-300 dark:border-border z-50 transition-all duration-300 flex items-center"
     :class="[isSidebarOpen ? 'left-62' : 'left-0']"
   >
-    <!-- Header Content -->
     <div class="flex-1 h-full px-6 flex items-center justify-between">
-      <!-- Left Section -->
       <div class="flex items-center gap-4">
-        <!-- Burger Menu - only visible when sidebar is closed -->
         <Button
           v-if="!isSidebarOpen"
           @click="emit('toggle-sidebar')"
@@ -18,7 +15,6 @@
           <Menu class="w-5 h-5 text-gray-700 dark:text-gray-300" />
         </Button>
 
-        <!-- Page Title -->
         <h1 class="text-sm ml-2 text-muted-foreground">
           <template v-if="pageTitle.includes('/')">
             {{ pageTitle.substring(0, pageTitle.lastIndexOf('/')) }}
@@ -32,8 +28,56 @@
         </h1>
       </div>
 
-      <!-- Right Section -->
       <div class="flex items-center gap-2">
+        <div v-if="availableTypes.length" class="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-1">
+          <DropdownMenu v-model:open="isNotificationsOpen">
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="icon" class="relative h-8 w-8" title="Unread alerts" aria-label="Unread alerts">
+                <Bell class="h-4 w-4" />
+                <span v-if="unreadAlerts.length" class="absolute right-0 top-0 h-2 w-2 rounded-full bg-red-500" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-[min(24rem,calc(100vw-2rem))] p-0" :side-offset="8">
+              <div class="flex items-center justify-between border-b border-border px-3 py-2">
+                <span class="text-sm font-semibold">Unread alerts</span>
+                <span class="text-xs text-muted-foreground">{{ unreadAlerts.length }}</span>
+              </div>
+              <div class="max-h-96 overflow-y-auto p-1">
+                <div v-if="notificationsLoading" class="p-4 text-center text-sm text-muted-foreground">Loading alerts…</div>
+                <div v-else-if="notificationsError" class="p-3 text-sm text-destructive">{{ notificationsError }}</div>
+                <div v-if="!notificationsLoading && !unreadAlerts.length" class="p-4 text-center text-sm text-muted-foreground">No unread alerts</div>
+                <div v-for="alert in unreadAlerts" :key="`${alert.type}:${alert.id}`" class="flex items-start gap-2 rounded-md border-b border-border px-2 py-3 last:border-0 hover:bg-muted/50">
+                  <component :is="alertIcons[alert.type]" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-medium text-foreground">{{ alert.title }}</div>
+                    <div class="mt-1 truncate text-xs text-muted-foreground" :title="alert.detail">{{ alert.detail }}</div>
+                    <div class="mt-1 text-[11px] text-muted-foreground">{{ companyNames[alert.companyId.toLowerCase()] || alert.companyId }} · {{ alertLabels[alert.type] }} · {{ new Date(alert.occurredAt).toLocaleString() }}</div>
+                  </div>
+                  <div class="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="icon" class="h-7 w-7" title="View alerts" aria-label="View alerts" @click.stop="openAlert(alert)"><Eye class="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" class="h-7 w-7" title="Mark as read" aria-label="Mark as read" @click.stop="readAlert(alert)"><Check class="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="icon" class="h-8 w-8" title="Alert settings" aria-label="Alert settings"><Settings class="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-56 p-1" :side-offset="8">
+              <DropdownMenuLabel>Show alert types</DropdownMenuLabel>
+              <p class="px-2 pb-2 text-xs text-muted-foreground">Checked types appear in toasts and the unread list.</p>
+              <DropdownMenuSeparator />
+              <div class="space-y-0.5 p-1" role="group" aria-label="Alert types">
+                <label v-for="type in availableTypes" :key="type" class="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-sm text-foreground hover:bg-accent">
+                  <input type="checkbox" class="h-4 w-4 shrink-0 accent-primary" :checked="selectedTypes.includes(type)" @change="setType(type, !selectedTypes.includes(type))" />
+                  <span>{{ alertLabels[type] }}</span>
+                </label>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <!-- Dark Mode Toggle -->
         <!--        <Button @click="toggleDarkMode" variant="ghost" size="icon" class="hidden sm:flex">-->
         <!--          <Sun v-if="!isDarkMode" class="w-5 h-5" />-->
@@ -207,6 +251,13 @@ import {
   Search,
   Building,
   LoaderCircle,
+  Bell,
+  Camera,
+  Gauge,
+  Scale,
+  ShieldAlert,
+  Eye,
+  Check,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -222,6 +273,26 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { toast } from 'vue-sonner'
+import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
+import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
+
+const alertIcons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
+const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead } = useRouteEldNotificationCenter()
+const { viewAlerts } = useRouteEldAlertNavigation()
+const isNotificationsOpen = ref(false)
+
+watch(isNotificationsOpen, (open) => { if (open) void refreshNotifications() })
+watch(selectedTypes, () => { void refreshNotifications() })
+
+async function openAlert(alert: UnreadAlert) {
+  if (await viewAlerts(alert.companyId, alert.type, alert.id)) isNotificationsOpen.value = false
+}
+
+async function readAlert(alert: UnreadAlert) {
+  try { await markRead(alert) }
+  catch { toast.error('Could not mark alert as read') }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -236,6 +307,7 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+watch(() => authStore.loggedIn, (loggedIn) => { if (loggedIn) void refreshNotifications() }, { immediate: true })
 
 // Company dropdown state
 const {
@@ -271,11 +343,9 @@ watch(isDropdownOpen, (open) => {
   if (open) loadCompanies()
 })
 
-// Page title based on route
 const pageTitle = computed(() => {
   const path = route.path
 
-  // Dynamic /logs/:id/* routes
   if (path.startsWith('/logs/')) {
     const subPage = path.split('/')[3] // undefined | 'boost' | 'tracking' | 'insert-info' | ...
     const subPageMap: Record<string, string> = {
@@ -289,7 +359,6 @@ const pageTitle = computed(() => {
     return `ELD / ${sub}`
   }
 
-  // Map routes to titles
   const titleMap: Record<string, string> = {
     '/overview': 'Overview',
     '/alerts': 'Alerts',
@@ -301,7 +370,6 @@ const pageTitle = computed(() => {
     '/company': 'Company',
     '/portal-users': 'Portal Users',
 
-    // ELD routes
     '/eld/logs': 'ELD / Logs',
     '/eld/event-sessions': 'ELD / Event Sessions',
     '/eld/unidentified': 'ELD / Event Sessions',
@@ -309,7 +377,6 @@ const pageTitle = computed(() => {
     '/alpr-camera/route': 'ALPR Camera / Route',
     '/alpr-camera/history': 'ALPR Camera / History',
 
-    // Tools routes
     '/tools/activity': 'Tools / Activity',
     '/tools/monitoring': 'Tools / Monitoring',
     '/tools/dot-inspection': 'Tools / DOT Inspection',
@@ -320,7 +387,6 @@ const pageTitle = computed(() => {
     '/tools/statistic-admin': 'Tools / Statistic Admin',
     '/tools/statistic-company': 'Tools / Statistic Company',
 
-    // Configuration routes
     '/config/issuer-states': 'Config / Issuer States',
     '/config/hos-rules': 'Config / HOS Rules',
     '/config/restarts': 'Config / Restart',
@@ -330,7 +396,6 @@ const pageTitle = computed(() => {
     '/tools/eld-connections': 'Config / ELD Connections',
     '/tools/maintenance-types': 'Config / Maintenance Types',
 
-    // User Manager routes
     '/users/roles': 'Users / Roles',
     '/users/permissions': 'Users / Permissions',
   }
@@ -367,7 +432,6 @@ const handleLogout = async () => {
   background: #cbd5e1;
 }
 
-/* Dark mode scrollbar */
 :deep(.dark) .max-h-\[400px\]::-webkit-scrollbar-thumb {
   background: #4a5568;
 }
@@ -376,7 +440,6 @@ const handleLogout = async () => {
   background: #718096;
 }
 
-/* Search highlight - sariq rang */
 :deep(mark) {
   background: linear-gradient(to right, #fde68a, #fcd34d);
   color: #000;
