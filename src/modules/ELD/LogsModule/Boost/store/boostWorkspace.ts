@@ -47,6 +47,20 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
   const isMutating = ref(false)
+  const activeOperation = ref<{
+    sessionId: string
+    type: 'submit' | 'rollback'
+    operation: RouteEldSessionOperation
+  } | null>(null)
+  const isSessionLocked = computed(
+    () => activeOperation.value !== null && activeOperation.value.sessionId === session.value?.id
+  )
+  const isBusy = computed(() => isMutating.value || isLoading.value || isSessionLocked.value)
+  function assertCanMutate() {
+    assertCanMutate()
+    if (isSessionLocked.value)
+      throw new Error('This session is being submitted. Wait for it to finish.')
+  }
   const activeTabId = ref<string | null>(null)
   const workspaceCache = new Map<string, RouteEldWorkspace>()
   const profileFormsCache = new Map<string, RouteEldProfileForm[]>()
@@ -228,7 +242,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   }
 
   async function createSession(driverId: string, fromDate: string, toDate: string) {
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     isMutating.value = true
     try {
       const response = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -252,7 +266,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function selectTab(tabId: string) {
     if (!session.value) return null
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     if (activeTabId.value === tabId && workspace.value) return workspace.value
     const currentSession = session.value
     if (!currentSession.tabs.some((tab) => tab.id === tabId)) {
@@ -291,7 +305,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function createTab() {
     if (!session.value) return null
     assertDraftSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     isMutating.value = true
     try {
       const response = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -312,7 +326,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function deleteTab(tabId: string) {
     if (!session.value) return null
     assertDraftSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     isMutating.value = true
     try {
       const response = await api.delete<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -331,7 +345,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function refreshWorkspace() {
     if (!session.value || !activeTabId.value) return null
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     isLoading.value = true
     try {
       return await synchronizeWorkspace(session.value.id, activeTabId.value, true)
@@ -357,7 +371,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     body?: Record<string, unknown> | null
   ) {
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value!.id
     const tabId = activeTabId.value!
     isMutating.value = true
@@ -397,7 +411,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function updateEvent(eventId: string, body: Record<string, unknown>) {
     if (!session.value || !activeTabId.value) return null
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -418,7 +432,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function insertEvent(body: Record<string, unknown>) {
     if (!session.value || !activeTabId.value) return null
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -439,7 +453,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function deleteEvent(eventId: string) {
     if (!session.value || !activeTabId.value) return null
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -460,7 +474,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function revertEvent(eventId: string) {
     if (!session.value || !activeTabId.value) return null
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     if (workspace.value?.events.filter((item) => item.event.id === eventId).length !== 1) {
       throw new Error('The selected event could not be uniquely identified.')
     }
@@ -524,7 +538,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   async function updateProfileForm(form: RouteEldProfileForm) {
     if (!session.value || !activeTabId.value) return null
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -631,7 +645,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     if (!normalizeList.length && !applyCertificationFix) {
       throw new Error('Select at least one repair routine.')
     }
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -656,17 +670,19 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     onProgress?: (operation: RouteEldSessionOperation) => void
   ) {
     if (!session.value) return null
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
+    if (activeOperation.value) throw new Error('Wait for the running session operation to finish.')
     const sessionId = session.value.id
+    const driverId = session.value.driverId
     const originalTabId = activeTabId.value
+    const url =
+      type === 'rollback'
+        ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(sessionId)
+        : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(sessionId)
+    let operation: RouteEldSessionOperation
     isMutating.value = true
-    let refreshed = false
     try {
-      const url =
-        type === 'rollback'
-          ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(sessionId)
-          : ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_SUBMIT(sessionId)
-      let operation = unwrap(
+      operation = unwrap(
         (
           await api.post<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(
             url,
@@ -675,7 +691,14 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
           )
         ).data
       )
-      onProgress?.(operation)
+    } finally {
+      isMutating.value = false
+    }
+    activeOperation.value = { sessionId, type, operation }
+    onProgress?.(operation)
+    const isCurrentSession = () => session.value?.id === sessionId
+    let refreshed = false
+    try {
       while (operation.status === 'QUEUED' || operation.status === 'RUNNING') {
         await new Promise((resolve) => setTimeout(resolve, 500))
         operation = unwrap(
@@ -686,39 +709,44 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
             )
           ).data
         )
+        activeOperation.value = { sessionId, type, operation }
         onProgress?.(operation)
       }
       if (operation.status === 'FAILED') {
-        await loadSession(sessionId, originalTabId)
-        refreshed = true
+        if (isCurrentSession()) {
+          await loadSession(sessionId, originalTabId)
+          refreshed = true
+        }
         throw new Error(operation.error || 'Operation failed')
       }
       const targetKind = type === 'rollback' ? 'ROLLBACK' : 'FINAL'
       clearSessionTabCache(sessionId)
-      const response = await api.get<RouteEldEventSession | ApiEnvelope<RouteEldEventSession>>(
-        ApiEndpoints.ROUTE_ELD_EVENT_SESSION(sessionId)
-      )
-      const updatedSession = unwrap(response.data)
-      const targetTab = [...updatedSession.tabs]
-        .filter((tab) => tab.kind === targetKind)
-        .sort((left, right) => right.position - left.position)[0]
-      await loadSession(sessionId, targetTab?.id)
-      refreshed = true
-      void fetchSessions(updatedSession.driverId).catch(() => {})
+      if (isCurrentSession()) {
+        const response = await api.get<RouteEldEventSession | ApiEnvelope<RouteEldEventSession>>(
+          ApiEndpoints.ROUTE_ELD_EVENT_SESSION(sessionId)
+        )
+        const updatedSession = unwrap(response.data)
+        const targetTab = [...updatedSession.tabs]
+          .filter((tab) => tab.kind === targetKind)
+          .sort((left, right) => right.position - left.position)[0]
+        await loadSession(sessionId, targetTab?.id)
+        refreshed = true
+      }
+      void fetchSessions(driverId).catch(() => {})
       return operation
     } catch (error) {
-      if (!refreshed) {
+      if (!refreshed && isCurrentSession()) {
         await loadSession(sessionId, originalTabId).catch(() => {})
       }
       throw error
     } finally {
-      isMutating.value = false
+      activeOperation.value = null
     }
   }
 
   async function retryEventDelivery(eventId: string) {
     if (!session.value || !activeTabId.value || !activeTab.value) return null
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const tabKind = activeTab.value.kind
     if (tabKind !== 'FINAL' && tabKind !== 'ROLLBACK') {
       throw new Error('Event delivery can only be retried from a final or rollback tab.')
@@ -820,6 +848,9 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     analyzeAiAdvice,
     normalize,
     submitOrRollback,
+    activeOperation,
+    isSessionLocked,
+    isBusy,
     runSessionOperation,
     retryEventDelivery,
     requestProfileFormEdit,
