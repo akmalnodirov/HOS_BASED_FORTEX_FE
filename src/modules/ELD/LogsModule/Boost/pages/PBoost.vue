@@ -13,7 +13,7 @@
       :can-manage-tabs="session?.status === 'DRAFT' && allowed('route_eld.log_details.tabs.manage')"
       :allow-submit="allowed('route_eld.log_details.submit')"
       :allow-rollback="allowed('route_eld.log_details.rollback')"
-      :actions-pending="store.isMutating || store.isLoading"
+      :actions-pending="store.isBusy"
       :submit-loading="sessionActionLoading"
       :violations-count="violations.length"
       @initial-click="selectInitialTab"
@@ -26,6 +26,19 @@
       @remove-tab="removeTab"
       @ai-advice-click="aiAdviceOpen = true"
     />
+    <div
+      v-if="store.isSessionLocked && !sessionProgressOpen"
+      class="mx-4 flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs"
+    >
+      <span>
+        {{ sessionOperationType === 'rollback' ? 'Rollback' : 'Submit' }} in progress ·
+        {{ sessionOperation?.completed ?? 0 }} / {{ sessionOperation?.total ?? 0 }} ·
+        {{ sessionOperationPercent }}%
+      </span>
+      <Button size="sm" variant="outline" class="h-7 text-xs" @click="sessionProgressOpen = true">
+        View
+      </Button>
+    </div>
 
     <section class="border-y border-border bg-background px-6 py-4">
       <div class="mb-3 flex items-center justify-between gap-3">
@@ -209,7 +222,7 @@
         :can-edit-events="canEditSession && allowed('route_eld.log_details.events.edit')"
         :can-insert-events="canEditSession && allowed('route_eld.log_details.events.insert')"
         :can-delete-events="canEditSession && allowed('route_eld.log_details.events.delete')"
-        :mutation-pending="store.isMutating || store.isLoading"
+        :mutation-pending="store.isBusy"
         :can-retry-delivery="canRetryDelivery"
         :retrying-event-id="retryingEventId"
         :column-visibility="eventTableColumnVisibility"
@@ -230,7 +243,7 @@
     </section>
 
     <CBoostActions
-      :action-pending="store.isMutating || store.isLoading"
+      :action-pending="store.isBusy"
       :drag-drop-enabled="dragDropEnabled && canEditSession"
       :can-edit="canEditSession && allowed('route_eld.log_details.events.edit')"
       :can-delete="allowed('route_eld.log_details.events.delete')"
@@ -372,16 +385,12 @@
     />
 
     <Dialog v-model:open="sessionProgressOpen">
-      <DialogContent
-        class="sm:max-w-130"
-        :show-close="!sessionActionLoading"
-        @pointer-down-outside="(event) => sessionActionLoading && event.preventDefault()"
-        @escape-key-down="(event) => sessionActionLoading && event.preventDefault()"
-      >
+      <DialogContent class="sm:max-w-130">
         <DialogHeader>
           <DialogTitle>{{ sessionOperationTitle }}</DialogTitle>
           <DialogDescription>
-            The session is being processed event by event. Keep this window open until it finishes.
+            The session is processed in the background. You can close this window and keep working;
+            this session stays locked until it finishes.
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-2">
@@ -432,7 +441,7 @@
             {{ sessionOperationError }}
           </p>
         </div>
-        <DialogFooter v-if="!sessionActionLoading">
+        <DialogFooter>
           <Button variant="outline" @click="sessionProgressOpen = false">Close</Button>
         </DialogFooter>
       </DialogContent>
@@ -680,12 +689,22 @@ const canRetryDelivery = computed(() =>
     ? allowed('route_eld.log_details.rollback')
     : store.activeTab?.kind === 'FINAL' && allowed('route_eld.log_details.submit'))
 )
-const sessionActionLoading = ref(false)
+const sessionActionStarting = ref(false)
+const sessionActionLoading = computed(() => sessionActionStarting.value || store.isSessionLocked)
 const sessionOperationType = ref<'submit' | 'rollback'>('submit')
 const sessionOperation = ref<RouteEldSessionOperation | null>(null)
 const sessionOperationError = ref('')
+watch(
+  () => store.activeOperation,
+  (active) => {
+    if (!active || active.sessionId !== store.session?.id) return
+    sessionOperationType.value = active.type
+    sessionOperation.value = { ...active.operation, failures: [...(active.operation.failures ?? [])] }
+  },
+  { immediate: true, deep: true }
+)
 const canEditSession = computed(
-  () => !store.isLoading && session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
+  () => !store.isLoading && !store.isSessionLocked && session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
 )
 const {
   visibility: eventTableColumnVisibility,
@@ -1253,13 +1272,19 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
   sessionOperation.value = null
   sessionOperationError.value = ''
   sessionProgressOpen.value = true
-  sessionActionLoading.value = true
+  sessionActionStarting.value = true
+  const sessionId = store.session?.id
   try {
     const result = await store.runSessionOperation(action, (operation) => {
+      sessionActionStarting.value = false
       sessionOperation.value = { ...operation, failures: [...(operation.failures ?? [])] }
     })
     if (result) sessionOperation.value = result
-    if (store.activeTabId && route.query.tabId !== store.activeTabId) {
+    if (
+      store.session?.id === sessionId &&
+      store.activeTabId &&
+      route.query.tabId !== store.activeTabId
+    ) {
       await router.replace({ query: { ...route.query, tabId: store.activeTabId } })
     }
     if (result?.failed)
@@ -1276,7 +1301,7 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
     sessionOperationError.value = error?.response?.data?.message || error?.message || `Session ${action} failed`
     toast.error(sessionOperationError.value)
   } finally {
-    sessionActionLoading.value = false
+    sessionActionStarting.value = false
   }
 }
 
