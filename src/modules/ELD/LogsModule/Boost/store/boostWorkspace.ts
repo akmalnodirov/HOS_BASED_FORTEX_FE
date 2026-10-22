@@ -57,7 +57,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   )
   const isBusy = computed(() => isMutating.value || isLoading.value || isSessionLocked.value)
   function assertCanMutate() {
-    assertCanMutate()
+    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
     if (isSessionLocked.value)
       throw new Error('This session is being submitted. Wait for it to finish.')
   }
