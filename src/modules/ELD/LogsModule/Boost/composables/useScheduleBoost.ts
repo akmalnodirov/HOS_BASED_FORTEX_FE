@@ -72,16 +72,36 @@ const EVENT_CODE_TO_NUMERIC: Record<string, [number, number]> = {
   DS_SB: [1, 2],
   DS_D: [1, 3],
   DS_ON: [1, 4],
+  DS_PC: [3, 1],
+  DS_YM: [3, 2],
+  ILC: [2, 1],
+  INTERMEDIATE_CLP: [2, 1],
   LOG_NORMAL_PRECISION: [2, 1],
+  ILR: [2, 2],
+  INTERMEDIATE_RLP: [2, 2],
   LOG_REDUCED_PRECISION: [2, 2],
   DR_IND_PC: [3, 1],
   DR_IND_YM: [3, 2],
+  LOGIN: [5, 1],
+  LOGOUT: [5, 2],
   DR_LOGIN: [5, 1],
   DR_LOGOUT: [5, 2],
+  EPU1: [6, 1],
+  ENGINE_POWER_UP_CLP: [6, 1],
   ENG_UP_NORMAL: [6, 1],
+  EPU2: [6, 2],
+  ENGINE_POWER_UP_RLP: [6, 2],
   ENG_UP_REDUCED: [6, 2],
+  ESD1: [6, 3],
+  ENGINE_SHUT_DOWN_CLP: [6, 3],
   ENG_DOWN_NORMAL: [6, 3],
+  ESD2: [6, 4],
+  ENGINE_SHUT_DOWN_RLP: [6, 4],
   ENG_DOWN_REDUCED: [6, 4],
+  MALF_LOGGED: [7, 1],
+  MALF_CLEARED: [7, 2],
+  DIAG_LOGGED: [7, 3],
+  DIAG_CLEARED: [7, 4],
 }
 const NUMERIC_TO_EVENT_CODE: Record<string, string> = {
   '1:1': 'DS_OFF',
@@ -323,14 +343,22 @@ function normalizedStatus(value?: string | null) {
     .toUpperCase()
 }
 
+function displayStatus(value?: string | null) {
+  const status = normalizedStatus(value)
+  return status === 'NONE' ? 'ACTIVE' : status
+}
+
 function asStatus(value?: string | null) {
   return normalizedStatus(value) === 'ACTIVE' ? 1 : 2
 }
 
 function numericEvent(event: RouteEldHosEvent): [number, number] {
-  const certification = /^DR_CERT_(\d+)$/.exec(event.eventCode)
+  const certification = /^(?:DR_)?CERT_?(\d+)$/i.exec(event.eventCode)
   if (certification) return [4, Math.min(9, Number(certification[1]) || 1)]
-  return EVENT_CODE_TO_NUMERIC[event.eventCode] ?? [1, CATEGORY_TO_CODE[event.eventCategory] ?? 1]
+  const mapped = EVENT_CODE_TO_NUMERIC[event.eventCode]
+  if (mapped) return mapped
+  const dutyCode = CATEGORY_TO_CODE[event.eventCategory]
+  return dutyCode ? [1, dutyCode] : [0, 0]
 }
 
 function sequenceIdHexToDecimal(value?: string | null) {
@@ -578,7 +606,7 @@ export function useScheduleBoost() {
         vehicleMiles: event.odometerMiles ?? undefined,
         engineHours: event.engineHours ?? undefined,
         annotation: event.notes ?? undefined,
-        eventRecordStatus: normalizedStatus(event.recordStatus),
+        eventRecordStatus: displayStatus(event.recordStatus),
         trailerNumber: workspaceEvent.trailers.join(', ') || undefined,
         shippingDocument: workspaceEvent.documents.join(', ') || undefined,
         actionState: workspaceEvent.isDeleted
@@ -621,7 +649,7 @@ export function useScheduleBoost() {
         vehicleMiles: event.odometerMiles ?? undefined,
         engineHours: event.engineHours ?? undefined,
         annotation: event.notes ?? undefined,
-        eventRecordStatus: normalizedStatus(event.recordStatus),
+        eventRecordStatus: displayStatus(event.recordStatus),
         trailerNumber: event.trailers.join(', ') || undefined,
         shippingDocument: event.documents.join(', ') || undefined,
         actionState: 8,
@@ -954,6 +982,11 @@ export function useScheduleBoost() {
     const [eventType, eventCode] = sourceEventValue
       ? numericEvent(sourceEventValue)
       : EVENT_CODE_TO_NUMERIC.DS_OFF
+    const initialEventCode = sourceEventValue?.eventCode ?? 'DS_OFF'
+    const statusless = /^(?:DR_)?CERT_?\d+$/i.test(initialEventCode) ||
+      ['DR_LOGIN', 'DR_LOGOUT', 'LOGIN', 'LOGOUT'].includes(initialEventCode)
+    const driverOrigin = /^(?:DR_)?CERT_?\d+$/i.test(initialEventCode) ||
+      ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM', 'DS_PC', 'DS_YM'].includes(initialEventCode)
     const maxSequence = rawEvents.value.reduce((maximum, item) => {
       const decimal = Number(sequenceIdHexToDecimal(item.event.sequenceId))
       return Number.isFinite(decimal) ? Math.max(maximum, decimal) : maximum
@@ -966,9 +999,10 @@ export function useScheduleBoost() {
         '',
       sequenceId: String(maxSequence + 1),
       event: { eventType, eventCode },
-      eventCodeId: sourceEventValue?.eventCode ?? 'DS_OFF',
-      origin: sourceEventValue ? asOrigin(sourceEventValue.recordOrigin) : 2,
-      recordStatus: 'ACTIVE',
+      eventCodeId: initialEventCode,
+      origin: driverOrigin ? 2 : EVENT_CODE_TO_NUMERIC[initialEventCode] ? 1 :
+        sourceEventValue ? asOrigin(sourceEventValue.recordOrigin) : 2,
+      recordStatus: statusless ? 'NONE' : 'ACTIVE',
       vehicleId: sourceEventValue?.vehicleId ?? null,
       vehicleUnit: sourceEventValue?.vehicleName ?? null,
       eldId: sourceEventValue?.eldId ?? null,

@@ -13,9 +13,10 @@
       <div class="space-y-1.5"><Label>Start time</Label><TimePicker :model-value="timeText" @update:model-value="updateTime" /></div>
       <div class="space-y-1.5">
         <Label>Record origin</Label>
-        <Select v-model="recordOrigin"><SelectTrigger><SelectValue placeholder="Select origin" /></SelectTrigger>
-          <SelectContent :body-lock="false"><SelectItem value="OTHER_USER">Other user</SelectItem><SelectItem value="DRIVER">Driver</SelectItem></SelectContent>
+        <Select v-model="recordOrigin" :disabled="eventCode === 'DS_D'"><SelectTrigger><SelectValue placeholder="Select origin" /></SelectTrigger>
+          <SelectContent :body-lock="false"><SelectItem value="ELD">Auto (ELD)</SelectItem><SelectItem value="OTHER_USER">Other user</SelectItem><SelectItem value="DRIVER">Driver</SelectItem></SelectContent>
         </Select>
+        <p v-if="eventCode === 'DS_D'" class="text-xs text-muted-foreground">Driving logs use Auto (ELD) origin.</p>
       </div>
       <div v-if="recordOrigin === 'OTHER_USER'" class="space-y-1.5">
         <Label>Responsible Route ELD user</Label>
@@ -91,14 +92,14 @@ const statuses = [
   { code: 'DS_OFF', label: 'Off duty' }, { code: 'DS_SB', label: 'Sleeper' },
   { code: 'DS_D', label: 'Driving' }, { code: 'DS_ON', label: 'On duty' },
   { code: 'DR_IND_YM', label: 'YM' }, { code: 'DR_IND_PC', label: 'PC' },
-  { code: 'DS_WT', label: 'Waiting' },
+  { code: 'DS_WT' },
 ]
 const noteShortcuts = [
   'PTI', 'Scale', 'Hook', 'Delivery', 'Fuel', 'DOT', 'Repairs', 'Drop', 'Pick Up',
   'Rest', 'Break', 'Loading', 'Unloading', 'Inspection',
 ]
 const eventCode = ref('DS_OFF')
-const recordOrigin = ref<'DRIVER' | 'OTHER_USER'>('OTHER_USER')
+const recordOrigin = ref<InsertInfoLogRequest['recordOrigin']>('OTHER_USER')
 const responsibleUserId = ref('')
 const vehicleId = ref('none')
 const latitude = ref<string | number>('')
@@ -138,6 +139,8 @@ function updateTime(value: string) {
 }
 function selectStatus(code: string) {
   eventCode.value = code
+  if (code === 'DS_D') recordOrigin.value = 'ELD'
+  else if (recordOrigin.value === 'ELD') recordOrigin.value = 'OTHER_USER'
   emit('update:event-code', code)
 }
 function appendNote(note: string) {
@@ -161,7 +164,7 @@ function save() {
   }
   emit('save', {
     eventCode: eventCode.value, recordOrigin: recordOrigin.value,
-    responsibleUserId: recordOrigin.value === 'DRIVER' ? props.driverExternalId : responsibleUserId.value,
+    responsibleUserId: recordOrigin.value === 'OTHER_USER' ? responsibleUserId.value : props.driverExternalId,
     vehicleId: vehicleId.value === 'none' ? null : vehicleId.value,
     latitude: lat, longitude: lon, calculatedLocation: calculatedLocation.value.trim() || null,
     odometerMiles: odometer, engineHours: engine,

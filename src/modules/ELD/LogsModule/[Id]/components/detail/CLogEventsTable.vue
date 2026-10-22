@@ -143,11 +143,13 @@
                     class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
                     :class="getEventBadgeClass(event.eventType, event.eventCode)"
                   >
-                    {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
+                    {{ event.eventType === 0 ? (event.eventName || 'Unknown event') : getEventLabelFromUtils(event.eventType, event.eventCode) }}
                   </span>
-                  <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                  <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-1 text-[10px] font-semibold"
+                    :class="event.freezeSource === 'MANUAL' ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400' : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300'"
                     :title="event.freezeSource === 'MANUAL' ? 'Frozen by a manual DOT inspection' : 'Frozen by Route ELD'">
-                    <LockKeyhole class="h-3 w-3" /> Frozen
+                    <ShieldAlert v-if="event.freezeSource === 'MANUAL'" class="h-3.5 w-3.5" />
+                    <LockKeyhole v-else class="h-3 w-3" /> Frozen
                   </span>
                   <button v-if="cameraEventIds.includes(String(event.id || event.eventId))"
                     type="button" class="rounded p-1 text-destructive hover:bg-destructive/10"
@@ -185,7 +187,7 @@
                   {{ getEngineHours(event) }}
                 </td>
                 <td v-if="isColumnVisible('recordOrigin')" class="px-4 py-3 text-center">
-                  {{ event.recordOrigin }}
+                  {{ getRecordOrigin(event) }}
                 </td>
                 <td v-if="isColumnVisible('recordStatus')" class="px-4 py-3 text-center">
                   {{ getRecordStatus(event) }}
@@ -232,7 +234,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
-import { Camera, CircleAlert, Copy, LockKeyhole, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { Camera, CircleAlert, Copy, LockKeyhole, Pencil, ShieldAlert, TriangleAlert } from 'lucide-vue-next'
 import { copyCoordinates } from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'
@@ -504,12 +506,25 @@ const getEngineHours = (event: any): string => {
 }
 
 const getRecordStatus = (event: any): string => {
+  const rawStatus = String(event.recordStatusCode || '').toUpperCase()
+  if (rawStatus === 'NONE' || rawStatus === 'ACTIVE') return 'Active'
+  if (rawStatus === 'INACTIVE_CHANGED') return 'Inactive · changed'
+  if (rawStatus) return rawStatus.replaceAll('_', ' ').toLowerCase().replace(/^./, (value) => value.toUpperCase())
   const recordStatus = event.recordStatus
   if (recordStatus === 1) return 'Active'
   if (recordStatus === 2) return 'Inactive'
   if (event.status) return event.status
   if (event.isActive !== undefined) return event.isActive ? 'Active' : 'Inactive'
   return 'Active'
+}
+
+const getRecordOrigin = (event: any): string => {
+  const origin = String(event.recordOrigin || '').toUpperCase()
+  if (origin === 'ELD' || origin === 'AUTOMATIC') return 'Auto'
+  if (origin === 'DRIVER') return 'Driver'
+  if (origin === 'OTHER_USER') return 'Other user'
+  if (origin === 'UNIDENTIFIED_DRIVER') return 'Unidentified driver'
+  return origin || 'Unknown'
 }
 
 const getNotes = (event: any): string => {

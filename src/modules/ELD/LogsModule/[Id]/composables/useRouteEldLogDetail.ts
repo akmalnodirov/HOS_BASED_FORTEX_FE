@@ -479,6 +479,7 @@ function mapEvent(
     dateTime: timestampInZone(event.timestamp, event.timeZone || zone),
     eventType: definition?.type ?? 0,
     eventCode: definition?.code ?? 0,
+    eventName: event.eventName,
     durationInSeconds: duration,
     calculatedLocation: event.location,
     manualLocation: event.driverLocationDescription,
@@ -489,6 +490,7 @@ function mapEvent(
     totalEngineHours: event.engineHours,
     recordOrigin: event.recordOrigin,
     recordStatus: recordStatus(event.recordStatus),
+    recordStatusCode: event.recordStatus,
     isFrozen: event.isFrozen,
     freezeSource: event.freezeSource,
     annotation: event.notes,
@@ -783,14 +785,15 @@ function clockSeconds(clock?: RouteEldClock | null) {
 
 function recordOrigin(value?: string | null) {
   const origin = value?.toUpperCase() ?? ''
-  if (origin.includes('AUTO')) return 1
+  if (origin === 'ELD' || origin.includes('AUTO')) return 1
   if (origin.includes('OTHER') || origin.includes('EDIT')) return 3
   if (origin.includes('EXEMPT')) return 4
   return 2
 }
 
 function recordStatus(value?: string | null) {
-  return value?.toUpperCase() === 'ACTIVE' ? 1 : 2
+  const status = value?.toUpperCase()
+  return status === 'ACTIVE' || status === 'NONE' ? 1 : 2
 }
 
 function splitName(value: string) {

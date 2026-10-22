@@ -35,16 +35,29 @@
             @select-event="handleIssueEvent"
           />
         </div>
-        <CLogEventTableColumnSettings
-          :options="eventTableColumnOptions"
-          :model-value="eventTableColumnVisibility"
-          @toggle="setEventTableColumnVisible"
-          @show-all="showAllEventTableColumns"
-        />
+        <div class="flex items-center gap-2">
+          <Select v-model="statusFilter">
+            <SelectTrigger class="h-9 w-40 text-sm font-normal">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent :body-lock="false">
+              <SelectItem value="__all__">All statuses</SelectItem>
+              <SelectItem v-for="status in statusFilterOptions" :key="status" :value="status">
+                {{ statusLabel(status) }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <CLogEventTableColumnSettings
+            :options="eventTableColumnOptions"
+            :model-value="eventTableColumnVisibility"
+            @toggle="setEventTableColumnVisible"
+            @show-all="showAllEventTableColumns"
+          />
+        </div>
       </div>
       <CLogEventsTable
         ref="eventsTable"
-        :events="displayEvents"
+        :events="filteredDisplayEvents"
         :camera-event-ids="cameraEventIds"
         :event-issues="eventIssues"
         :column-visibility="eventTableColumnVisibility"
@@ -115,6 +128,7 @@ import CLogProfileForm from '../components/detail/CLogProfileForm.vue'
 import CLogRouteEldTracking from '../components/detail/CLogRouteEldTracking.vue'
 import CLogEventIssues from '../components/detail/CLogEventIssues.vue'
 import CLogEventTableColumnSettings from '../components/detail/CLogEventTableColumnSettings.vue'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import CBoostEventCameraDialog from '../../Boost/components/modals/CBoostEventCameraDialog.vue'
 import type { RouteEldEventCameraAnalysis, RouteEldEventCameraPresence, RouteEldHosEvent } from '../../Boost/types/boost'
 import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
@@ -129,6 +143,7 @@ const api = useApi()
 const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 const eventsTable = ref<{ focusEvent: (eventId: string) => Promise<boolean> } | null>(null)
 const graphSection = ref<HTMLElement | null>(null)
+const statusFilter = ref('ACTIVE')
 const {
   columnOptions: eventTableColumnOptions,
   visibility: eventTableColumnVisibility,
@@ -162,6 +177,23 @@ const {
   driverDailyForm,
   signatureImageUrl,
 } = logDetail
+
+const normalizedStatus = (event: (typeof displayEvents.value)[number]) => {
+  const status = String(event.recordStatusCode || (event.recordStatus === 1 ? 'ACTIVE' : 'INACTIVE'))
+    .toUpperCase()
+  return status === 'NONE' ? 'ACTIVE' : status
+}
+const statusFilterOptions = computed(() =>
+  Array.from(new Set(['ACTIVE', ...displayEvents.value.map(normalizedStatus)])).sort()
+)
+const statusLabel = (status: string) =>
+  status === 'INACTIVE_CHANGED' ? 'Inactive · changed' :
+    status.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase())
+const filteredDisplayEvents = computed(() =>
+  statusFilter.value === '__all__'
+    ? displayEvents.value
+    : displayEvents.value.filter((event) => normalizedStatus(event) === statusFilter.value)
+)
 
 const cameraCache = cameraPresenceCache
 const cameraEvents = computed(() => (detail.value?.events ?? []).filter((event) =>

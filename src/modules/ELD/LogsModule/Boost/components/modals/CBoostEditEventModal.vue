@@ -77,8 +77,8 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
+          <div class="grid gap-3" :class="showRecordStatus ? 'grid-cols-2' : 'grid-cols-1'">
+            <div v-if="showRecordStatus" class="space-y-1">
               <label class="text-sm font-medium">Record status</label>
               <Select
                 :model-value="form.recordStatus ?? ''"
@@ -102,12 +102,15 @@
             </div>
             <div class="space-y-1">
               <label class="text-sm font-medium">Origin</label>
-              <Select :model-value="String(form.origin ?? '')" @update:model-value="onOriginChange">
+              <Select
+                :model-value="String(form.origin ?? '')"
+                @update:model-value="onOriginChange"
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Origin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">ELD</SelectItem>
+                  <SelectItem value="1">Auto (ELD)</SelectItem>
                   <SelectItem value="2">Driver</SelectItem>
                   <SelectItem value="3">Other user</SelectItem>
                   <SelectItem value="4">Unidentified driver</SelectItem>
@@ -115,6 +118,9 @@
               </Select>
               <p v-if="requiresOtherUserOrigin" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
                 Origin changed to Other user because this provider-generated event type was modified.
+              </p>
+              <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
+                Origin follows the selected event type.
               </p>
             </div>
           </div>
@@ -638,23 +644,57 @@ const editableEvents = editableEventIds.map((id) => {
 
 const selectedEventKey = computed(
   () =>
-    props.form.eventCodeId ??
+    (props.form.eventCodeId && editableEventIds.includes(props.form.eventCodeId)
+      ? props.form.eventCodeId : null) ??
+    (props.form.event.eventType === 4 ? `DR_CERT_${props.form.event.eventCode}` : null) ??
     eventIdByNumeric[`${props.form.event.eventType}:${props.form.event.eventCode}`] ??
     ''
 )
 
 const selectedEvent = computed(() => editableEvents.find((e) => e.id === selectedEventKey.value))
 
+const isStatuslessEvent = computed(
+  () =>
+    /^DR_CERT_\d+$/.test(selectedEventKey.value) ||
+    selectedEventKey.value === 'DR_LOGIN' ||
+    selectedEventKey.value === 'DR_LOGOUT'
+)
+const showRecordStatus = computed(
+  () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
+)
+const fixedOrigin = computed<number | null>(() => {
+  if (requiresOtherUserOrigin.value) return 3
+  if (/^DR_CERT_\d+$/.test(selectedEventKey.value)) return 2
+  if (
+    ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
+      selectedEventKey.value
+    )
+  ) return 2
+  if (
+    [
+      'DS_D', 'LOG_NORMAL_PRECISION', 'LOG_REDUCED_PRECISION', 'DR_LOGIN', 'DR_LOGOUT',
+      'ENG_UP_NORMAL', 'ENG_UP_REDUCED', 'ENG_DOWN_NORMAL', 'ENG_DOWN_REDUCED',
+    ].includes(selectedEventKey.value)
+  ) return 1
+  return null
+})
+
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
+  const statusless = /^DR_CERT_\d+$/.test(ev.id) || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
+  const driverOrigin = /^DR_CERT_\d+$/.test(ev.id) ||
+    ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(ev.id)
+  const modifiedProviderEvent = Boolean(
+    props.form.eventId &&
+    props.form.originalIsEditable === false &&
+    ev.id !== props.form.originalEventCode
+  )
   patch({
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
-    ...(props.form.eventId && props.form.originalIsEditable === false &&
-      ev.id !== props.form.originalEventCode && props.form.origin === 1
-      ? { origin: 3 }
-      : {}),
+    recordStatus: statusless ? 'NONE' : 'ACTIVE',
+    origin: modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
   })
 }
 
@@ -741,7 +781,6 @@ const isSubmitDisabled = computed(() => {
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
-  // Certification events do not require location data; the provider discards it on update.
   if (isCertifiedVisible.value) return false
   const { positioning, latitude, longitude, locationNote } = props.form
   if (

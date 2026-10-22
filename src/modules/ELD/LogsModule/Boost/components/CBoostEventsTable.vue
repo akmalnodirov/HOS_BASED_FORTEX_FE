@@ -357,7 +357,7 @@
 
                   <div
                     v-if="isColumnVisible('duration')"
-                    class="min-w-0 overflow-hidden whitespace-nowrap text-xs text-foreground"
+                    class="min-w-0 overflow-hidden whitespace-nowrap text-sm text-foreground"
                   >
                     {{ formatDutyDuration(event.duration) }}
                   </div>
@@ -386,9 +386,11 @@
                     <span v-else class="truncate text-xs text-muted-foreground">{{
                       event.eventName || '-'
                     }}</span>
-                    <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                    <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-1 text-[10px] font-semibold"
+                      :class="event.freezeSource === 'MANUAL' ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400' : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300'"
                       :title="event.freezeSource === 'MANUAL' ? 'Frozen by a manual DOT inspection' : 'Frozen by Route ELD'">
-                      <LockKeyhole class="h-3 w-3" /> Frozen
+                      <ShieldAlert v-if="event.freezeSource === 'MANUAL'" class="h-3.5 w-3.5" />
+                      <LockKeyhole v-else class="h-3 w-3" /> Frozen
                     </span>
                     <TooltipProvider v-if="cameraEventIdSet.has(event.eventId)">
                       <Tooltip>
@@ -701,6 +703,7 @@ import {
   RotateCcw,
   LoaderCircle,
   LockKeyhole,
+  ShieldAlert,
 } from 'lucide-vue-next'
 import {
   Accordion,
@@ -723,7 +726,7 @@ import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
 import { copyCoordinates } from '../utils/coordinateClipboard'
 
 const RECORD_ORIGIN_LABELS: Record<number, string> = {
-  1: 'ELD',
+  1: 'Auto',
   2: 'Driver',
   3: 'User',
   4: 'Unknown',
@@ -834,13 +837,13 @@ const copyCellValue = async (value: string, label: string) => {
 const openItems = ref<string[]>([])
 const isColumnVisible = (column: BoostEventTableColumn) => props.columnVisibility[column]
 const columnTracks: Array<[BoostEventTableColumn, string]> = [
-  ['duration', 'minmax(105px,.62fr)'],
+  ['duration', 'minmax(115px,.62fr)'],
   ['event', 'minmax(165px,1.05fr)'],
   ['location', 'minmax(210px,1.65fr)'],
   ['system', 'minmax(82px,.6fr)'],
   ['odometer', 'minmax(94px,.7fr)'],
   ['engineHours', 'minmax(94px,.7fr)'],
-  ['notes', 'minmax(135px,1fr)'],
+  ['notes', 'minmax(115px,1fr)'],
   ['status', '90px'],
   ['trailer', 'minmax(95px,.75fr)'],
   ['document', 'minmax(115px,.9fr)'],

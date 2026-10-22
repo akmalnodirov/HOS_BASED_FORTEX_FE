@@ -649,7 +649,7 @@ const {
 const boostGraphRef = ref<InstanceType<typeof CBoostGraph> | null>(null)
 const showGraph = ref(true)
 const changeFilter = ref('__all__')
-const statusFilter = ref('__all__')
+const statusFilter = ref('ACTIVE')
 const driverFilter = ref('__main__')
 const showLocationFinderModal = ref(false)
 const showErrorWarningModal = ref(false)
@@ -1208,9 +1208,9 @@ const changeFilterOptions = computed(() =>
 const statusFilterOptions = computed(() =>
   Array.from(
     new Set(
-      dailyEvents.value
+      ['ACTIVE', ...dailyEvents.value
         .flatMap((group) => group.events)
-        .map((event) => String(event.eventRecordStatus || 'ACTIVE').toUpperCase())
+        .map((event) => String(event.eventRecordStatus || 'ACTIVE').toUpperCase())]
     )
   ).sort()
 )
