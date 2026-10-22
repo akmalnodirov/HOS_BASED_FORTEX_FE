@@ -235,7 +235,9 @@ const getVehicleName = (id: string) => {
   return vehicle?.name || vehicle?.vin || id
 }
 
-const addVehicle = (vehicleId: string) => {
+const addVehicle = (value: unknown) => {
+  if (typeof value !== 'string') return
+  const vehicleId = value
   if (vehicleId === 'all') {
     // Add all vehicles that are not yet selected
     const allIds = props.vehicles.map((v) => v.id)

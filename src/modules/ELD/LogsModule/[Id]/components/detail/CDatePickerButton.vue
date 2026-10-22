@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { shallowRef, watch, computed } from 'vue'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
@@ -46,7 +46,7 @@ function toDayjs(date: any): Dayjs {
   return dayjs(new Date(date.year, date.month - 1, date.day))
 }
 
-const calendarDate = ref<CalendarDate | undefined>(toCalendarDate(props.date))
+const calendarDate = shallowRef<CalendarDate | undefined>(toCalendarDate(props.date))
 
 watch(
   () => props.date,

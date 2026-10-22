@@ -214,6 +214,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/camera-presence`
   static readonly ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS = (id: string) =>
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/options`
+  static readonly ROUTE_ELD_INSERT_INFO_LOG = (id: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${id}/insert-info-log`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE = (id: string) =>
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/co-driver`
   static readonly ROUTE_ELD_DRIVER_MONITORING = (id: string) =>
@@ -313,15 +315,19 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_DOT_INSPECTION_STATUS = (id: string) =>
     `${this.ROUTE_ELD_DOT_INSPECTION(id)}/status`
   static readonly ROUTE_ELD_STATION_ALERTS = `${this.BASE_URL}/route-eld/alerts`
+  static readonly ROUTE_ELD_STATION_ALERTS_READ_ALL = `${this.ROUTE_ELD_STATION_ALERTS}/read-all`
   static readonly ROUTE_ELD_STATION_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_STATION_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_ALPR_CAMERA_ALERTS = `${this.BASE_URL}/route-eld/alpr-camera-alerts`
+  static readonly ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL = `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/read-all`
   static readonly ROUTE_ELD_ALPR_CAMERA_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
+  static readonly ROUTE_ELD_SPEED_ALERTS_READ_ALL = `${this.ROUTE_ELD_SPEED_ALERTS}/read-all`
   static readonly ROUTE_ELD_SPEED_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_SPEED_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_VIOLATION_ALERTS = `${this.BASE_URL}/route-eld/violation-alerts`
+  static readonly ROUTE_ELD_VIOLATION_ALERTS_READ_ALL = `${this.ROUTE_ELD_VIOLATION_ALERTS}/read-all`
   static readonly ROUTE_ELD_VIOLATION_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_VIOLATION_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`

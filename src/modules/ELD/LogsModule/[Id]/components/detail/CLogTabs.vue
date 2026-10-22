@@ -3,7 +3,7 @@
     <Tabs v-model="activeTab" class="w-auto">
       <TabsList class="bg-transparent h-10 lg:h-11 2xl:h-12 p-0 gap-3 lg:gap-4 2xl:gap-6">
         <TabsTrigger
-          v-for="tab in tabs"
+          v-for="tab in visibleTabs"
           :key="tab"
           :value="tab"
           class="px-0 py-0 h-full text-[10px] lg:text-xs 2xl:text-sm text-[#727272] dark:text-muted-foreground font-medium uppercase tracking-wide cursor-pointer rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground hover:text-foreground transition-all bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none"
@@ -70,7 +70,7 @@
 
     <!-- Default Toolbar (for non-Boost pages) -->
     <div
-      v-else-if="route.name === 'ELDLogDetail' || route.name === 'ELDTracking'"
+      v-else-if="route.name === 'ELDLogDetail' || route.name === 'ELDTracking' || route.name === 'ELDInsertInfoLog'"
       class="flex items-center gap-1.5 lg:gap-2 2xl:gap-3 pb-2"
     >
       <Popover v-model:open="isCalendarOpen">
@@ -182,6 +182,7 @@ const route = useRoute()
 const boostStore = useBoostWorkspaceStore()
 const authStore = useAuthStore()
 const canCreateSession = computed(() => hasPermission(authStore.token, 'route_eld.log_details.sessions.create'))
+const canInsertInfo = computed(() => hasPermission(authStore.token, 'route_eld.log_details.events.insert'))
 const { sessions, session: activeSession } = storeToRefs(boostStore)
 const activeSessionId = computed(() => activeSession.value?.id ?? '')
 
@@ -190,8 +191,10 @@ const tabs = [
   'AI',
   'BOOST',
   'TRACKING',
+  'INSERT INFO LOG',
   // 'HISTORY'
 ]
+const visibleTabs = computed(() => tabs.filter(tab => tab !== 'INSERT INFO LOG' || canInsertInfo.value))
 const activeTab = ref('ALL')
 
 const isBoostPage = computed(() => route.name === 'ELDBoost')

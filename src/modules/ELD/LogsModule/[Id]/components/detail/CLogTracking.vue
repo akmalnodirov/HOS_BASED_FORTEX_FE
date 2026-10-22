@@ -408,8 +408,9 @@ const onMapReady = async (instance: any) => {
 
 const fitRouteToMap = () => {
   const mapWrapper = getMapWrapper()
-  if (!mapWrapper?.map || routePath.value.length === 0 || !window.google?.maps) return
-  const bounds = new window.google.maps.LatLngBounds()
+  const googleMaps = (window as any).google?.maps
+  if (!mapWrapper?.map || routePath.value.length === 0 || !googleMaps) return
+  const bounds = new googleMaps.LatLngBounds()
   routePath.value.forEach((point) => bounds.extend(point))
   mapWrapper.map.fitBounds(bounds)
   if (routePath.value.length === 1) mapWrapper.map.setZoom(14)

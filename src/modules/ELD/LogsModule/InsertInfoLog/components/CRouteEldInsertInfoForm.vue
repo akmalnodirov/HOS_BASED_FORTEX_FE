@@ -1,0 +1,193 @@
+<template>
+  <form class="w-full space-y-5 rounded-lg border border-border bg-card p-4 sm:p-6" @submit.prevent="save">
+    <div>
+      <h2 class="text-base font-semibold">Insert Info log</h2>
+      <p class="mt-1 text-xs text-muted-foreground">Choose a status and start time. The graph previews the change until the next duty event.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+      <Button v-for="status in statuses" :key="status.code" type="button"
+        :variant="eventCode === status.code ? 'default' : 'outline'"
+        class="w-full" @click="selectStatus(status.code)">{{ status.label }}</Button>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div class="space-y-1.5"><Label>Start time</Label><TimePicker :model-value="timeText" @update:model-value="updateTime" /></div>
+      <div class="space-y-1.5">
+        <Label>Record origin</Label>
+        <Select v-model="recordOrigin"><SelectTrigger><SelectValue placeholder="Select origin" /></SelectTrigger>
+          <SelectContent :body-lock="false"><SelectItem value="OTHER_USER">Other user</SelectItem><SelectItem value="DRIVER">Driver</SelectItem></SelectContent>
+        </Select>
+      </div>
+      <div v-if="recordOrigin === 'OTHER_USER'" class="space-y-1.5">
+        <Label>Responsible Route ELD user</Label>
+        <Select v-model="responsibleUserId" :disabled="!activeUsers.length"><SelectTrigger><SelectValue :placeholder="activeUsers.length ? 'Select a user' : 'No active users available'" /></SelectTrigger>
+          <SelectContent :body-lock="false"><SelectItem v-for="user in activeUsers" :key="user.id" :value="user.id">{{ user.name }}</SelectItem></SelectContent>
+        </Select>
+      </div>
+    </div>
+    <div class="rounded-md border border-border/70 bg-muted/20 p-4">
+      <h3 class="mb-4 text-sm font-medium">Location</h3>
+      <div class="grid gap-4 md:grid-cols-2">
+      <div class="space-y-1.5"><Label>Latitude</Label><Input v-model="latitude" type="number" step="any" placeholder="Latitude" /></div>
+      <div class="space-y-1.5"><Label>Longitude</Label><Input v-model="longitude" type="number" step="any" placeholder="Longitude" /></div>
+      <div class="space-y-1.5 md:col-span-2"><Label>Calculated location</Label><Input v-model="calculatedLocation" placeholder="Location description" /></div>
+      <div class="flex gap-2 md:col-span-2">
+        <Button type="button" variant="outline" size="sm" @click="copyCoordinates"><Copy class="mr-2 h-4 w-4" />Copy</Button>
+        <Button type="button" variant="outline" size="sm" @click="pasteCoordinates"><ClipboardPaste class="mr-2 h-4 w-4" />Paste</Button>
+      </div>
+      </div>
+    </div>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="space-y-1.5"><Label>Odometer (mi)</Label><Input v-model="odometerMiles" type="number" min="0" step="any" placeholder="Odometer" /></div>
+      <div class="space-y-1.5"><Label>Engine hours</Label><Input v-model="engineHours" type="number" min="0" step="any" placeholder="Engine hours" /></div>
+      <div class="space-y-1.5">
+        <Label>Vehicle</Label>
+        <Select v-model="vehicleId"><SelectTrigger><SelectValue placeholder="No vehicle" /></SelectTrigger>
+          <SelectContent :body-lock="false"><SelectItem value="none">No vehicle</SelectItem><SelectItem v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">{{ vehicle.name }}</SelectItem></SelectContent>
+        </Select>
+      </div>
+    </div>
+    <div class="space-y-2">
+      <Label>Notes</Label><Textarea v-model="notes" maxlength="100" placeholder="Notes" class="min-h-20" />
+      <div class="flex flex-wrap gap-1.5" aria-label="Common notes">
+        <Button v-for="note in noteShortcuts" :key="note" type="button" variant="outline" size="sm"
+          class="h-7 px-2.5 text-xs" @click="appendNote(note)">{{ note }}</Button>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2">
+      <Button type="button" variant="outline" @click="clear">Clear</Button>
+      <Button type="submit" :disabled="loading || !driverExternalId || (recordOrigin === 'OTHER_USER' && !responsibleUserId)">
+        {{ loading ? 'Saving…' : 'Save active log' }}
+      </Button>
+    </div>
+  </form>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ClipboardPaste, Copy } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
+import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations'
+import type { InsertInfoLogRequest, InsertInfoOption } from '../types'
+
+const props = defineProps<{
+  startSeconds: number
+  driverExternalId: string
+  users: InsertInfoOption[]
+  vehicles: InsertInfoOption[]
+  loading: boolean
+}>()
+const emit = defineEmits<{
+  'update:start-seconds': [seconds: number]
+  'update:event-code': [code: string]
+  save: [values: Omit<InsertInfoLogRequest, 'timestamp' | 'timeZone'>]
+}>()
+const statuses = [
+  { code: 'DS_OFF', label: 'Off duty' }, { code: 'DS_SB', label: 'Sleeper' },
+  { code: 'DS_D', label: 'Driving' }, { code: 'DS_ON', label: 'On duty' },
+  { code: 'DR_IND_YM', label: 'YM' }, { code: 'DR_IND_PC', label: 'PC' },
+  { code: 'DS_WT', label: 'Waiting' },
+]
+const noteShortcuts = [
+  'PTI', 'Scale', 'Hook', 'Delivery', 'Fuel', 'DOT', 'Repairs', 'Drop', 'Pick Up',
+  'Rest', 'Break', 'Loading', 'Unloading', 'Inspection',
+]
+const eventCode = ref('DS_OFF')
+const recordOrigin = ref<'DRIVER' | 'OTHER_USER'>('OTHER_USER')
+const responsibleUserId = ref('')
+const vehicleId = ref('none')
+const latitude = ref<string | number>('')
+const longitude = ref<string | number>('')
+const calculatedLocation = ref('')
+const odometerMiles = ref<string | number>('')
+const engineHours = ref<string | number>('')
+const notes = ref('')
+const geoStore = useGeoLocationsStore()
+const activeUsers = computed(() => props.users.filter(user => user.active !== false))
+const timeText = computed(() => `${String(Math.floor(props.startSeconds / 3600)).padStart(2, '0')}:${String(Math.floor(props.startSeconds % 3600 / 60)).padStart(2, '0')}`)
+watch(activeUsers, users => {
+  if (!users.some(user => user.id === responsibleUserId.value)) responsibleUserId.value = users[0]?.id ?? ''
+}, { immediate: true })
+let geocodeTimer: ReturnType<typeof setTimeout> | undefined
+watch([latitude, longitude], ([latText, lonText]) => {
+  if (geocodeTimer) clearTimeout(geocodeTimer)
+  const lat = Number(latText), lon = Number(lonText)
+  if (String(latText).trim() === '' || String(lonText).trim() === '' ||
+      !Number.isFinite(lat) || !Number.isFinite(lon) ||
+      lat < -90 || lat > 90 || lon < -180 || lon > 180) return
+  const priorLocation = calculatedLocation.value
+  geocodeTimer = setTimeout(async () => {
+    const location = await geoStore.getCalculatedAddress({ latitude: lat, longitude: lon })
+    if (latitude.value === latText && longitude.value === lonText &&
+        calculatedLocation.value === priorLocation && location) calculatedLocation.value = location
+  }, 600)
+})
+onBeforeUnmount(() => { if (geocodeTimer) clearTimeout(geocodeTimer) })
+
+function updateTime(value: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value)
+  if (!match) return
+  const hours = Number(match[1]), minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return
+  emit('update:start-seconds', hours * 3600 + minutes * 60)
+}
+function selectStatus(code: string) {
+  eventCode.value = code
+  emit('update:event-code', code)
+}
+function appendNote(note: string) {
+  const parts = notes.value.split(',').map(value => value.trim()).filter(Boolean)
+  if (parts.includes(note)) return
+  const combined = [...parts, note].join(', ')
+  if (combined.length <= 100) notes.value = combined
+}
+function optionalNumber(value: string | number): number | null {
+  return String(value).trim() === '' ? null : Number(value)
+}
+function save() {
+  const lat = optionalNumber(latitude.value), lon = optionalNumber(longitude.value)
+  const odometer = optionalNumber(odometerMiles.value), engine = optionalNumber(engineHours.value)
+  if ((lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
+      (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) ||
+      (lat === null) !== (lon === null)) { toast.error('Enter a valid latitude and longitude pair.'); return }
+  if ((odometer !== null && (!Number.isFinite(odometer) || odometer < 0)) ||
+      (engine !== null && (!Number.isFinite(engine) || engine < 0))) {
+    toast.error('Enter valid odometer and engine hours.'); return
+  }
+  emit('save', {
+    eventCode: eventCode.value, recordOrigin: recordOrigin.value,
+    responsibleUserId: recordOrigin.value === 'DRIVER' ? props.driverExternalId : responsibleUserId.value,
+    vehicleId: vehicleId.value === 'none' ? null : vehicleId.value,
+    latitude: lat, longitude: lon, calculatedLocation: calculatedLocation.value.trim() || null,
+    odometerMiles: odometer, engineHours: engine,
+    notes: notes.value.trim() || null,
+  })
+}
+async function copyCoordinates() {
+  if (String(latitude.value).trim() === '' || String(longitude.value).trim() === '') {
+    toast.warning('No coordinates to copy'); return
+  }
+  try { await navigator.clipboard.writeText(`${latitude.value}, ${longitude.value}`); toast.success('Coordinates copied') }
+  catch { toast.error('Could not copy coordinates') }
+}
+async function pasteCoordinates() {
+  try {
+    const values = (await navigator.clipboard.readText()).split(',').map(value => value.trim())
+    if (values.length !== 2 || !values.every(value => value && Number.isFinite(Number(value)))) throw new Error('Invalid coordinates')
+    latitude.value = values[0]; longitude.value = values[1]
+    toast.success('Coordinates pasted')
+  } catch { toast.error('Clipboard must contain latitude, longitude') }
+}
+function clear() {
+  selectStatus('DS_OFF'); recordOrigin.value = 'OTHER_USER'; responsibleUserId.value = activeUsers.value[0]?.id ?? ''
+  vehicleId.value = 'none'; latitude.value = ''; longitude.value = ''; calculatedLocation.value = ''
+  odometerMiles.value = ''; engineHours.value = ''; notes.value = ''
+  emit('update:start-seconds', 0)
+}
+defineExpose({ clear })
+</script>

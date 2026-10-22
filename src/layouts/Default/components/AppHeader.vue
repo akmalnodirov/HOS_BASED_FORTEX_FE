@@ -30,7 +30,7 @@
 
       <div class="flex items-center gap-2">
         <div v-if="availableTypes.length" class="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-1">
-          <DropdownMenu v-model:open="isNotificationsOpen">
+          <DropdownMenu v-model:open="isNotificationsOpen" :modal="false">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="icon" class="relative h-8 w-8" title="Unread alerts" aria-label="Unread alerts">
                 <Bell class="h-4 w-4" />
@@ -40,16 +40,26 @@
             <DropdownMenuContent align="end" class="w-[min(24rem,calc(100vw-2rem))] p-0" :side-offset="8">
               <div class="flex items-center justify-between border-b border-border px-3 py-2">
                 <span class="text-sm font-semibold">Unread alerts</span>
-                <span class="text-xs text-muted-foreground">{{ unreadAlerts.length }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-muted-foreground">{{ unreadAlerts.length }}</span>
+                  <Button variant="ghost" size="sm" class="h-7 px-2 text-xs" :disabled="notificationsLoading" @click.stop="readAllNotifications">Read all</Button>
+                </div>
               </div>
               <div class="max-h-96 overflow-y-auto p-1">
                 <div v-if="notificationsLoading" class="p-4 text-center text-sm text-muted-foreground">Loading alerts…</div>
                 <div v-else-if="notificationsError" class="p-3 text-sm text-destructive">{{ notificationsError }}</div>
                 <div v-if="!notificationsLoading && !unreadAlerts.length" class="p-4 text-center text-sm text-muted-foreground">No unread alerts</div>
-                <div v-for="alert in unreadAlerts" :key="`${alert.type}:${alert.id}`" class="flex items-start gap-2 rounded-md border-b border-border px-2 py-3 last:border-0 hover:bg-muted/50">
-                  <component :is="alertIcons[alert.type]" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div v-for="alert in unreadAlerts" :key="`${alert.type}:${alert.id}`"
+                  class="flex items-start gap-2 rounded-md border-b border-border px-2 py-3 last:border-b-0"
+                  :class="alert.type === 'violation'
+                    ? 'border-l-4 border-l-red-600 bg-red-50 hover:bg-red-100 dark:border-l-red-400 dark:bg-red-950/40 dark:hover:bg-red-950/60'
+                    : 'hover:bg-muted/50'">
+                  <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                    :class="alert.type === 'violation' ? 'bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300' : 'text-amber-600'">
+                    <component :is="alertIcons[alert.type]" class="h-4 w-4" />
+                  </span>
                   <div class="min-w-0 flex-1">
-                    <div class="text-xs font-medium text-foreground">{{ alert.title }}</div>
+                    <div class="text-xs font-semibold" :class="alert.type === 'violation' ? 'text-red-900 dark:text-red-100' : 'text-foreground'">{{ alert.title }}</div>
                     <div class="mt-1 truncate text-xs text-muted-foreground" :title="alert.detail">{{ alert.detail }}</div>
                     <div class="mt-1 text-[11px] text-muted-foreground">{{ companyNames[alert.companyId.toLowerCase()] || alert.companyId }} · {{ alertLabels[alert.type] }} · {{ new Date(alert.occurredAt).toLocaleString() }}</div>
                   </div>
@@ -61,22 +71,22 @@
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
+          <Popover :modal="false">
+            <PopoverTrigger as-child>
               <Button variant="ghost" size="icon" class="h-8 w-8" title="Alert settings" aria-label="Alert settings"><Settings class="h-4 w-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-56 p-1" :side-offset="8">
-              <DropdownMenuLabel>Show alert types</DropdownMenuLabel>
+            </PopoverTrigger>
+            <PopoverContent align="end" class="w-56 p-1" :side-offset="8">
+              <div class="px-2 py-1.5 text-sm font-semibold">Show alert types</div>
               <p class="px-2 pb-2 text-xs text-muted-foreground">Checked types appear in toasts and the unread list.</p>
-              <DropdownMenuSeparator />
+              <div class="-mx-1 my-1 h-px bg-muted" />
               <div class="space-y-0.5 p-1" role="group" aria-label="Alert types">
                 <label v-for="type in availableTypes" :key="type" class="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-sm text-foreground hover:bg-accent">
                   <input type="checkbox" class="h-4 w-4 shrink-0 accent-primary" :checked="selectedTypes.includes(type)" @change="setType(type, !selectedTypes.includes(type))" />
                   <span>{{ alertLabels[type] }}</span>
                 </label>
               </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverContent>
+          </Popover>
         </div>
         <!-- Dark Mode Toggle -->
         <!--        <Button @click="toggleDarkMode" variant="ghost" size="icon" class="hidden sm:flex">-->
@@ -265,10 +275,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
@@ -278,7 +287,7 @@ import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
 
 const alertIcons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
-const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead } = useRouteEldNotificationCenter()
+const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead, markAllRead } = useRouteEldNotificationCenter()
 const { viewAlerts } = useRouteEldAlertNavigation()
 const isNotificationsOpen = ref(false)
 
@@ -292,6 +301,11 @@ async function openAlert(alert: UnreadAlert) {
 async function readAlert(alert: UnreadAlert) {
   try { await markRead(alert) }
   catch { toast.error('Could not mark alert as read') }
+}
+
+async function readAllNotifications() {
+  try { await markAllRead() }
+  catch { toast.error('Some alerts could not be marked as read') }
 }
 
 const route = useRoute()

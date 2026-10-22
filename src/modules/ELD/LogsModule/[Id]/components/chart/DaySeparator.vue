@@ -15,16 +15,16 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 
-const separators = ref([])
-const separatorRefs = ref([])
+const separators = ref<string[]>([])
+const separatorRefs = ref<SVGPathElement[]>([])
 
 const { isDarkMode } = useDarkMode()
 
-const addSeparatorRef = (el) => {
-  if (el) separatorRefs.value.push(el)
+const addSeparatorRef = (el: Element | ComponentPublicInstance | null) => {
+  if (el instanceof SVGPathElement) separatorRefs.value.push(el)
 }
 
 const props = defineProps({
@@ -48,9 +48,9 @@ const props = defineProps({
   },
 })
 
-const calculateSeparators = (count) => {
+const calculateSeparators = (count: number): string[] => {
   let start = 0
-  let separatorPaths = []
+  let separatorPaths: string[] = []
   for (let i = 0; i < count; i++) {
     let newX = 0
     if (i % 24 === 0 && i !== 0) {

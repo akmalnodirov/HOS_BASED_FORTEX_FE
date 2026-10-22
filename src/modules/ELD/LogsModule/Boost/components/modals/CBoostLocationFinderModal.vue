@@ -252,8 +252,10 @@ async function doSearch() {
   }
 }
 async function copyCoords() {
-  if (!coordinatesComplete.value) return
-  await copyCoordinates(parsedLatitude.value, parsedLongitude.value)
+  const latitude = parsedLatitude.value
+  const longitude = parsedLongitude.value
+  if (latitude === null || longitude === null) return
+  await copyCoordinates(latitude, longitude)
   toast.success('Coordinates copied')
 }
 async function pasteCoords() {

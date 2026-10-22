@@ -5,13 +5,13 @@
       v-for="(item, key) in generatedLabels"
       :key="key"
       stroke-width="2"
-      :font-weight="isNaN(item.label) ? 600 : 400"
-      :font-size="isNaN(item.label) && item.label?.length > 1 ? (edit ? 12 : 16) : edit ? 10 : 14"
+      :font-weight="isDayName(item.label) ? 600 : 400"
+      :font-size="isDayName(item.label) && item.label.length > 1 ? (edit ? 12 : 16) : edit ? 10 : 14"
       :x="item.x || 0"
       :y="item.y"
       :text-anchor="item.textAnchor"
       :fill="
-        isNaN(item.label)
+        isDayName(item.label)
           ? isDarkMode
             ? '#FFFFFFB2'
             : '#222222'
@@ -26,7 +26,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, type PropType } from 'vue'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 
 const props = defineProps({
@@ -35,7 +35,7 @@ const props = defineProps({
     required: true,
   },
   dayNames: {
-    type: Array,
+    type: Array as PropType<string[]>,
     required: true,
   },
   distance: {
@@ -50,14 +50,15 @@ const props = defineProps({
 
 const { isDarkMode } = useDarkMode()
 
-const generateHourLabel = (hour, dayNames) => {
+const isDayName = (label: string) => Number.isNaN(Number(label))
+const generateHourLabel = (hour: number, dayNames: string[]): string => {
   const adjustedHour = hour % 24
   if (adjustedHour === 0 && dayNames?.length > 0) {
     return dayNames[Math.floor(hour / 24) % dayNames.length]
   } else if (adjustedHour === 12) {
     return 'N'
   } else {
-    return adjustedHour % 12 || 12
+    return String(adjustedHour % 12 || 12)
   }
 }
 

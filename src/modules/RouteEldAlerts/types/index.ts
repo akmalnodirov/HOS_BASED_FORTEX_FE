@@ -121,6 +121,7 @@ export interface ViolationAlert {
   timeZone: string | null
   occurredAt: string
   isRead: boolean
+  fixedAt: string | null
   driverLatitude: number | null
   driverLongitude: number | null
   driverLocation: string | null

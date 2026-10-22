@@ -145,6 +145,10 @@
                   >
                     {{ getEventLabelFromUtils(event.eventType, event.eventCode) }}
                   </span>
+                  <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                    :title="event.freezeSource === 'MANUAL' ? 'Frozen by a manual DOT inspection' : 'Frozen by Route ELD'">
+                    <LockKeyhole class="h-3 w-3" /> Frozen
+                  </span>
                   <button v-if="cameraEventIds.includes(String(event.id || event.eventId))"
                     type="button" class="rounded p-1 text-destructive hover:bg-destructive/10"
                     title="View event route and cameras" aria-label="View event route and cameras"
@@ -228,7 +232,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
-import { Camera, CircleAlert, Copy, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { Camera, CircleAlert, Copy, LockKeyhole, Pencil, TriangleAlert } from 'lucide-vue-next'
 import { copyCoordinates } from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
 import SortIcon from '@/components/icons/SortIcon.vue'
 import CCustomCheckbox from '@/components/custom/CCustomCheckbox.vue'

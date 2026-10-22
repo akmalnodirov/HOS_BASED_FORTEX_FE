@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
+import type { ApexOptions } from 'apexcharts'
 import type { DonutData } from '@/modules/Tools/StatisticAdmin/types'
 
 interface Props {
@@ -23,9 +24,7 @@ const chartOptions = ref({
     position: 'bottom',
     horizontalAlign: 'center',
     markers: {
-      width: 10,
-      height: 10,
-      radius: 10,
+      size: 10,
     },
   },
   plotOptions: {
@@ -58,7 +57,7 @@ const chartOptions = ref({
   stroke: {
     width: 0,
   },
-})
+} satisfies ApexOptions)
 
 const series = ref(props.data.series)
 

@@ -208,6 +208,7 @@ import { GoogleMap, InfoWindow, Marker, Polyline } from 'vue3-google-map'
 import { ApiEndpoints } from '@/api/endpoints'
 import { Button } from '@/components/ui/button'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
+import type { MapType } from '@/components/custom/CMapTypeControl.vue'
 import { useApi } from '@/composables/useAxiosService'
 import { mapStyles } from '@/utils/maps'
 import type {
@@ -241,7 +242,7 @@ const mapContainerRef = ref<HTMLElement | null>(null)
 const mapRef = ref<any>(null)
 const routePolylineRefs = ref<any[]>([])
 const rawMap = ref<any>(null)
-const mapTypeId = ref('roadmap')
+const mapTypeId = ref<MapType>('roadmap')
 const backgroundCamerasVisible = ref(false)
 const isFullscreen = ref(false)
 const selectedCamera = ref<AlprRouteCamera | AlprMapCamera | null>(null)

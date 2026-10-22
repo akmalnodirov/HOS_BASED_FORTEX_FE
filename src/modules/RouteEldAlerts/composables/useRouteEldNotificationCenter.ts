@@ -128,5 +128,17 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
     alerts.value = alerts.value.filter((item) => !(item.id === alert.id && item.type === alert.type))
   }
 
-  return { selectedTypes, availableTypes, enabledTypes, alerts, loading, error, companyNames, setType, refresh, markRead }
+  async function markAllRead() {
+    const endpoints = {
+      station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
+      alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
+      speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
+      violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
+    }
+    const results = await Promise.allSettled(enabledTypes.value.map((type) => api.patch(endpoints[type], null)))
+    await refresh()
+    if (results.some((result) => result.status === 'rejected')) throw new Error('Some alerts could not be marked as read.')
+  }
+
+  return { selectedTypes, availableTypes, enabledTypes, alerts, loading, error, companyNames, setType, refresh, markRead, markAllRead }
 })

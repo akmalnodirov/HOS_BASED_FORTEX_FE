@@ -35,6 +35,8 @@ export interface BoostUiEventRow {
   eventType: number
   eventCode: number
   eventName?: string
+  isFrozen?: boolean
+  freezeSource?: string | null
   calculatedLocation?: string
   manualLocation?: string
   positioning?: string | null
@@ -564,6 +566,8 @@ export function useScheduleBoost() {
         eventType,
         eventCode,
         eventName: event.eventName,
+        isFrozen: event.isFrozen,
+        freezeSource: event.freezeSource,
         calculatedLocation: event.location || undefined,
         manualLocation: event.driverLocationDescription || undefined,
         positioning: event.positioning,
@@ -605,6 +609,8 @@ export function useScheduleBoost() {
         eventType,
         eventCode,
         eventName: event.eventName,
+        isFrozen: event.isFrozen,
+        freezeSource: event.freezeSource,
         calculatedLocation: event.location || undefined,
         manualLocation: event.driverLocationDescription || undefined,
         positioning: event.positioning,

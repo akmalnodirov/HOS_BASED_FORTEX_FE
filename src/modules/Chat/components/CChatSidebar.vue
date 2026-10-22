@@ -35,7 +35,7 @@ const getInitials = (name: string) => {
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
         <Input
           :model-value="searchQuery"
-          @update:model-value="emit('update:searchQuery', $event)"
+          @update:model-value="emit('update:searchQuery', String($event))"
           placeholder="Search"
           class="pl-9"
         />

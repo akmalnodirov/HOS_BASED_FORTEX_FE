@@ -417,6 +417,7 @@ function buildGraph(
       y2: 0,
       eventCode:
         eventDefinition(value.event.eventCode, value.event.eventCategory)?.code ?? value.order,
+      providerEventCode: value.event.eventCode,
       eventType: eventDefinition(value.event.eventCode, value.event.eventCategory)?.type ?? 1,
       eventTime: timestampInZone(value.start, value.event.timeZone),
       duration,
@@ -488,6 +489,8 @@ function mapEvent(
     totalEngineHours: event.engineHours,
     recordOrigin: event.recordOrigin,
     recordStatus: recordStatus(event.recordStatus),
+    isFrozen: event.isFrozen,
+    freezeSource: event.freezeSource,
     annotation: event.notes,
     vehicleUnit: event.vehicleName,
     vehicleVin: event.vehicleVin,

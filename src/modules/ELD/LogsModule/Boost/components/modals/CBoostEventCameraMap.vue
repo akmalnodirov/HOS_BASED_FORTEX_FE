@@ -188,6 +188,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Maximize, Minimize, X } from 'lucide-vue-next'
 import { CustomMarker, GoogleMap, Polyline } from 'vue3-google-map'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
+import type { MapType } from '@/components/custom/CMapTypeControl.vue'
 import { mapStyles } from '@/utils/maps'
 import { resolveRouteEldScheduleTimeZone } from '../../composables/useScheduleBoost'
 import type { RouteEldEventCameraAnalysis, RouteEldHosEvent, RouteEldMatchedCamera } from '../../types/boost'
@@ -213,7 +214,7 @@ const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const mapRef = ref<any>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const zoom = ref(4)
-const mapTypeId = ref('roadmap')
+const mapTypeId = ref<MapType>('roadmap')
 const isFullscreen = ref(false)
 const localSelectedEventId = ref<string | null>(null)
 const selectedCamera = ref<RouteEldMatchedCamera | null>(null)

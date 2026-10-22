@@ -135,7 +135,7 @@ defineEmits<{ 'update:open': [value: boolean]; apply: [] }>()
 
 type Group = { key: string; logDate: string | null; isSigned: boolean | null; invalid: boolean; certifications: RouteEldCertificationEvent[] }
 const groups = computed<Group[]>(() => {
-  const days = (props.report?.days ?? []).map((day) => ({ key: day.logDate, logDate: day.logDate, isSigned: day.isSigned, invalid: false, certifications: day.certifications ?? [] }))
+  const days: Group[] = (props.report?.days ?? []).map((day) => ({ key: day.logDate, logDate: day.logDate, isSigned: day.isSigned, invalid: false, certifications: day.certifications ?? [] }))
   if (props.report?.invalidDateCertifications?.length) days.push({ key: '__invalid__', logDate: null, isSigned: null, invalid: true, certifications: props.report.invalidDateCertifications })
   return days
 })
