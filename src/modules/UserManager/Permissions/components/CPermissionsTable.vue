@@ -10,7 +10,7 @@ export interface Permission {
   name: string
   code?: string
 }
-export type SortKey = 'no' | 'name' | 'code'
+export type SortKey = 'name' | 'code'
 export type SortOrder = 'asc' | 'desc'
 
 defineProps<{
@@ -25,8 +25,8 @@ const emit = defineEmits<{
   (event: 'edit', permission: Permission): void
 }>()
 
-const headings: { label: string; key: SortKey; class?: string }[] = [
-  { label: 'No', key: 'no', class: 'w-20' },
+const headings: { label: string; key?: SortKey; class?: string }[] = [
+  { label: 'No', class: 'w-20' },
   { label: 'Name', key: 'name' },
   { label: 'Code', key: 'code' },
 ]
@@ -37,11 +37,12 @@ const headings: { label: string; key: SortKey; class?: string }[] = [
     <Table class="min-w-[820px]">
       <TableHeader class="sticky top-0 z-20">
         <TableRow class="border-0 bg-[#f0f0f0] hover:bg-[#f0f0f0] dark:bg-muted/50 dark:hover:bg-muted/50">
-          <TableHead v-for="heading in headings" :key="heading.key" :class="heading.class">
-            <button class="flex cursor-pointer items-center gap-2 font-medium hover:text-foreground" @click="emit('sort', heading.key)">
+          <TableHead v-for="heading in headings" :key="heading.label" :class="heading.class">
+            <button v-if="heading.key" class="flex cursor-pointer items-center gap-2 font-medium hover:text-foreground" @click="emit('sort', heading.key)">
               {{ heading.label }}
               <SortIcon class="h-4 w-4" />
             </button>
+            <span v-else class="font-medium">{{ heading.label }}</span>
           </TableHead>
           <TableHead class="w-24 text-right"><span class="font-medium">Actions</span></TableHead>
         </TableRow>

@@ -7,7 +7,7 @@ import type {
   DonutData,
   TableRecord,
   StatisticsCard,
-} from '@/types/statistics'
+} from '../types'
 import { usePagination } from '@/composables/usePagination'
 
 export type SortKey =

@@ -27,7 +27,8 @@ const {
   changeTimeFilter,
 } = useStatisticCompany()
 
-const handleCompanySelect = (value: string) => {
+const handleCompanySelect = (value: unknown) => {
+  if (typeof value !== 'string') return
   if (value === 'all') {
     selectCompany(null)
   } else {

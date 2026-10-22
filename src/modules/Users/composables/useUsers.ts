@@ -92,9 +92,11 @@ export function usePortalUsers() {
         companyNames: user.companies.map((company) => company.name).join(', '),
         status: user.isActive,
       }))
+      return true
     } catch (error) {
       portalUsers.value = []
       toast.error(errorMessage(error, 'Failed to load users'))
+      return false
     } finally {
       isLoading.value = false
     }
@@ -181,8 +183,10 @@ export function usePortalUsers() {
 
   async function removeUser(user: User) {
     await api.delete(ApiEndpoints.ROUTE_ELD_DISPATCHER(user.id))
+    const loaded = await fetchUsers()
+    if (!loaded || portalUsers.value.some((item) => item.id === user.id))
+      throw new Error('The user is still present after deletion. Please try again.')
     toast.success('User removed')
-    await fetchUsers()
   }
 
   watch([debouncedSearch, statusFilter], () => pagination.resetPage())

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,6 +47,8 @@ async function confirmDelete() {
   try {
     await users.removeUser(deleteUser.value)
     deleteUser.value = null
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Could not remove user')
   } finally {
     deleting.value = false
   }

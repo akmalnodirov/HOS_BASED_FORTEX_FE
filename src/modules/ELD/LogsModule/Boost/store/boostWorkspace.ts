@@ -233,9 +233,9 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         return null
       }
       activeTabId.value = tab.id
-      await synchronizeWorkspace(sessionId, tab.id, true)
+      const synchronized = await synchronizeWorkspace(sessionId, tab.id, true)
       void fetchSchedule(session.value.driverId, session.value.fromDate, session.value.toDate).catch(() => {})
-      return version === sessionLoadVersion ? workspace.value : null
+      return version === sessionLoadVersion ? synchronized : null
     } finally {
       if (version === sessionLoadVersion) isLoading.value = false
     }

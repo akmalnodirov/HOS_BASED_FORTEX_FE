@@ -13,6 +13,6 @@ import RouteEldInitialLayout from './RouteEldInitialLayout.vue'
 
 const route = useRoute()
 const usesRouteEldLayout = computed(() =>
-  ['ELDLogDetail', 'ELDBoost', 'ELDTracking'].includes(String(route.name))
+  ['ELDLogDetail', 'ELDBoost', 'ELDTracking', 'ELDInsertInfoLog'].includes(String(route.name))
 )
 </script>

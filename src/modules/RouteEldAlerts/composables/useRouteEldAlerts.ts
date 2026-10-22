@@ -152,6 +152,35 @@ export function useRouteEldAlerts() {
     }
   }
 
+  async function markSpeedRead(id: string) {
+    markingReadId.value = id
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_SPEED_ALERT_READ(id), null)
+      const alert = speedAlerts.value.find((item) => item.id === id)
+      if (alert) alert.isRead = true
+    } finally { markingReadId.value = null }
+  }
+
+  async function markViolationRead(id: string) {
+    markingReadId.value = id
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_VIOLATION_ALERT_READ(id), null)
+      const alert = violationAlerts.value.find((item) => item.id === id)
+      if (alert) alert.isRead = true
+    } finally { markingReadId.value = null }
+  }
+
+  async function markAllRead(type: RouteEldAlertType, companyId: string | null) {
+    const endpoint = {
+      station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
+      alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
+      speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
+      violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
+    }[type]
+    await api.patch(endpoint, null, { params: companyId ? { companyId } : {} })
+    await fetchAlerts(type, companyId, true)
+  }
+
   return {
     stationAlerts,
     alprCameraAlerts,
@@ -170,5 +199,8 @@ export function useRouteEldAlerts() {
     resetAlerts,
     markStationRead,
     markAlprCameraRead,
+    markSpeedRead,
+    markViolationRead,
+    markAllRead,
   }
 }

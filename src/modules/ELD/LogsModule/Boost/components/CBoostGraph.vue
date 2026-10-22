@@ -252,7 +252,17 @@
             :x2="segment.endX"
             :y1="segment.y"
             :y2="segment.y"
-            :stroke="segment.specialKind === 'PC' ? '#7C3AED' : '#D97706'"
+            class="stroke-white dark:stroke-card"
+            stroke-width="6"
+          />
+          <line
+            v-for="segment in specialDutySegments"
+            :key="`special-dash-${segment.eventId}`"
+            :x1="segment.startX"
+            :x2="segment.endX"
+            :y1="segment.y"
+            :y2="segment.y"
+            stroke="#465A95"
             stroke-width="4"
             stroke-dasharray="7 4"
           />
@@ -356,6 +366,12 @@
 
           <g v-if="coDriverPath" class="pointer-events-none opacity-50">
             <path :d="coDriverPath" fill="none" stroke="#64748B" stroke-width="2" stroke-linejoin="round" />
+            <g v-for="segment in coDriverSpecialSegments" :key="`co-special-${segment.id}`">
+              <line :x1="segment.startX" :x2="segment.endX" :y1="segment.y" :y2="segment.y"
+                class="stroke-white dark:stroke-card" stroke-width="4" />
+              <line :x1="segment.startX" :x2="segment.endX" :y1="segment.y" :y2="segment.y"
+                stroke="#64748B" stroke-width="3" stroke-dasharray="7 4" />
+            </g>
             <circle
               v-for="point in coDriverPoints"
               :key="`co-${point.event.id}`"
@@ -568,7 +584,9 @@ const dutySegments = computed(() =>
         ? 'PC'
         : yardMoveCodes.has(point.event.eventCode)
           ? 'YM'
-          : null,
+          : waitingCodes.has(point.event.eventCode)
+            ? 'WAITING'
+            : null,
       labelX: (point.x + endX) / 2,
       showLabels: endX - point.x >= 42,
       durationLabel,
@@ -643,6 +661,16 @@ const coDriverPath = computed(() => {
   const lastDayEnd = Math.min(plotWidth.value, (Math.floor(points.at(-1)!.x / dayWidth.value) + 1) * dayWidth.value)
   return `${path} H ${lastDayEnd}`
 })
+const coDriverSpecialSegments = computed(() =>
+  coDriverPoints.value.flatMap((point, index) =>
+    personalUseCodes.has(point.event.eventCode) ||
+    yardMoveCodes.has(point.event.eventCode) ||
+    waitingCodes.has(point.event.eventCode)
+      ? [{ id: point.event.id, startX: point.x,
+        endX: coDriverPoints.value[index + 1]?.x ?? lastEndX.value, y: point.y }]
+      : []
+  )
+)
 const reassignedSegments = computed(() => {
   const reassigned = props.reassignedEvents
     .filter((event) => event.recordStatus === 'ACTIVE' && statusLabels.includes(event.eventCategory as (typeof statusLabels)[number]))
@@ -919,4 +947,5 @@ function zonedTimestamp(value: string, timeZone: string | null) {
 }
 const personalUseCodes = new Set(['DS_PC', 'DR_IND_PC'])
 const yardMoveCodes = new Set(['DS_YM', 'DR_IND_YM'])
+const waitingCodes = new Set(['DS_WT'])
 </script>

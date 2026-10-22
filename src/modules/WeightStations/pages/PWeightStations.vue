@@ -372,6 +372,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
+import type { MapType } from '@/components/custom/CMapTypeControl.vue'
 import { useWeightStationAddressReveal } from '../composables/useWeightStationAddressReveal'
 import { mapStyles } from '@/utils/maps'
 import { US_STATES } from '../usStates'
@@ -389,7 +390,7 @@ const stationMapRef = ref<any>(null)
 const mapSectionEl = ref<HTMLElement | null>(null)
 const mapContainerEl = ref<HTMLElement | null>(null)
 const mapCenter = ref({ lat: 39.5, lng: -98.35 })
-const mapTypeId = ref('roadmap')
+const mapTypeId = ref<MapType>('roadmap')
 const mapReady = ref(false)
 const isMapFullscreen = ref(false)
 const activeStationId = ref<string | null>(null)

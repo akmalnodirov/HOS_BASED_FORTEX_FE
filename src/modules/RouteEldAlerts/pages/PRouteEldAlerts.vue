@@ -42,6 +42,14 @@
         <Button
           variant="outline"
           class="h-10"
+          :disabled="isLoading || isRefreshing || readAllLoading || (!allCompanies && !requestCompanyId)"
+          @click="readAllAlerts"
+        >
+          <Check class="mr-2 h-4 w-4" />Read all
+        </Button>
+        <Button
+          variant="outline"
+          class="h-10"
           :disabled="isRefreshing || (!allCompanies && !requestCompanyId)"
           @click="refresh"
         >
@@ -411,6 +419,9 @@
               <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewSpeedMap(alert)">
                 <MapPinned class="h-4 w-4" />
               </Button>
+              <Button v-if="!alert.isRead" variant="ghost" size="icon" title="Mark read" aria-label="Mark read" :disabled="markingReadId === alert.id" @click="markSpeedRead(alert.id)">
+                <LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" /><Check v-else class="h-4 w-4" />
+              </Button>
             </td>
           </tr>
           <tr v-if="!isLoading && paginatedSpeedAlerts.length === 0">
@@ -446,32 +457,43 @@
             :key="alert.id"
             class="h-12 border-t border-border transition-colors hover:bg-muted/40"
           >
-            <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
-            <td class="px-3 font-medium">{{ alert.driverName }}</td>
-            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
-            <td class="whitespace-nowrap px-3">{{ formatLogDate(alert.logDate) }}</td>
-            <td class="px-3 font-medium text-red-600">{{ alert.violationCount }}</td>
-            <td class="max-w-96 px-3">
-              <div class="truncate" :title="alert.note || ''">{{ alert.note || '—' }}</div>
-            </td>
-            <td class="px-3">{{ alert.timeZone || '—' }}</td>
-            <td class="whitespace-nowrap px-3">{{ formatDate(alert.occurredAt) }}</td>
-            <td class="px-3">
-              <span
-                class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
-                :class="alert.isRead ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700'"
+          <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
+          <td class="px-3 font-medium max-w-36">{{ alert.driverName }}</td>
+          <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
+          <td class="whitespace-nowrap px-3">{{ formatLogDate(alert.logDate) }}</td>
+          <td class="px-3 font-medium text-red-600">{{ alert.violationCount }}</td>
+          <td class="max-w-56 px-3">
+            <div class="truncate" :title="alert.note || ''">{{ alert.note || '—' }}</div>
+          </td>
+          <td class="px-3">{{ alert.timeZone || '—' }}</td>
+          <td class="whitespace-nowrap px-3">{{ formatDate(alert.occurredAt) }}</td>
+          <td class="px-3">
+            <span v-if="!alert.isRead"
+              class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
+              :class="alert.isRead ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700'"
               >
-                {{ alert.isRead ? 'Read' : 'Unread' }}
-              </span>
-            </td>
-            <td class="px-3 text-center">
+              {{ 'Unread' }}
+            </span>
+            <span 
+              class="inline-flex rounded-full px-2 py-1 text-xs font-semibold" 
+              :class="alert.fixedAt ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'">
+              {{ alert.fixedAt ? 'Fixed' : 'Not fixed' }}
+            </span>
+          </td>
+          <td class="px-3 text-center">
+            <div class="flex items-center justify-center gap-1">
               <Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewViolationMap(alert)">
                 <MapPinned class="h-4 w-4" />
               </Button>
-            </td>
+              <Button v-if="!alert.isRead" variant="ghost" size="icon" title="Mark read" aria-label="Mark read" :disabled="markingReadId === alert.id" @click="markViolationRead(alert.id)">
+                <LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" />
+                <Check v-else class="h-4 w-4" />
+              </Button>
+            </div>
+          </td>
           </tr>
           <tr v-if="!isLoading && paginatedViolationAlerts.length === 0">
-            <td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">
+            <td :colspan="allCompanies ? 11 : 10" class="h-28 text-center text-muted-foreground">
               No violation notifications match the selected filters.
             </td>
           </tr>
@@ -565,6 +587,7 @@ import { hasPermission } from '@/router/permissions'
 import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
+import { useRouteEldNotificationCenter } from '../composables/useRouteEldNotificationCenter'
 import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const props = withDefaults(defineProps<{
@@ -587,8 +610,12 @@ const {
   resetAlerts,
   markStationRead,
   markAlprCameraRead,
+  markSpeedRead,
+  markViolationRead,
+  markAllRead,
 } = useRouteEldAlerts()
 const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
+const { refresh: refreshUnreadAlerts } = useRouteEldNotificationCenter()
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -599,6 +626,7 @@ const permittedTypes = computed<RouteEldAlertType[]>(() =>
 )
 const selectedCompanyId = computed(() => authStore.companyId)
 const requestCompanyId = ref<string | null>(null)
+const readAllLoading = ref(false)
 const selectedCompanyName = ref<string | null>(null)
 const companyError = ref<string | null>(null)
 const companyFilter = ref('all')
@@ -963,6 +991,18 @@ async function resolveSelectedCompany() {
 function refresh() {
   if (props.allCompanies || requestCompanyId.value)
     void fetchAlerts(alertType.value, requestCompanyId.value, true)
+}
+
+async function readAllAlerts() {
+  readAllLoading.value = true
+  try {
+    await markAllRead(alertType.value, requestCompanyId.value)
+    await refreshUnreadAlerts()
+  } catch {
+    companyError.value = 'Could not mark all alerts as read.'
+  } finally {
+    readAllLoading.value = false
+  }
 }
 
 function viewStationMap(alert: StationAlert) {

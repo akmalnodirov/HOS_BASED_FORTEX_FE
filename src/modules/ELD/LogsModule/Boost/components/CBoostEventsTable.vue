@@ -386,6 +386,10 @@
                     <span v-else class="truncate text-xs text-muted-foreground">{{
                       event.eventName || '-'
                     }}</span>
+                    <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                      :title="event.freezeSource === 'MANUAL' ? 'Frozen by a manual DOT inspection' : 'Frozen by Route ELD'">
+                      <LockKeyhole class="h-3 w-3" /> Frozen
+                    </span>
                     <TooltipProvider v-if="cameraEventIdSet.has(event.eventId)">
                       <Tooltip>
                         <TooltipTrigger as-child>
@@ -696,6 +700,7 @@ import {
   TriangleAlert,
   RotateCcw,
   LoaderCircle,
+  LockKeyhole,
 } from 'lucide-vue-next'
 import {
   Accordion,

@@ -71,7 +71,7 @@
             />
           </g>
 
-          <g v-for="line in chartData?.verticalLines ?? []" :key="verticalKey(line)">
+          <g v-for="line in visibleVerticalLines" :key="verticalKey(line)">
             <line
               :x1="line.x1"
               :x2="line.x2"
@@ -84,7 +84,7 @@
           </g>
 
           <g
-            v-for="event in graphEvents"
+            v-for="event in visibleGraphEvents"
             :key="event.eventId"
             class="cursor-pointer"
             @click="emit('select-event', event.value)"
@@ -106,7 +106,7 @@
               :y2="orderY(event.order)"
               stroke="currentColor"
               :stroke-width="selectedEventId === event.eventId ? 7 : 4"
-              :stroke-dasharray="event.order > 4 ? '8 5' : undefined"
+              :stroke-dasharray="event.order > 4 || event.value.providerEventCode === 'DS_WT' ? '8 5' : undefined"
               stroke-linecap="round"
               class="text-[#465A95] transition-[stroke-width] dark:text-[#7588BF]"
             />
@@ -153,6 +153,23 @@
             >
               <title>{{ segmentTitle(event.value) }}</title>
             </rect>
+          </g>
+
+          <g v-if="preview && preview.endX > preview.startX" class="pointer-events-none">
+            <line v-if="preview.previousOrder && preview.previousOrder !== preview.order"
+              :x1="preview.startX" :x2="preview.startX"
+              :y1="orderY(preview.previousOrder)" :y2="orderY(preview.order)"
+              class="stroke-primary/70" stroke-width="2" />
+            <line :key="previewEventCode"
+              :x1="preview.startX" :x2="preview.endX"
+              :y1="orderY(preview.order)" :y2="orderY(preview.order)"
+              class="insert-info-preview-line stroke-primary" stroke-width="5"
+              :stroke-dasharray="preview.dashed ? '8 5' : undefined" stroke-linecap="round" />
+            <line v-if="preview.nextOrder && preview.nextOrder !== preview.order"
+              :x1="preview.endX" :x2="preview.endX"
+              :y1="orderY(preview.order)" :y2="orderY(preview.nextOrder)"
+              class="stroke-primary/70" stroke-width="2" />
+            <title>Preview: {{ preview.label }} from the selected time until the next duty event</title>
           </g>
 
           <g
@@ -249,13 +266,39 @@
               pointer-events="all"
             />
           </g>
+          <g v-if="selectTimeEnabled">
+            <line
+              v-if="selectedTimeSeconds !== null"
+              :x1="selectedTimeSeconds / 86400 * graphWidth"
+              :x2="selectedTimeSeconds / 86400 * graphWidth"
+              :y1="chartTop"
+              :y2="chartBottom"
+              class="stroke-primary"
+              stroke-width="2"
+              stroke-dasharray="4 3"
+              pointer-events="none"
+            />
+            <rect
+              x="0"
+              :y="chartTop"
+              :width="graphWidth"
+              :height="chartBottom - chartTop"
+              fill="transparent"
+              class="cursor-ew-resize touch-none"
+              pointer-events="all"
+              @pointerdown="startGraphDrag"
+              @pointermove="moveGraphDrag"
+              @pointerup="endGraphDrag"
+              @pointercancel="endGraphDrag"
+            />
+          </g>
         </svg>
       </div>
 
       <div
         class="grid h-[206px] w-18 shrink-0 self-start grid-rows-4 pt-6 text-xs font-semibold text-foreground"
       >
-        <span v-for="value in totals" :key="value" class="flex items-center justify-center">
+        <span v-for="(value, index) in totals" :key="index" class="flex items-center justify-center">
           {{ value }}
         </span>
       </div>
@@ -263,8 +306,19 @@
   </div>
 </template>
 
+<style scoped>
+@keyframes insert-info-preview-appear {
+  from { opacity: 0.35; stroke-width: 2; }
+  to { opacity: 1; stroke-width: 5; }
+}
+.insert-info-preview-line { animation: insert-info-preview-appear 250ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .insert-info-preview-line { animation: none; }
+}
+</style>
+
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import type {
   DailySummaryResponse,
   GraphDuties,
@@ -290,6 +344,9 @@ const props = withDefaults(
     violations?: RouteEldCalculatedViolation[]
     rangeStart?: number
     rangeEnd?: number
+    selectTimeEnabled?: boolean
+    selectedTimeSeconds?: number | null
+    previewEventCode?: string | null
   }>(),
   {
     events: () => [],
@@ -299,12 +356,44 @@ const props = withDefaults(
     selectedEventId: null,
     rangeStart: 0,
     rangeEnd: 0,
+    selectTimeEnabled: false,
+    selectedTimeSeconds: null,
+    previewEventCode: null,
   }
 )
 
 const emit = defineEmits<{
   'select-event': [event: GraphDuties | RouteEldEvent | { eventId: string }]
+  'select-time': [seconds: number]
 }>()
+
+const draggingPointerId = ref<number | null>(null)
+
+function updateGraphTime(event: PointerEvent) {
+  const bounds = (event.currentTarget as SVGRectElement).getBoundingClientRect()
+  if (!bounds?.width) return
+  const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width))
+  emit('select-time', Math.min(86340, Math.round(ratio * 1440) * 60))
+}
+
+function startGraphDrag(event: PointerEvent) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  draggingPointerId.value = event.pointerId
+  ;(event.currentTarget as SVGRectElement).setPointerCapture(event.pointerId)
+  updateGraphTime(event)
+}
+
+function moveGraphDrag(event: PointerEvent) {
+  if (draggingPointerId.value === event.pointerId) updateGraphTime(event)
+}
+
+function endGraphDrag(event: PointerEvent) {
+  if (draggingPointerId.value !== event.pointerId) return
+  updateGraphTime(event)
+  draggingPointerId.value = null
+  const target = event.currentTarget as SVGRectElement
+  if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
+}
 
 const graphWidth = 1440
 const graphHeight = 240
@@ -326,6 +415,56 @@ const graphEvents = computed(() => {
       x2: value.x2,
     }))
   )
+})
+
+const previewDefinitions: Record<string, { order: number; label: string; dashed: boolean }> = {
+  DS_OFF: { order: 1, label: 'Off duty', dashed: false },
+  DS_SB: { order: 2, label: 'Sleeper', dashed: false },
+  DS_D: { order: 3, label: 'Driving', dashed: false },
+  DS_ON: { order: 4, label: 'On duty', dashed: false },
+  DR_IND_YM: { order: 5, label: 'Yard move', dashed: true },
+  DR_IND_PC: { order: 6, label: 'Personal conveyance', dashed: true },
+  DS_WT: { order: 1, label: 'Waiting', dashed: true },
+}
+
+const preview = computed(() => {
+  if (!props.selectTimeEnabled || props.selectedTimeSeconds === null || !props.previewEventCode) return null
+  const definition = previewDefinitions[props.previewEventCode]
+  if (!definition) return null
+  const startX = Math.max(0, Math.min(graphWidth, props.selectedTimeSeconds / 86400 * graphWidth))
+  const segments = graphEvents.value
+  const nextStart = segments.map(event => event.x1).filter(x => x > startX + 0.01).sort((a, b) => a - b)[0]
+  const lastEnd = Math.max(0, ...segments.map(event => event.x2))
+  const endX = nextStart ?? (lastEnd > startX ? lastEnd : graphWidth)
+  const current = segments.find(event => event.x1 < startX && event.x2 > startX)
+    ?? segments.filter(event => event.x2 <= startX).sort((a, b) => b.x2 - a.x2)[0]
+  const next = segments.find(event => Math.abs(event.x1 - endX) < 0.01)
+  return {
+    startX, endX, order: definition.order, label: definition.label, dashed: definition.dashed,
+    previousOrder: current?.order ?? null, nextOrder: next?.order ?? null,
+  }
+})
+
+const visibleGraphEvents = computed(() => {
+  if (!preview.value) return graphEvents.value
+  const { startX, endX } = preview.value
+  return graphEvents.value.flatMap(event => {
+    if (event.x1 >= startX && event.x1 < endX) return []
+    if (event.x1 < startX && event.x2 > startX) {
+      const fraction = (startX - event.x1) / (event.x2 - event.x1)
+      return [{ ...event, x2: startX, value: {
+        ...event.value, duration: event.value.duration * fraction,
+        distanceMiles: event.value.distanceMiles === undefined ? undefined : event.value.distanceMiles * fraction,
+      } }]
+    }
+    return [event]
+  })
+})
+
+const visibleVerticalLines = computed(() => {
+  const lines = props.chartData?.verticalLines ?? []
+  if (!preview.value) return lines
+  return lines.filter(line => line.x1 < preview.value!.startX || line.x1 > preview.value!.endX)
 })
 
 const eventX = (event: Pick<RouteEldEvent, 'timestamp'>) => {
@@ -382,12 +521,19 @@ const intermediateMarkers = computed(() => {
   return result.filter((marker) => marker.x >= 0 && marker.x <= graphWidth)
 })
 
-const totals = computed(() => [
-  hours(props.dailySummary?.dailyOffDuty),
-  hours(props.dailySummary?.dailySleeperBerth),
-  hours(props.dailySummary?.dailyDriving),
-  hours(props.dailySummary?.dailyOnDuty),
-])
+const totals = computed(() => {
+  const values = [props.dailySummary?.dailyOffDuty ?? 0, props.dailySummary?.dailySleeperBerth ?? 0,
+    props.dailySummary?.dailyDriving ?? 0, props.dailySummary?.dailyOnDuty ?? 0]
+  if (preview.value) {
+    const { startX, endX, order } = preview.value
+    for (const event of graphEvents.value) {
+      const overlap = Math.max(0, Math.min(event.x2, endX) - Math.max(event.x1, startX))
+      if (overlap > 0) values[event.order === 5 ? 3 : event.order === 6 ? 0 : event.order - 1] -= overlap / graphWidth * 86400
+    }
+    values[order === 5 ? 3 : order === 6 ? 0 : order - 1] += (endX - startX) / graphWidth * 86400
+  }
+  return values.map(value => hours(Math.max(0, value)))
+})
 
 function isIntermediate(event: RouteEldEvent) {
   const code = event.eventCode.toUpperCase()

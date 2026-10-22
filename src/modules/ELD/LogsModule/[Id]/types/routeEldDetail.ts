@@ -75,6 +75,8 @@ export interface RouteEldEvent {
   positioning: string | null
   driverLocationDescription: string | null
   dateToCertify: string | null
+  isFrozen?: boolean
+  freezeSource?: string | null
 }
 
 export interface RouteEldTrackingPoint {

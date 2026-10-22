@@ -1,4 +1,4 @@
-import { computed, ref, type Component, type ComputedRef } from 'vue'
+import { computed, ref, type Component, type Ref } from 'vue'
 import {
   BadgeCheck,
   CircleAlert,
@@ -49,9 +49,9 @@ export interface RouteEldLogGraphMarkerOption {
 }
 
 interface Dependencies {
-  events: ComputedRef<RouteEldEvent[]>
-  eventIssues: ComputedRef<RouteEldEventIssue[]>
-  violations: ComputedRef<RouteEldCalculatedViolation[]>
+  events: Readonly<Ref<RouteEldEvent[]>>
+  eventIssues: Readonly<Ref<RouteEldEventIssue[]>>
+  violations: Readonly<Ref<RouteEldCalculatedViolation[]>>
   graphWidth: number
   eventX: (event: Pick<RouteEldEvent, 'timestamp'>) => number
   formatEventTime: (event: RouteEldEvent) => string

@@ -92,7 +92,7 @@ const handleLogout = async () => {
   await authStore.logout()
 }
 
-const handleTabChange = (value) => {
+const handleTabChange = (value: unknown) => {
   if (typeof value === 'string' && value !== route.path) {
     router.push(value)
   }

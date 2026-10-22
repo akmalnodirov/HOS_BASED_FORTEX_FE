@@ -7,6 +7,7 @@ export interface GraphDuties {
   y1: number
   y2: number
   eventCode: number
+  providerEventCode?: string
   eventType: number
   eventTime: Dayjs | string
   duration: number

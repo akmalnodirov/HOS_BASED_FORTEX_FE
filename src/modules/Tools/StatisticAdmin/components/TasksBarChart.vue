@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
+import type { ApexOptions } from 'apexcharts'
 
 interface Props {
   tasks: { name: string; value: number }[]
@@ -56,7 +57,7 @@ const chartOptions = ref({
   dataLabels: {
     enabled: false,
   },
-})
+} satisfies ApexOptions)
 
 const series = ref([
   {

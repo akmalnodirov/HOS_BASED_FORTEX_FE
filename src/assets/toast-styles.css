@@ -103,3 +103,17 @@
 .dark [data-sonner-toast].route-eld-alert-toast [data-description] {
   color: #b6c0ce !important;
 }
+
+[data-sonner-toast].route-eld-violation-toast {
+  background: #fff1f2 !important;
+  border-color: #fda4af !important;
+  border-left: 4px solid #dc2626 !important;
+  box-shadow: 0 8px 24px rgba(185, 28, 28, 0.18) !important;
+}
+
+.dark [data-sonner-toast].route-eld-violation-toast {
+  background: #3b2026 !important;
+  border-color: #9f3a45 !important;
+  border-left-color: #f87171 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
