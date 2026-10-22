@@ -92,7 +92,6 @@ const statuses = [
   { code: 'DS_OFF', label: 'Off duty' }, { code: 'DS_SB', label: 'Sleeper' },
   { code: 'DS_D', label: 'Driving' }, { code: 'DS_ON', label: 'On duty' },
   { code: 'DR_IND_YM', label: 'YM' }, { code: 'DR_IND_PC', label: 'PC' },
-  { code: 'DS_WT' },
 ]
 const noteShortcuts = [
   'PTI', 'Scale', 'Hook', 'Delivery', 'Fuel', 'DOT', 'Repairs', 'Drop', 'Pick Up',
