@@ -4,7 +4,7 @@
       <h2 class="text-base font-semibold">Insert Info log</h2>
       <p class="mt-1 text-xs text-muted-foreground">Choose a status and start time. The graph previews the change until the next duty event.</p>
     </div>
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
       <Button v-for="status in statuses" :key="status.code" type="button"
         :variant="eventCode === status.code ? 'default' : 'outline'"
         class="w-full" @click="selectStatus(status.code)">{{ status.label }}</Button>
