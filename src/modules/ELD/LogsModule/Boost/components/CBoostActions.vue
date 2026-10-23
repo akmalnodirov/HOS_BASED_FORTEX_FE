@@ -1,12 +1,12 @@
 <template>
   <div class="sticky bottom-0 z-50 !mt-0 border-t border-border bg-background shadow-lg">
-    <div class="px-6 py-4">
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-2"></div>
+    <div class="overflow-x-auto px-6 py-4">
+      <div class="flex w-full min-w-max items-center justify-between gap-4 text-sm">
+        <div class="flex items-center gap-2">
+          <slot name="leading" />
+        </div>
 
-        <div class="flex items-center gap-2"></div>
-
-        <div class="flex items-center justify-end gap-2 flex-1">
+        <div class="flex items-center justify-end gap-2">
           <Button
             v-if="canDelete"
             variant="outline"
@@ -47,7 +47,7 @@
           </Button>
 
           <Label v-if="canEdit"
-            class="hover:bg-accent/50 flex items-start gap-3 rounded border py-2.5 px-3 has-aria-checked:border-[#666666] has-aria-checked:bg-white dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
+            class="hover:bg-accent/50 flex h-9.5 items-center gap-2 rounded border px-3 has-aria-checked:border-[#666666] has-aria-checked:bg-white dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
             :class="!canEdit ? 'cursor-not-allowed opacity-50' : ''"
           >
             <Checkbox
@@ -57,9 +57,7 @@
               @update:model-value="canEdit && $emit('dragdrop-change', $event === true)"
               class="border-[#DBDBDB] data-[state=checked]:border-black data-[state=checked]:bg-black data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
             />
-            <div class="grid gap-1.5 font-normal">
-              <p class="text-sm leading-none font-medium">Drag & Drop</p>
-            </div>
+            <span class="text-sm font-medium leading-none">Drag & Drop</span>
           </Label>
 
           <Button

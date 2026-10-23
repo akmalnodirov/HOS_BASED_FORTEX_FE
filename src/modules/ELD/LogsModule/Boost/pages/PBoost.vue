@@ -1,11 +1,9 @@
 <template>
   <div class="space-y-3 bg-muted/30 pb-0 pt-1">
     <CBoostToolbar
-      :free-times="boostFreeTimes"
+      class="sticky top-[65px] z-40 bg-background shadow-sm"
       :tabs="tabs"
       :selected-tab="selectedTab"
-      :error-count="errorCount"
-      :warning-count="warningCount"
       :session-status="session?.status"
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
@@ -15,13 +13,9 @@
       :allow-rollback="allowed('route_eld.log_details.rollback')"
       :actions-pending="store.isBusy"
       :submit-loading="sessionActionLoading"
-      :violations-count="violations.length"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
       @session-action="runSessionAction"
-      @error-warning-click="showErrorWarningModal = true"
-      @violation-click="showViolationModal = true"
-      @free-time-click="handleFreeTimeClick"
       @select-tab="selectTab"
       @remove-tab="removeTab"
       @ai-advice-click="aiAdviceOpen = true"
@@ -41,18 +35,28 @@
     </div>
 
     <section class="border-y border-border bg-background px-6 py-4">
-      <div class="mb-3 flex items-center justify-between gap-3">
+      <div class="mb-3 grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div>
           <h2 class="text-sm font-semibold">Duty-status graph</h2>
           <p class="text-xs text-muted-foreground">{{ sessionPeriodLabel }}</p>
         </div>
-        <div class="flex items-center gap-2">
-          <Button variant="outline" size="sm" @click="showGraph = !showGraph">
-            <ChevronUp v-if="showGraph" class="mr-2 h-4 w-4" />
-            <ChevronDown v-else class="mr-2 h-4 w-4" />
-            {{ showGraph ? 'Hide graph' : 'Show graph' }}
-          </Button>
-        </div>
+        <CBoostGraphHeaderControls
+          class="justify-self-center"
+            :free-times="boostFreeTimes"
+            :error-count="errorCount"
+            :warning-count="warningCount"
+            :violations-count="violations.length"
+            :actions-pending="store.isBusy"
+            :submit-loading="sessionActionLoading"
+            @error-warning-click="showErrorWarningModal = true"
+            @violation-click="showViolationModal = true"
+            @free-time-click="handleFreeTimeClick"
+        />
+        <Button variant="outline" size="sm" class="justify-self-end" @click="showGraph = !showGraph">
+          <ChevronUp v-if="showGraph" class="mr-2 h-4 w-4" />
+          <ChevronDown v-else class="mr-2 h-4 w-4" />
+          {{ showGraph ? 'Hide graph' : 'Show graph' }}
+        </Button>
       </div>
       <CBoostGraph
         v-show="showGraph"
@@ -143,73 +147,6 @@
     </section>
 
     <section class="border-y border-border bg-background pt-4">
-      <div class="flex items-center justify-between gap-3 px-6 pb-3">
-        <div>
-          <h2 class="text-sm font-semibold">HOS events</h2>
-        </div>
-        <div class="flex items-center gap-2">
-          <Button
-            v-if="allowed('route_eld.log_details.events.insert')"
-            variant="outline"
-            size="sm"
-            :disabled="!canEditSession"
-            @click="openInsertModal"
-          >
-            <Plus class="mr-2 h-4 w-4" /> Insert event
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="!hasAlprOrigin"
-            @click="alprRouteOpen = true"
-          >
-            <RouteIcon class="mr-2 h-4 w-4" /> ALPR route
-          </Button>
-          <Button variant="outline" size="sm" @click="showLocationFinderModal = true">
-            <MapPin class="mr-2 h-4 w-4" /> Location finder
-          </Button>
-          <Select v-model="changeFilter">
-            <SelectTrigger class="h-9 w-38 text-sm font-normal">
-              <SelectValue placeholder="All changes" />
-            </SelectTrigger>
-            <SelectContent :body-lock="false">
-              <SelectItem value="__all__">All changes</SelectItem>
-              <SelectItem v-for="option in changeFilterOptions" :key="option" :value="option">
-                {{ changeStatusLabel(option) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Select v-if="showCoDrivers && latestPeriodCoDriver" v-model="driverFilter">
-            <SelectTrigger class="h-9 w-44 text-sm font-normal">
-              <SelectValue placeholder="Driver" />
-            </SelectTrigger>
-            <SelectContent :body-lock="false">
-              <SelectItem value="__all__">All drivers</SelectItem>
-              <SelectItem value="__main__">{{ session?.driverName || 'Driver' }}</SelectItem>
-              <SelectItem value="__co_driver__">
-                {{ latestPeriodCoDriver?.name || 'Co-driver' }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Select v-model="statusFilter">
-            <SelectTrigger class="h-9 w-40 text-sm font-normal">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent :body-lock="false">
-              <SelectItem value="__all__">All statuses</SelectItem>
-              <SelectItem v-for="option in statusFilterOptions" :key="option" :value="option">
-                {{ eventStatusLabel(option) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <CBoostEventTableColumnSettings
-            :options="boostEventTableColumnOptions"
-            :model-value="eventTableColumnVisibility"
-            @toggle="setEventTableColumnVisible"
-            @show-all="showAllEventTableColumns"
-          />
-        </div>
-      </div>
       <CBoostEventsTable
         :events="filteredDailyEvents"
         :loading="isDailyEventsLoading || (showCoDrivers && (!coDriverRenderEnabled || isCoDriverLoading))"
@@ -268,7 +205,53 @@
       @multi-update-click="multiUpdateModalOpen = true"
       @normalize-click="openNormalize"
       @certification-click="openCertification"
-    />
+    >
+      <template #leading>
+        <CBoostEventTableColumnSettings
+          :options="boostEventTableColumnOptions"
+          :model-value="eventTableColumnVisibility"
+          @toggle="setEventTableColumnVisible"
+          @show-all="showAllEventTableColumns"
+        />
+        <Select v-model="statusFilter">
+          <SelectTrigger class="h-9 w-36 text-sm font-normal">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent :body-lock="false">
+            <SelectItem value="__all__">All statuses</SelectItem>
+            <SelectItem v-for="option in statusFilterOptions" :key="option" :value="option">{{ eventStatusLabel(option) }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select v-if="showCoDrivers && latestPeriodCoDriver" v-model="driverFilter">
+          <SelectTrigger class="h-9 w-40 text-sm font-normal">
+            <SelectValue placeholder="Driver" />
+          </SelectTrigger>
+          <SelectContent :body-lock="false">
+            <SelectItem value="__all__">All drivers</SelectItem>
+            <SelectItem value="__main__">{{ session?.driverName || 'Driver' }}</SelectItem>
+            <SelectItem value="__co_driver__">{{ latestPeriodCoDriver?.name || 'Co-driver' }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select v-model="changeFilter">
+          <SelectTrigger class="h-9 w-34 text-sm font-normal">
+            <SelectValue placeholder="All changes" />
+          </SelectTrigger>
+          <SelectContent :body-lock="false">
+            <SelectItem value="__all__">All changes</SelectItem>
+            <SelectItem v-for="option in changeFilterOptions" :key="option" :value="option">{{ changeStatusLabel(option) }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" class="h-9 text-sm" @click="showLocationFinderModal = true">
+          <MapPin class="mr-2 h-4 w-4" /> Location finder
+        </Button>
+        <Button variant="outline" size="sm" class="h-9 text-sm" :disabled="!hasAlprOrigin" @click="alprRouteOpen = true">
+          <RouteIcon class="mr-2 h-4 w-4" /> ALPR route
+        </Button>
+        <Button v-if="allowed('route_eld.log_details.events.insert')" variant="outline" size="sm" class="h-9 text-sm" :disabled="!canEditSession" @click="openInsertModal">
+          <Plus class="mr-2 h-4 w-4" /> Insert event
+        </Button>
+      </template>
+    </CBoostActions>
 
     <CBoostErrorWarningModal
       v-model:open="showErrorWarningModal"
@@ -534,6 +517,7 @@ import type {
   RouteEldSessionOperation,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
+import CBoostGraphHeaderControls from '../components/CBoostGraphHeaderControls.vue'
 import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
 import CBoostGraph from '../components/CBoostGraph.vue'
 import CBoostEventsTable from '../components/CBoostEventsTable.vue'
@@ -1297,6 +1281,16 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
           ? 'Session rolled back successfully'
           : 'Session submitted successfully'
       )
+    if (
+      result?.status === 'COMPLETED' &&
+      sessionOperationPercent.value === 100 &&
+      result.failed === 0 &&
+      !result.failures?.length &&
+      !result.error &&
+      !sessionOperationError.value
+    ) {
+      sessionProgressOpen.value = false
+    }
   } catch (error: any) {
     sessionOperationError.value = error?.response?.data?.message || error?.message || `Session ${action} failed`
     toast.error(sessionOperationError.value)

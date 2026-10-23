@@ -25,7 +25,17 @@
       <div class="w-full select-none" :style="{ minWidth: `${tableMinWidth}px` }">
         <div class="sticky top-0 z-30 mb-1 rounded-lg bg-[#f0f0f0] dark:bg-muted/50">
           <div class="boost-events-grid grid gap-3 px-4 py-3" :style="gridStyle">
-            <div class="flex items-center">
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                :aria-label="areAllGroupsExpanded ? 'Collapse all days' : 'Expand all days'"
+                :title="areAllGroupsExpanded ? 'Collapse all days' : 'Expand all days'"
+                :aria-expanded="areAllGroupsExpanded"
+                @click="toggleAllGroups"
+              >
+                <ChevronDown class="h-4 w-4 transition-transform duration-200" :class="areAllGroupsExpanded ? 'rotate-180' : ''" />
+              </button>
               <CCustomCheckbox :checked="isAllSelected" @update:checked="toggleSelectAll" />
             </div>
             <div class="flex items-center">
@@ -151,7 +161,10 @@
                 <AccordionTrigger
                   class="w-full cursor-pointer border-0 bg-[#f0f0f0] px-4 py-2.5 hover:no-underline dark:bg-muted"
                 >
-                  <div class="w-full flex items-center gap-12.5 min-w-0">
+                  <div
+                    class="grid w-full min-w-0 items-center gap-3 text-xs text-foreground"
+                    style="grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px 32px"
+                  >
                     <div class="flex items-center gap-2 shrink-0">
                       <ChevronDown
                         :class="[
@@ -167,9 +180,10 @@
                       </span>
                     </div>
 
-                    <div class="min-w-0 flex-1">
+                    <div class="col-span-4 min-w-0">
                       <div
-                        class="flex items-center justify-between flex-1 min-w-0 text-xs text-foreground"
+                        class="grid min-w-0 items-center gap-3 text-xs text-foreground"
+                        style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px"
                       >
                         <div class="flex items-center gap-1 min-w-0">
                           <svg
@@ -397,6 +411,14 @@
                       <ShieldAlert v-if="event.freezeSource === 'MANUAL'" class="h-3.5 w-3.5" />
                       <LockKeyhole v-else class="h-3 w-3" /> Frozen
                     </span>
+                    <span
+                      v-if="event.changeStatus === 'CO_DRIVER'"
+                      class="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700"
+                      :class="cameraEventIdSet.has(event.eventId) ? '' : 'ml-auto'"
+                      :title="`Co-driver: ${event.driverFullName}`"
+                    >
+                      Co-driver
+                    </span>
                     <TooltipProvider v-if="cameraEventIdSet.has(event.eventId)">
                       <Tooltip>
                         <TooltipTrigger as-child>
@@ -404,10 +426,11 @@
                             type="button"
                             variant="ghost"
                             size="icon"
-                            class="relative h-7 w-7 shrink-0 text-red-500 hover:text-red-600"
+                            class="ml-auto h-8 w-8 shrink-0 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60 dark:hover:text-red-300"
+                            aria-label="View event route and cameras"
                             @click.stop="emit('open-camera-route', event.eventId)"
                           >
-                            <Camera class="h-3.5 w-3.5" />
+                            <Camera class="h-5 w-5" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent
@@ -426,13 +449,6 @@
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <span
-                      v-if="event.changeStatus === 'CO_DRIVER'"
-                      class="ml-auto shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700"
-                      :title="`Co-driver: ${event.driverFullName}`"
-                    >
-                      Co-driver
-                    </span>
                   </div>
 
                   <div
@@ -840,6 +856,15 @@ const copyCellValue = async (value: string, label: string) => {
 }
 
 const openItems = ref<string[]>([])
+const areAllGroupsExpanded = computed(() => {
+  const groups = props.events ?? []
+  return groups.length > 0 && groups.every((group) => openItems.value.includes(`group-${group.date}`))
+})
+const toggleAllGroups = () => {
+  openItems.value = areAllGroupsExpanded.value
+    ? []
+    : (props.events ?? []).map((group) => `group-${group.date}`)
+}
 const isColumnVisible = (column: BoostEventTableColumn) => props.columnVisibility[column]
 const columnTracks: Array<[BoostEventTableColumn, string]> = [
   ['duration', 'minmax(115px,.62fr)'],
