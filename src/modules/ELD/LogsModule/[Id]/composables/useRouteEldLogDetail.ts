@@ -489,8 +489,8 @@ function mapEvent(
     totalVehicleMiles: event.odometerMiles,
     totalEngineHours: event.engineHours,
     recordOrigin: event.recordOrigin,
-    recordStatus: recordStatus(event.recordStatus),
-    recordStatusCode: event.recordStatus,
+    recordStatus: recordStatus(displayRecordStatus(event.recordStatus)),
+    recordStatusCode: displayRecordStatus(event.recordStatus),
     isFrozen: event.isFrozen,
     freezeSource: event.freezeSource,
     annotation: event.notes,
@@ -789,6 +789,11 @@ function recordOrigin(value?: string | null) {
   if (origin.includes('OTHER') || origin.includes('EDIT')) return 3
   if (origin.includes('EXEMPT')) return 4
   return 2
+}
+
+function displayRecordStatus(value?: string | null) {
+  const status = value?.trim().toUpperCase() ?? ''
+  return status === '' || status === 'NONE' || status === 'UNKNOWN' ? 'ACTIVE' : status
 }
 
 function recordStatus(value?: string | null) {

@@ -140,10 +140,11 @@
                 <td v-if="isColumnVisible('event')" class="px-4 py-3 text-center">
                   <div class="inline-flex items-center gap-1.5">
                   <span
-                    class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight whitespace-nowrap"
-                    :class="getEventBadgeClass(event.eventType, event.eventCode)"
+                    class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight"
+                    :class="[getEventBadgeClass(event.eventType, event.eventCode), event.eventType === 7 ? 'whitespace-normal' : 'whitespace-nowrap']"
+                    :title="event.eventType === 7 ? event.eventName : undefined"
                   >
-                    {{ event.eventType === 0 ? (event.eventName || 'Unknown event') : getEventLabelFromUtils(event.eventType, event.eventCode) }}
+                    {{ event.eventType === 0 || (event.eventType === 7 && event.eventName) ? (event.eventName || 'Unknown event') : getEventLabelFromUtils(event.eventType, event.eventCode) }}
                   </span>
                   <span v-if="event.isFrozen" class="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-1 text-[10px] font-semibold"
                     :class="event.freezeSource === 'MANUAL' ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400' : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300'"
