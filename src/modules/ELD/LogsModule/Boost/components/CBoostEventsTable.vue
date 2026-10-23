@@ -25,7 +25,8 @@
       <div class="w-full select-none" :style="{ minWidth: `${tableMinWidth}px` }">
         <div class="sticky top-0 z-30 mb-1 rounded-lg bg-[#f0f0f0] dark:bg-muted/50">
           <div class="boost-events-grid grid gap-3 px-4 py-3" :style="gridStyle">
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-2">
+              <CCustomCheckbox :checked="isAllSelected" @update:checked="toggleSelectAll" />
               <button
                 type="button"
                 class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -36,7 +37,6 @@
               >
                 <ChevronDown class="h-4 w-4 transition-transform duration-200" :class="areAllGroupsExpanded ? 'rotate-180' : ''" />
               </button>
-              <CCustomCheckbox :checked="isAllSelected" @update:checked="toggleSelectAll" />
             </div>
             <div class="flex items-center">
               <span
@@ -162,8 +162,7 @@
                   class="w-full cursor-pointer border-0 bg-[#f0f0f0] px-4 py-2.5 hover:no-underline dark:bg-muted"
                 >
                   <div
-                    class="grid w-full min-w-0 items-center gap-3 text-xs text-foreground"
-                    style="grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px 32px"
+                    class="grid w-full min-w-0 grid-cols-[140px_repeat(3,minmax(0,1fr))_90px_32px] items-center gap-3 text-xs text-foreground"
                   >
                     <div class="flex items-center gap-2 shrink-0">
                       <ChevronDown
@@ -180,11 +179,7 @@
                       </span>
                     </div>
 
-                    <div class="col-span-4 min-w-0">
-                      <div
-                        class="grid min-w-0 items-center gap-3 text-xs text-foreground"
-                        style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px"
-                      >
+                    <div class="col-span-4 grid min-w-0 grid-cols-subgrid items-center">
                         <div class="flex items-center gap-1 min-w-0">
                           <svg
                             width="16"
@@ -255,7 +250,6 @@
                         >
                           {{ group.dailyForm.isCertified ? 'Signed' : 'Unsigned' }}
                         </span>
-                      </div>
                     </div>
 
                     <Button
@@ -856,14 +850,18 @@ const copyCellValue = async (value: string, label: string) => {
 }
 
 const openItems = ref<string[]>([])
+const groupOpenState = new Map<string, boolean>()
+const expandNewGroups = ref(true)
 const areAllGroupsExpanded = computed(() => {
   const groups = props.events ?? []
   return groups.length > 0 && groups.every((group) => openItems.value.includes(`group-${group.date}`))
 })
 const toggleAllGroups = () => {
-  openItems.value = areAllGroupsExpanded.value
-    ? []
-    : (props.events ?? []).map((group) => `group-${group.date}`)
+  expandNewGroups.value = !areAllGroupsExpanded.value
+  groupOpenState.clear()
+  openItems.value = expandNewGroups.value
+    ? (props.events ?? []).map((group) => `group-${group.date}`)
+    : []
 }
 const isColumnVisible = (column: BoostEventTableColumn) => props.columnVisibility[column]
 const columnTracks: Array<[BoostEventTableColumn, string]> = [
@@ -882,7 +880,7 @@ const columnTracks: Array<[BoostEventTableColumn, string]> = [
 ]
 const gridStyle = computed(() => ({
   gridTemplateColumns: [
-    '40px',
+    '48px',
     'minmax(58px,.38fr)',
     'minmax(132px,.82fr)',
     ...columnTracks.flatMap(([column, track]) => {
@@ -908,7 +906,7 @@ const minimumColumnWidths: Record<BoostEventTableColumn, number> = {
 }
 const tableMinWidth = computed(
   () =>
-    40 +
+    48 +
     58 +
     132 +
     (props.showDriverColumn ? 152 : 0) +
@@ -922,10 +920,19 @@ const tableMinWidth = computed(
 watch(
   () => props.events,
   (groups) => {
-    openItems.value = groups.map((g) => `group-${g.date}`)
+    openItems.value = groups
+      .map((group) => `group-${group.date}`)
+      .filter((key) => groupOpenState.get(key) ?? expandNewGroups.value)
   },
   { immediate: true }
 )
+watch(openItems, (keys) => {
+  const open = new Set(keys)
+  for (const group of props.events ?? []) {
+    const key = `group-${group.date}`
+    groupOpenState.set(key, open.has(key))
+  }
+}, { flush: 'sync' })
 
 const isGroupOpen = (date: string) => openItems.value.includes(`group-${date}`)
 

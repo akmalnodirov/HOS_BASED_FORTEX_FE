@@ -35,22 +35,37 @@
     </div>
 
     <section class="border-y border-border bg-background px-6 py-4">
-      <div class="mb-3 grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <div>
-          <h2 class="text-sm font-semibold">Duty-status graph</h2>
-          <p class="text-xs text-muted-foreground">{{ sessionPeriodLabel }}</p>
+      <div class="mb-3 grid grid-cols-1 items-center gap-3 2xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#AF4B4B]/10"
+            :disabled="store.isBusy || sessionActionLoading || violations.length === 0"
+            @click="showViolationModal = true"
+          >
+            Violations
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#E74C3C]/10 disabled:opacity-40"
+            :disabled="errorCount + warningCount === 0 || store.isBusy || sessionActionLoading"
+            @click="showErrorWarningModal = true"
+          >
+            <span class="text-red-600">Errors: {{ errorCount }}</span>
+            <span class="text-muted-foreground">·</span>
+            <span class="text-amber-600">Warnings: {{ warningCount }}</span>
+          </Button>
+          <!-- <div class="min-w-0">
+            <h2 class="text-sm font-semibold">Duty-status graph</h2>
+            <p class="text-xs text-muted-foreground">{{ sessionPeriodLabel }}</p>
+          </div> -->
         </div>
         <CBoostGraphHeaderControls
           class="justify-self-center"
-            :free-times="boostFreeTimes"
-            :error-count="errorCount"
-            :warning-count="warningCount"
-            :violations-count="violations.length"
-            :actions-pending="store.isBusy"
-            :submit-loading="sessionActionLoading"
-            @error-warning-click="showErrorWarningModal = true"
-            @violation-click="showViolationModal = true"
-            @free-time-click="handleFreeTimeClick"
+          :free-times="boostFreeTimes"
+          @free-time-click="handleFreeTimeClick"
         />
         <Button variant="outline" size="sm" class="justify-self-end" @click="showGraph = !showGraph">
           <ChevronUp v-if="showGraph" class="mr-2 h-4 w-4" />
@@ -146,7 +161,7 @@
       </CBoostGraph>
     </section>
 
-    <section class="border-y border-border bg-background pt-4">
+    <section class="border-y border-border bg-background">
       <CBoostEventsTable
         :events="filteredDailyEvents"
         :loading="isDailyEventsLoading || (showCoDrivers && (!coDriverRenderEnabled || isCoDriverLoading))"
@@ -1263,7 +1278,8 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
       sessionActionStarting.value = false
       sessionOperation.value = { ...operation, failures: [...(operation.failures ?? [])] }
     })
-    if (result) sessionOperation.value = result
+    if (!result) throw new Error(`Session ${action} did not start`)
+    sessionOperation.value = result
     if (
       store.session?.id === sessionId &&
       store.activeTabId &&
@@ -1271,24 +1287,20 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
     ) {
       await router.replace({ query: { ...route.query, tabId: store.activeTabId } })
     }
-    if (result?.failed)
+    const failedCount = Math.max(result.failed, result.failures?.length ?? 0)
+    if (result.error) sessionOperationError.value = result.error
+    if (failedCount || result.error) {
       toast.warning(
-        `${result.failed} event${result.failed === 1 ? '' : 's'} could not be processed`
+        failedCount
+          ? `${failedCount} event${failedCount === 1 ? '' : 's'} could not be processed`
+          : result.error || 'Session operation finished with issues'
       )
-    else
+    } else {
       toast.success(
         action === 'rollback'
           ? 'Session rolled back successfully'
           : 'Session submitted successfully'
       )
-    if (
-      result?.status === 'COMPLETED' &&
-      sessionOperationPercent.value === 100 &&
-      result.failed === 0 &&
-      !result.failures?.length &&
-      !result.error &&
-      !sessionOperationError.value
-    ) {
       sessionProgressOpen.value = false
     }
   } catch (error: any) {

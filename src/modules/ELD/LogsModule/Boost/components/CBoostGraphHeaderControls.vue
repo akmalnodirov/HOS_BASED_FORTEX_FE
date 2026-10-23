@@ -1,17 +1,5 @@
 <template>
   <div class="flex min-w-0 flex-wrap items-center justify-center gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#E74C3C]/10 disabled:opacity-40"
-      :disabled="errorCount + warningCount === 0 || actionsPending || submitLoading"
-      @click="$emit('error-warning-click')"
-    >
-      <span class="text-red-600">Errors: {{ errorCount }}</span>
-      <span class="text-muted-foreground">·</span>
-      <span class="text-amber-600">Warnings: {{ warningCount }}</span>
-    </Button>
-
     <div v-if="freeTimesFiltered.length" class="flex min-w-0 items-center gap-1">
       <Button variant="ghost" size="sm" class="h-8 w-8 shrink-0 p-0" aria-label="Previous free times" @click="scrollLeft">
         <ChevronLeft class="h-4 w-4" />
@@ -33,44 +21,22 @@
         <ChevronRight class="h-4 w-4" />
       </Button>
     </div>
-
-    <Button
-      variant="outline"
-      size="sm"
-      class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#AF4B4B]/10"
-      :disabled="actionsPending || submitLoading || violationsCount === 0"
-      @click="$emit('violation-click')"
-    >
-      Violations
-    </Button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 
 const props = withDefaults(defineProps<{
   freeTimes?: BoostFreeTime[]
-  errorCount?: number
-  warningCount?: number
-  violationsCount?: number
-  actionsPending?: boolean
-  submitLoading?: boolean
 }>(), {
   freeTimes: () => [],
-  errorCount: 0,
-  warningCount: 0,
-  violationsCount: 0,
-  actionsPending: false,
-  submitLoading: false,
 })
 
 defineEmits<{
-  (e: 'error-warning-click'): void
-  (e: 'violation-click'): void
   (e: 'free-time-click', freeTime: BoostFreeTime): void
 }>()
 
@@ -79,6 +45,8 @@ const freeTimesContainer = ref<HTMLDivElement | null>(null)
 const freeTimesContent = ref<HTMLDivElement | null>(null)
 const scrollOffset = ref(0)
 const scrollStep = 100
+
+watch(() => props.freeTimes, () => { scrollOffset.value = 0 }, { deep: true })
 
 const scrollLeft = () => { scrollOffset.value = Math.max(0, scrollOffset.value - scrollStep) }
 const scrollRight = () => {

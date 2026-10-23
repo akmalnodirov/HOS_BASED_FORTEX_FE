@@ -1,12 +1,12 @@
 <template>
   <div class="sticky bottom-0 z-50 !mt-0 border-t border-border bg-background shadow-lg">
-    <div class="overflow-x-auto px-6 py-4">
-      <div class="flex w-full min-w-max items-center justify-between gap-4 text-sm">
-        <div class="flex items-center gap-2">
+    <div class="px-6 py-3">
+      <div class="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <slot name="leading" />
         </div>
 
-        <div class="flex items-center justify-end gap-2">
+        <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <Button
             v-if="canDelete"
             variant="outline"
