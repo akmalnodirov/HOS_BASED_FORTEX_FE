@@ -230,6 +230,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
   static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
+  static readonly ROUTE_ELD_LOG_DETAILS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/details`
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`

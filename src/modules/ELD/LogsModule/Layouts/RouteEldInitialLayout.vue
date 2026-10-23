@@ -8,7 +8,7 @@
       <CLogHeader
         :driver-info="headerDriverInfo"
         :co-driver-name="headerCoDriverName"
-        :daily-summary="isBoostPage ? null : dailySummary"
+        :daily-summary="headerDailySummary"
         :daily-time-remainder="headerTimeRemainder"
         class="mb-4"
       >
@@ -79,7 +79,7 @@ const {
   schedule: boostSchedule,
 } = storeToRefs(boostWorkspaceStore)
 const {
-  dailySummary,
+  headerDailySummary,
   weeklyViolations,
   dailyTimeRemainder,
   driverInfo,
