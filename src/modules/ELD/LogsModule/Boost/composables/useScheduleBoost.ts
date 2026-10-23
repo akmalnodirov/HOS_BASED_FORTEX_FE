@@ -118,6 +118,10 @@ const NUMERIC_TO_EVENT_CODE: Record<string, string> = {
   '6:2': 'ENG_UP_REDUCED',
   '6:3': 'ENG_DOWN_NORMAL',
   '6:4': 'ENG_DOWN_REDUCED',
+  '7:1': 'MALF_LOGGED',
+  '7:2': 'MALF_CLEARED',
+  '7:3': 'DIAG_LOGGED',
+  '7:4': 'DIAG_CLEARED',
 }
 
 const ROUTE_ELD_TIME_ZONES: Record<string, string> = {
@@ -345,11 +349,11 @@ function normalizedStatus(value?: string | null) {
 
 function displayStatus(value?: string | null) {
   const status = normalizedStatus(value)
-  return status === 'NONE' ? 'ACTIVE' : status
+  return status === 'NONE' || status === 'UNKNOWN' || status === '' ? 'ACTIVE' : status
 }
 
 function asStatus(value?: string | null) {
-  return normalizedStatus(value) === 'ACTIVE' ? 1 : 2
+  return displayStatus(value) === 'ACTIVE' ? 1 : 2
 }
 
 function numericEvent(event: RouteEldHosEvent): [number, number] {

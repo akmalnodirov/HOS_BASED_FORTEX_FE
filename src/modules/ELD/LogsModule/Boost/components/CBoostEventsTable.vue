@@ -379,8 +379,13 @@
                         :style="{
                           color: findEventByTypeAndCode(event.eventType, event.eventCode)!.color,
                         }"
+                        :title="event.eventType === 7 ? event.eventName : undefined"
                       >
-                        {{ findEventByTypeAndCode(event.eventType, event.eventCode)!.label }}
+                        {{
+                          event.eventType === 7 && event.eventName
+                            ? event.eventName
+                            : findEventByTypeAndCode(event.eventType, event.eventCode)!.label
+                        }}
                       </span>
                     </template>
                     <span v-else class="truncate text-xs text-muted-foreground">{{
