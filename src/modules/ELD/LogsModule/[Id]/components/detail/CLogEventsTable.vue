@@ -138,7 +138,10 @@
                 </td>
                 <td class="px-4 py-3 text-center">{{ formatEventTime(event) }}</td>
                 <td v-if="isColumnVisible('event')" class="px-4 py-3 text-center">
-                  <div class="inline-flex items-center gap-1.5">
+                  <div
+                    class="relative flex w-full min-w-0 items-center justify-center gap-1.5"
+                    :class="cameraEventIds.includes(String(event.id || event.eventId)) ? 'px-8' : ''"
+                  >
                   <span
                     class="px-3 py-1 rounded text-[10px] font-bold text-center uppercase tracking-tight"
                     :class="[getEventBadgeClass(event.eventType, event.eventCode), event.eventType === 7 ? 'whitespace-normal' : 'whitespace-nowrap']"
@@ -153,10 +156,10 @@
                     <LockKeyhole v-else class="h-3 w-3" /> Frozen
                   </span>
                   <button v-if="cameraEventIds.includes(String(event.id || event.eventId))"
-                    type="button" class="rounded p-1 text-destructive hover:bg-destructive/10"
+                    type="button" class="absolute right-0 shrink-0 rounded bg-red-50 p-1.5 text-red-600 hover:bg-red-100 hover:text-red-700 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60 dark:hover:text-red-300"
                     title="View event route and cameras" aria-label="View event route and cameras"
                     @click.stop="emit('open-camera-route', String(event.id || event.eventId))">
-                    <Camera class="h-3.5 w-3.5" />
+                    <Camera class="h-5 w-5" />
                   </button>
                   </div>
                 </td>

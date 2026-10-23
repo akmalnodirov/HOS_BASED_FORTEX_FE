@@ -69,61 +69,6 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-between bg-white dark:bg-card w-full py-4 px-6">
-      <Button
-        variant="outline"
-        size="sm"
-        class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#E74C3C]/10 hover:text-[#AF4B4B/20] disabled:opacity-40 disabled:cursor-not-allowed"
-        :disabled="errorCount + warningCount === 0 || actionsPending || submitLoading"
-        @click="$emit('error-warning-click')"
-      >
-        <span class="text-red-600">Errors: {{ errorCount }}</span>
-        <span class="text-muted-foreground">·</span>
-        <span class="text-amber-600">Warnings: {{ warningCount }}</span>
-      </Button>
-
-      <div v-if="freeTimesFiltered.length" class="flex items-center gap-1">
-        <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="scrollLeft">
-          <ChevronLeft class="w-4 h-4" />
-        </Button>
-
-        <div
-          ref="freeTimesContainer"
-          class="max-w-112.5 overflow-hidden"
-          @wheel.prevent="scrollFreeTimesWithWheel"
-        >
-          <div
-            ref="freeTimesContent"
-            class="flex items-center gap-2 transition-transform duration-300"
-            :style="{ transform: `translateX(-${scrollOffset}px)` }"
-          >
-            <button
-              v-for="(freeTime, index) in freeTimesFiltered"
-              :key="freeTime.eventId || index"
-              class="shrink-0 px-4 py-1.5 bg-[#f8f9fd] dark:bg-muted border-[#d6e1ff] dark:border-border border rounded-md text-xs font-medium text-[#090909] dark:text-foreground hover:bg-[#e8ecfa] dark:hover:bg-muted/80 hover:border-[#b8c8ff] dark:hover:border-border transition-colors cursor-pointer"
-              @click="handleFreeTimeClick(freeTime)"
-            >
-              {{ formatHHMM(freeTime.freeDurationInSeconds) }}
-            </button>
-          </div>
-        </div>
-
-        <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="scrollRight">
-          <ChevronRight class="w-4 h-4" />
-        </Button>
-      </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        class="h-9 px-4 text-xs border-[#AF4B4B] text-[#AF4B4B] hover:bg-[#AF4B4B]/10 hover:text-[#AF4B4B/20]"
-        :disabled="actionsPending || submitLoading || violationsCount == 0"
-        @click="$emit('violation-click')"
-      >
-        <span>Violations</span>
-      </Button>
-    </div>
-
     <Dialog v-model:open="showDeleteConfirm">
       <DialogContent class="sm:max-w-[360px]">
         <DialogHeader>
@@ -143,7 +88,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Plus, ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-vue-next'
+import { Plus, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -153,7 +98,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { BoostFreeTime } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
 import type { TabResponse } from '../types/boost.ts'
 
 const props = withDefaults(
@@ -168,12 +112,8 @@ const props = withDefaults(
     canManageTabs?: boolean
     allowSubmit?: boolean
     allowRollback?: boolean
-    freeTimes?: BoostFreeTime[]
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
-    errorCount?: number
-    warningCount?: number
-    violationsCount?: number
   }>(),
   {
     submitDisabled: false,
@@ -186,24 +126,15 @@ const props = withDefaults(
     canManageTabs: false,
     allowSubmit: false,
     allowRollback: false,
-    freeTimes: () => [],
     tabs: () => [],
     selectedTab: null,
-    errorCount: 0,
-    warningCount: 0,
-    violationsCount: 0
   }
 )
-
-const freeTimesFiltered = computed(() => props.freeTimes?.filter((e) => e.freeDurationInSeconds >= 3600))
 
 const emit = defineEmits<{
   (e: 'initial-click'): void
   (e: 'new-click'): void
   (e: 'session-action', action: 'submit' | 'rollback'): void
-  (e: 'error-warning-click'): void
-  (e: 'violation-click'): void
-  (e: 'free-time-click', freeTime: BoostFreeTime): void
   (e: 'select-tab', tab: TabResponse): void
   (e: 'remove-tab', tabId: string): void
   (e: 'ai-advice-click'): void
@@ -225,10 +156,6 @@ const primarySessionActionLabel = computed(() => {
   return ''
 })
 
-const handleFreeTimeClick = (freeTime: BoostFreeTime) => {
-  emit('free-time-click', freeTime)
-}
-
 const showDeleteConfirm = ref(false)
 const pendingRemoveTabId = ref<string | null>(null)
 
@@ -247,39 +174,4 @@ const confirmRemoveTab = () => {
   pendingRemoveTabId.value = null
 }
 
-const freeTimesContainer = ref<HTMLDivElement | null>(null)
-const freeTimesContent = ref<HTMLDivElement | null>(null)
-const scrollOffset = ref(0)
-const scrollStep = 100
-
-const scrollLeft = () => {
-  scrollOffset.value = Math.max(0, scrollOffset.value - scrollStep)
-}
-
-const scrollRight = () => {
-  if (freeTimesContainer.value && freeTimesContent.value) {
-    const containerWidth = freeTimesContainer.value.clientWidth
-    const contentWidth = freeTimesContent.value.scrollWidth
-    const maxScroll = Math.max(0, contentWidth - containerWidth)
-    scrollOffset.value = Math.min(maxScroll, scrollOffset.value + scrollStep)
-  }
-}
-
-const scrollFreeTimesWithWheel = (event: WheelEvent) => {
-  if (!freeTimesContainer.value || !freeTimesContent.value) return
-  const maxScroll = Math.max(
-    0,
-    freeTimesContent.value.scrollWidth - freeTimesContainer.value.clientWidth
-  )
-  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
-  scrollOffset.value = Math.max(0, Math.min(maxScroll, scrollOffset.value + delta))
-}
-
-const formatHHMM = (seconds: number): string => {
-  const s = Math.max(0, seconds)
-  const totalMinutes = Math.floor(s / 60)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`
-}
 </script>

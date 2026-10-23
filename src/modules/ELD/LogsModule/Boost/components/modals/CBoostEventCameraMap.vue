@@ -46,6 +46,7 @@
         :options="{
           position: { lat: cluster.latitude, lng: cluster.longitude },
           anchorPoint: 'CENTER',
+          zIndex: 100,
         }"
       >
         <button
@@ -66,6 +67,7 @@
         :options="{
           position: { lat: camera.latitude, lng: camera.longitude },
           anchorPoint: 'CENTER',
+          zIndex: 1000,
         }"
       >
         <button
@@ -88,12 +90,12 @@
               v-if="camera.bearings.length || camera.bearingConfidence"
               cx="20"
               cy="20"
-              r="6.5"
+              r="10"
               fill="none"
               stroke="#F59E0B"
               stroke-width="2.5"
             />
-            <circle cx="20" cy="20" r="4.5" fill="#E5484D" stroke="#FFFFFF" stroke-width="1.5" />
+            <circle cx="20" cy="20" r="7" fill="#E5484D" stroke="#FFFFFF" stroke-width="2" />
           </svg>
         </button>
       </CustomMarker>
