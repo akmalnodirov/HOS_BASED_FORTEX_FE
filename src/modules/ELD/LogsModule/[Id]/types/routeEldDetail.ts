@@ -27,6 +27,15 @@ export interface RouteEldHosViolation {
   startTime: string | null
 }
 
+export interface RouteEldDailyLogSummary {
+  logDate: string
+  isSigned: boolean
+  timeDrivenMilliseconds: number
+  timeOnDutyMilliseconds: number
+  violationCount: number
+  violations: RouteEldHosViolation[]
+}
+
 export interface RouteEldProfileForm {
   id: string
   logDate: string
@@ -126,4 +135,5 @@ export interface RouteEldLogDetail {
   trackingPoints: RouteEldTrackingPoint[]
   violations: RouteEldCalculatedViolation[]
   eventIssues: RouteEldEventIssue[]
+  dailySummary: RouteEldDailyLogSummary | null
 }

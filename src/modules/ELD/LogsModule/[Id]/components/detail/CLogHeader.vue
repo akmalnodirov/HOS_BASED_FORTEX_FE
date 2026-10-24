@@ -214,6 +214,7 @@ interface DriverInfo {
   timeZone?: string | null
   connectionStatus?: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONNECTED' | string
   signaturePath?: string
+  isSigned?: boolean
   workedDurationInSeconds?: number
   lastEventCode?: number | null
   lastEventType?: number | null
@@ -242,7 +243,7 @@ const props = defineProps<{
 const { isDarkMode } = useDarkMode()
 const route = useRoute()
 const isBoostLayout = computed(() => route.name === 'ELDBoost')
-const hasSignature = computed(() => Boolean(props.driverInfo?.signaturePath?.trim()))
+const hasSignature = computed(() => props.driverInfo?.isSigned ?? Boolean(props.driverInfo?.signaturePath?.trim()))
 
 function formatViolationTime(value: string) {
   const timestamp = new Date(value)

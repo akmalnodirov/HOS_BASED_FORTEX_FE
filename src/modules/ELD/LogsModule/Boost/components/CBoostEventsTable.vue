@@ -289,6 +289,7 @@
                   :style="gridStyle"
                   :class="[
                     event.actionState === 4 ? 'opacity-55' : '',
+                    event.ownerDriverId !== activeDriverId ? 'opacity-60' : '',
                     highlightedEventId === event.eventId
                       ? '!bg-emerald-50 ring-2 ring-inset ring-emerald-500 dark:!bg-emerald-950/35'
                       : selectedRowIds.includes(event.eventId)
@@ -303,7 +304,9 @@
                 >
                   <div class="flex items-center" @click.stop>
                     <CCustomCheckbox
+                      v-if="isActiveDriverEvent(event)"
                       :checked="selectedRowIds.includes(event.eventId)"
+                      :disabled="event.actionState === 4 || event.actionState === 8"
                       @update:checked="toggleRow(event.eventId)"
                     />
                   </div>
@@ -405,14 +408,6 @@
                       <ShieldAlert v-if="event.freezeSource === 'MANUAL'" class="h-3.5 w-3.5" />
                       <LockKeyhole v-else class="h-3 w-3" /> Frozen
                     </span>
-                    <span
-                      v-if="event.changeStatus === 'CO_DRIVER'"
-                      class="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700"
-                      :class="cameraEventIdSet.has(event.eventId) ? '' : 'ml-auto'"
-                      :title="`Co-driver: ${event.driverFullName}`"
-                    >
-                      Co-driver
-                    </span>
                     <TooltipProvider v-if="cameraEventIdSet.has(event.eventId)">
                       <Tooltip>
                         <TooltipTrigger as-child>
@@ -447,7 +442,8 @@
 
                   <div
                     v-if="showDriverColumn"
-                    class="min-w-0 truncate text-xs text-foreground"
+                    class="min-w-0 truncate text-xs font-semibold"
+                    :class="event.ownerDriverId === mainDriverId ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'"
                     :title="event.driverFullName"
                   >
                     {{ event.driverFullName || '—' }}
@@ -624,7 +620,7 @@
                     @click.stop
                   >
                     <Button
-                      v-if="canEditEvents"
+                      v-if="canEditEvents && isActiveDriverEvent(event)"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -634,7 +630,7 @@
                       <Pencil class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canInsertEvents"
+                      v-if="canInsertEvents && isActiveDriverEvent(event)"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -644,7 +640,7 @@
                       <Copy class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canEditEvents && event.changeStatus && event.changeStatus.toUpperCase() !== 'UNCHANGED'"
+                      v-if="canEditEvents && isActiveDriverEvent(event) && event.changeStatus && event.changeStatus.toUpperCase() !== 'UNCHANGED'"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-blue-600"
@@ -655,7 +651,7 @@
                       <Undo2 class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="!canEditEvents || event.actionState === 8"
+                      v-if="!isActiveDriverEvent(event) || !canEditEvents || event.actionState === 8"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -665,7 +661,7 @@
                       <Eye class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canRetryDelivery && (event.deliveryStatus === 'SUBMISSION_PENDING' || event.deliveryStatus === 'ROLLBACK_PENDING' || (event.deliveryStatus === 'SUBMITTED' && event.eventType === 4 && ['CHANGED', 'INSERTED'].includes(event.changeStatus?.toUpperCase() ?? '')))"
+                      v-if="canRetryDelivery && isActiveDriverEvent(event) && (event.deliveryStatus === 'SUBMISSION_PENDING' || event.deliveryStatus === 'ROLLBACK_PENDING' || (event.deliveryStatus === 'SUBMITTED' && event.eventType === 4 && ['CHANGED', 'INSERTED'].includes(event.changeStatus?.toUpperCase() ?? '')))"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-blue-600"
@@ -677,7 +673,7 @@
                       <RotateCcw v-else class="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      v-if="canDeleteEvents"
+                      v-if="canDeleteEvents && isActiveDriverEvent(event)"
                       variant="ghost"
                       size="icon"
                       class="h-7 w-7 text-[#666666] dark:text-muted-foreground"
@@ -773,6 +769,8 @@ interface Props {
   highlightedEventId?: string
   selectedRowIds?: string[]
   showDriverColumn?: boolean
+  mainDriverId?: string
+  activeDriverId?: string
   canEditProfile?: boolean
   canEditEvents?: boolean
   canInsertEvents?: boolean
@@ -964,6 +962,9 @@ watch(
 
 const allEvents = computed<BoostUiEventRow[]>(() => props.events.flatMap((g) => g.events))
 
+const isActiveDriverEvent = (event: BoostUiEventRow) =>
+  !props.activeDriverId || !event.ownerDriverId || event.ownerDriverId === props.activeDriverId
+
 const selectableEvents = computed(() =>
   allEvents.value.filter((event) => event.actionState !== 4 && event.actionState !== 8)
 )
@@ -995,7 +996,7 @@ const { setup: setupDragDrop, cleanup: cleanupDragDrop, suppressClick } = useDra
 )
 
 function draggableAttrs(column: DragColumnType, event: BoostUiEventRow) {
-  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.changeStatus === 'CO_DRIVER') return {}
+  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.actionState === 8) return {}
   const hasValue = column === 'location'
     ? hasDraggableLocation(event)
     : column === 'odometer'
