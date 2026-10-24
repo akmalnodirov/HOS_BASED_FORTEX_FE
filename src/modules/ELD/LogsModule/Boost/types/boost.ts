@@ -472,6 +472,9 @@ export interface RouteEldEventSession {
   isRollbackBlocked: boolean
   pendingSubmissionCount: number
   pendingRollbackCount: number
+  coDriverId?: string | null
+  coDriverDisableSleeperBerth?: boolean | null
+  coDriverName?: string | null
 }
 
 export interface RouteEldSessionOperationFailure {
@@ -571,6 +574,7 @@ export interface RouteEldWorkspaceEvent {
   isRolledBack: boolean
   isDeleted: boolean
   isInserted: boolean
+  ownerDriverId?: string | null
 }
 
 export interface RouteEldCalculatedClock {
@@ -618,19 +622,14 @@ export interface RouteEldWorkspace {
   canEdit: boolean
   events: RouteEldWorkspaceEvent[]
   calculations: RouteEldScheduleCalculations
+  calculationsByDriver?: Record<string, RouteEldScheduleCalculations>
+  freezePeriodsByDriver?: Record<string, Array<Record<string, unknown>>>
   reassignedEvents: Array<{
     event: RouteEldHosEvent
     type: string
     toDriverName: string
   }>
   freezePeriods: Array<Record<string, unknown>>
-}
-
-export interface RouteEldCoDriverSchedule {
-  externalDriverId: string
-  fromDate: string
-  toDate: string
-  events: RouteEldHosEvent[]
 }
 
 export interface RouteEldAlprOrigin {
@@ -711,6 +710,7 @@ export interface RouteEldEventCameraPresence {
 }
 
 export interface RouteEldProfileForm {
+  ownerDriverId?: string | null
   logDate: string
   coDriverId?: string | null
   coDriverName?: string | null

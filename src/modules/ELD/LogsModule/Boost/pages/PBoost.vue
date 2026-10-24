@@ -13,6 +13,12 @@
       :allow-rollback="allowed('route_eld.log_details.rollback')"
       :actions-pending="store.isBusy"
       :submit-loading="sessionActionLoading"
+      :driver-id="activeDriverId"
+      :main-driver-id="session?.driverId"
+      :main-driver-name="session?.driverName"
+      :co-driver-id="session?.coDriverId"
+      :co-driver-name="session?.coDriverName"
+      @update:driver-id="selectedDriverId = $event"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
       @session-action="runSessionAction"
@@ -84,11 +90,11 @@
         :selected-event-id="selectedEventId"
         :boost-selected-ids="rangeBoostSelectedIds"
         :free-times="displayedFreeTimes"
-        :violations="workspace?.calculations.violations ?? []"
-        :event-issues="workspace?.calculations.eventIssues ?? []"
+        :violations="activeCalculations?.violations ?? []"
+        :event-issues="activeCalculations?.eventIssues ?? []"
         :reassigned-events="workspace?.reassignedEvents.map((item) => item.event) ?? []"
         :co-driver-events="coDriverRenderEnabled ? coDriverGraphEvents : []"
-        :co-driver-name="latestPeriodCoDriver?.name"
+        :co-driver-name="activeDriverId === session?.driverId ? session?.coDriverName : session?.driverName"
         :is-graph-loading="isGraphLoading"
         :is-co-driver-loading="showCoDrivers && (isCoDriverLoading || !coDriverRenderEnabled)"
         @selected-event="onGraphEventSelect"
@@ -96,12 +102,12 @@
       >
         <template #graph-actions>
           <button
-            v-if="latestPeriodCoDriver"
+            v-if="session?.coDriverId"
             type="button"
             role="switch"
             :aria-checked="showCoDrivers"
             class="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium"
-            title="Show co-driver logs as read-only events"
+            title="Show both drivers' logs"
             @click="showCoDrivers = !showCoDrivers"
           >
             <span
@@ -113,10 +119,10 @@
                 :class="showCoDrivers ? 'translate-x-4' : 'translate-x-0.5'"
               />
             </span>
-            Co-driver
+            Both
             <LoaderCircle v-if="isCoDriverLoading" class="h-3.5 w-3.5 animate-spin" />
             <span v-else-if="showCoDrivers" class="max-w-28 truncate">
-              {{ latestPeriodCoDriver?.name }}
+              {{ activeDriverId === session?.driverId ? session?.coDriverName : session?.driverName }}
             </span>
           </button>
         </template>
@@ -164,11 +170,13 @@
     <section class="border-y border-border bg-background">
       <CBoostEventsTable
         :events="filteredDailyEvents"
-        :loading="isDailyEventsLoading || (showCoDrivers && (!coDriverRenderEnabled || isCoDriverLoading))"
+        :loading="isDailyEventsLoading"
         :selected-event-id="selectedEventId"
         :highlighted-event-id="highlightedEventId"
         :selected-row-ids="selectedRowIds"
-        :show-driver-column="coDriverRenderEnabled && Boolean(latestPeriodCoDriver)"
+        :show-driver-column="Boolean(session?.coDriverId)"
+        :main-driver-id="session?.driverId"
+        :active-driver-id="activeDriverId"
         :can-edit-profile="canEditSession && allowed('route_eld.log_details.profile_forms.edit')"
         :drag-drop-enabled="dragDropEnabled && canEditSession"
         :can-edit-events="canEditSession && allowed('route_eld.log_details.events.edit')"
@@ -183,7 +191,7 @@
         @toggle-selection="onTableEventSelect"
         @update:selected-row-ids="onSelectedRowIdsUpdate"
         @edit-event="openEditableEvent"
-        @copy-event="copyBoostEvent"
+        @copy-event="openCopiedEvent"
         @delete-event="deleteBoostEvent"
         @revert-event="revertBoostEvent"
         @view-event="openEventViewer"
@@ -237,7 +245,7 @@
             <SelectItem v-for="option in statusFilterOptions" :key="option" :value="option">{{ eventStatusLabel(option) }}</SelectItem>
           </SelectContent>
         </Select>
-        <Select v-if="showCoDrivers && latestPeriodCoDriver" v-model="driverFilter">
+        <Select v-if="session?.coDriverId" v-model="driverFilter">
           <SelectTrigger class="h-9 w-40 text-sm font-normal">
             <SelectValue placeholder="Driver" />
           </SelectTrigger>
@@ -314,7 +322,8 @@
       :form="editEventForm"
       :edit-options="store.eventEditOptions"
       :users="responsibleUsers"
-      :disable-sleeper-berth="Boolean(session?.disableSleeperBerth)"
+      :disable-sleeper-berth="Boolean(activeDriverId === session?.driverId
+        ? session?.disableSleeperBerth : session?.coDriverDisableSleeperBerth)"
       :from-date="session?.fromDate"
       :to-date="session?.toDate"
       :loading="isEditEventLoading"
@@ -370,6 +379,7 @@
       v-model:open="alprRouteOpen"
       :session-id="session?.id ?? null"
       :tab-id="store.activeTabId"
+      :driver-id="activeDriverId"
     />
 
     <CBoostEventCameraDialog
@@ -589,6 +599,9 @@ const {
   chartData,
   dailyEvents,
   coDriverGraphEvents,
+  selectedDriverId,
+  activeDriverId,
+  activeCalculations,
   showCoDrivers,
   coDriverRenderEnabled,
   latestPeriodCoDriver,
@@ -705,6 +718,9 @@ watch(
 const canEditSession = computed(
   () => !store.isLoading && !store.isSessionLocked && session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
 )
+watch(() => store.coDriverSyncError, (message) => {
+  if (message && route.name === 'ELDBoost') toast.error(message)
+})
 const {
   visibility: eventTableColumnVisibility,
   setVisible: setEventTableColumnVisible,
@@ -739,7 +755,10 @@ const eventCount = computed(
   () => workspace.value?.events.filter((event) => !event.isDeleted).length ?? 0
 )
 const graphEvents = computed(() =>
-  (workspace.value?.events ?? []).filter((item) => !item.isDeleted).map((item) => item.event)
+  (workspace.value?.events ?? [])
+    .filter((item) => !item.isDeleted &&
+      (item.ownerDriverId || session.value?.driverId) === activeDriverId.value)
+    .map((item) => item.event)
 )
 type CameraSource = { eventId: string; signature: string }
 const cameraSources = computed<CameraSource[]>(() => {
@@ -983,7 +1002,7 @@ const availableDurationDonors = computed(() => {
       congestion: (typeof restCongestions.value)[number]
     }
   >()
-  for (const freeTime of workspace.value?.calculations.freeTimes ?? []) {
+  for (const freeTime of activeCalculations.value?.freeTimes ?? []) {
     if (selectedRestCongestion.value?.eventIds.includes(freeTime.eventId)) continue
     const congestion = restCongestions.value.find((item) =>
       item.eventIds.includes(freeTime.eventId)
@@ -1218,10 +1237,9 @@ const filteredDailyEvents = computed(() => {
     ...group,
     events: group.events.filter(
       (event) =>
-        (event.changeStatus !== 'CO_DRIVER' ? true : showCoDrivers.value) &&
         (driverFilter.value === '__all__' ||
-          (driverFilter.value === '__co_driver__' && event.changeStatus === 'CO_DRIVER') ||
-          (driverFilter.value === '__main__' && event.changeStatus !== 'CO_DRIVER')) &&
+          (driverFilter.value === '__co_driver__' && event.ownerDriverId === session.value?.coDriverId) ||
+          (driverFilter.value === '__main__' && event.ownerDriverId === session.value?.driverId)) &&
         (changeFilter.value === '__all__' ||
           String(event.changeStatus || 'UNCHANGED').toUpperCase() === changeFilter.value) &&
         (statusFilter.value === '__all__' ||
@@ -1229,8 +1247,18 @@ const filteredDailyEvents = computed(() => {
     ),
   }))
 })
-watch(showCoDrivers, (visible) => {
-  driverFilter.value = visible ? '__main__' : '__all__'
+watch(activeDriverId, () => {
+  if (driverFilter.value !== '__all__')
+    driverFilter.value = activeDriverId.value === session.value?.driverId ? '__main__' : '__co_driver__'
+  selectedRowIds.value = []
+  selectedEventId.value = ''
+  aiAdviceResult.value = null
+  certificationReport.value = null
+  normalizeResult.value = null
+  if (activeDriverId.value) {
+    void store.fetchEventEditOptions(activeDriverId.value).catch(() => {})
+    void store.fetchDriverOptions(activeDriverId.value).catch(() => {})
+  }
 })
 const changeStatusLabel = (value?: string) => {
   const normalized = String(value || 'UNCHANGED').toUpperCase()
@@ -1245,7 +1273,7 @@ const eventStatusLabel = (value?: string) =>
 const hasAlprOrigin = computed(() =>
   graphEvents.value.some((event) => event.latitude != null && event.longitude != null)
 )
-const issueCount = computed(() => workspace.value?.calculations.eventIssues.length ?? 0)
+const issueCount = computed(() => activeCalculations.value?.eventIssues.length ?? 0)
 const sessionOperationPercent = computed(() => {
   const operation = sessionOperation.value
   if (!operation?.total) return operation?.status === 'COMPLETED' ? 100 : 0
@@ -1501,60 +1529,13 @@ const openEditableEvent = async (eventId: string) => {
   eventEditorReadonly.value = false
   await openEditEvent(eventId)
 }
+const openCopiedEvent = async (eventId: string) => {
+  eventEditorReadonly.value = false
+  await copyBoostEvent(eventId)
+}
 const openEventViewer = async (eventId: string) => {
   eventEditorReadonly.value = true
-  const mainEvent = workspace.value?.events.some((item) => item.event.id === eventId)
-  if (mainEvent) {
-    await openEditEvent(eventId)
-    return
-  }
-  const event = coDriverGraphEvents.value.find((item) => item.id === eventId)
-  if (!event) return
-  const numericByCode: Record<string, [number, number]> = {
-    DS_OFF: [1, 1], DS_WT: [1, 1], DS_SB: [1, 2], DS_D: [1, 3], DS_ON: [1, 4],
-    LOG_NORMAL_PRECISION: [2, 1], LOG_REDUCED_PRECISION: [2, 2],
-    DR_IND_PC: [3, 1], DR_IND_YM: [3, 2], DR_LOGIN: [5, 1], DR_LOGOUT: [5, 2],
-    ENG_UP_NORMAL: [6, 1], ENG_UP_REDUCED: [6, 2], ENG_DOWN_NORMAL: [6, 3], ENG_DOWN_REDUCED: [6, 4],
-  }
-  const certification = /^DR_CERT_(\d+)$/.exec(event.eventCode)
-  const [eventType, eventCode] = certification
-    ? [4, Number(certification[1])]
-    : numericByCode[event.eventCode] ?? [0, 0]
-  const date = dayjs(event.timestamp)
-  editEventForm.value = {
-    id: Number.parseInt(event.sequenceId || '0', 16) || 0,
-    eventId: event.id,
-    sequenceId: Number.isFinite(Number.parseInt(event.sequenceId || '', 16))
-      ? String(Number.parseInt(event.sequenceId || '0', 16))
-      : event.sequenceId ?? null,
-    event: { eventType, eventCode },
-    eventCodeId: event.eventCode,
-    origin: event.recordOrigin === 'ELD' ? 1 : event.recordOrigin === 'DRIVER' ? 2 : event.recordOrigin === 'UNIDENTIFIED_DRIVER' ? 4 : 3,
-    recordStatus: event.recordStatus,
-    vehicleId: event.vehicleId ?? null,
-    vehicleUnit: event.vehicleName ?? null,
-    eldId: event.eldId ?? null,
-    positioning: event.driverLocationDescription
-      ? 'MANUAL'
-      : event.positioning === 'MANUAL' || event.positioning === 'AUTOMATIC'
-        ? event.positioning
-        : null,
-    odometer: event.odometerMiles ?? null,
-    engineHours: event.engineHours ?? null,
-    trailer: event.trailers.join(', ') || null,
-    doc: event.documents.join(', ') || null,
-    locationOrigin: event.driverLocationDescription ? 2 : 1,
-    latitude: event.latitude ?? null,
-    longitude: event.longitude ?? null,
-    location: event.location ?? null,
-    locationNote: event.driverLocationDescription ?? null,
-    notes: event.notes ?? null,
-    startDate: event.logDate,
-    time: { hours: date.hour(), minutes: date.minute(), seconds: date.second() },
-    certifiedDate: event.dateToCertify ?? null,
-    certifiedTime: { hours: date.hour(), minutes: date.minute(), seconds: date.second() },
-  }
-  showEditEventModal.value = true
+  await openEditEvent(eventId, true)
 }
 const deleteEventFromEditor = async (eventId: string) => {
   if (await deleteBoostEvent(eventId)) showEditEventModal.value = false
@@ -1644,7 +1625,7 @@ const openReassignModal = async () => {
   reassignModalOpen.value = true
   reassignTargetsLoading.value = true
   try {
-    await store.fetchReassignTargets(driverId.value)
+    await store.fetchReassignTargets(activeDriverId.value)
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || 'Failed to load drivers')
   } finally {
@@ -1659,7 +1640,8 @@ const openCertification = async () => {
     const response = await api.get<
       RouteEldCertificationReport | ApiEnvelope<RouteEldCertificationReport>
     >(
-      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CERTIFICATION_REPORT(session.value.id, store.activeTabId)
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CERTIFICATION_REPORT(session.value.id, store.activeTabId),
+      { params: { driverId: activeDriverId.value } }
     )
     certificationReport.value =
       'successResult' in response.data ? response.data.successResult : response.data

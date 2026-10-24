@@ -216,8 +216,6 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/options`
   static readonly ROUTE_ELD_INSERT_INFO_LOG = (id: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${id}/insert-info-log`
-  static readonly ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE = (id: string) =>
-    `${this.ROUTE_ELD_DRIVER_SCHEDULE(id)}/co-driver`
   static readonly ROUTE_ELD_DRIVER_MONITORING = (id: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${id}/monitoring`
   static readonly ROUTE_ELD_COMPANIES = `${this.BASE_URL}/route-eld/companies`
@@ -234,6 +232,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/co-driver/sync`
   static readonly ROUTE_ELD_DRIVER_EVENT_SESSIONS = (driverId: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${driverId}/event-sessions`
   static readonly ROUTE_ELD_EVENT_SESSION_TABS = (sessionId: string) =>

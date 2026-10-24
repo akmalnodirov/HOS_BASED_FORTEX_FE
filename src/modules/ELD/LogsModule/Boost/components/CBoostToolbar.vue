@@ -37,6 +37,17 @@
       </div>
 
       <div class="flex items-center gap-2">
+        <div v-if="coDriverId" class="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1" aria-label="Active driver">
+          <button
+            v-for="driver in [{ id: mainDriverId, name: mainDriverName || 'Driver', tone: 'text-blue-600' }, { id: coDriverId, name: coDriverName || 'Co-driver', tone: 'text-red-600' }]"
+            :key="driver.id"
+            type="button"
+            class="max-w-44 truncate rounded px-2.5 py-1 text-xs font-semibold transition-colors"
+            :class="driverId === driver.id ? 'bg-background shadow-sm ' + driver.tone : 'text-muted-foreground hover:bg-background/70'"
+            :title="driver.name"
+            @click="$emit('update:driver-id', driver.id || '')"
+          >{{ driver.name }}</button>
+        </div>
         <!-- <Button
           variant="outline"
           size="sm"
@@ -114,6 +125,11 @@ const props = withDefaults(
     allowRollback?: boolean
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
+    driverId?: string
+    mainDriverId?: string
+    mainDriverName?: string
+    coDriverId?: string | null
+    coDriverName?: string | null
   }>(),
   {
     submitDisabled: false,
@@ -128,6 +144,11 @@ const props = withDefaults(
     allowRollback: false,
     tabs: () => [],
     selectedTab: null,
+    driverId: '',
+    mainDriverId: '',
+    mainDriverName: '',
+    coDriverId: null,
+    coDriverName: null,
   }
 )
 
@@ -138,6 +159,7 @@ const emit = defineEmits<{
   (e: 'select-tab', tab: TabResponse): void
   (e: 'remove-tab', tabId: string): void
   (e: 'ai-advice-click'): void
+  (e: 'update:driver-id', driverId: string): void
 }>()
 
 const primarySessionAction = computed<'submit' | 'rollback' | null>(() => {
