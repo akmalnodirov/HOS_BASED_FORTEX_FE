@@ -202,8 +202,9 @@ const cameraEvents = computed(() => (detail.value?.events ?? []).filter((event) 
   .sort((a, b) => a.timestamp - b.timestamp))
 const cameraSignature = (event: RouteEldEvent) => {
   const index = cameraEvents.value.findIndex((item) => item.id === event.id)
-  return [cameraEvents.value[index - 1], event, cameraEvents.value[index + 1]]
-    .map((item) => item ? `${item.latitude}:${item.longitude}` : '').join('|')
+  return [cameraEvents.value[index - 1], event, cameraEvents.value[index + 1],
+    cameraEvents.value.slice(index + 1).find((item) => ['OFF', 'SB', 'D', 'ON'].includes(item.eventCategory))]
+    .map((item) => item ? `${item.latitude}:${item.longitude}:${item.timestamp}:${item.eventCode}` : '').join('|')
 }
 const cameraCacheKey = (event: RouteEldEvent) => `all:${route.params.id}:${event.id}`
 const cameraEventIds = computed(() => cameraEvents.value.filter((event) => {
@@ -240,7 +241,7 @@ watch(() => `${route.params.id}:${headerDate.value.format('YYYY-MM-DD')}:${camer
           ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERA_PRESENCE(driverId),
           { eventIds: batch.map(({ event }) => event.id) },
           { params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
-            toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 150 }, signal: controller.signal })
+            toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 97 }, signal: controller.signal })
         if (controller.signal.aborted) return
         const results = 'successResult' in response.data ? response.data.successResult : response.data
         const found = new Map(results.map((result) => [result.eventId, result.hasCamera]))
@@ -274,7 +275,7 @@ async function openCameraRoute(eventId: string) {
     const response = await api.get<RouteEldEventCameraAnalysis | { successResult: RouteEldEventCameraAnalysis }>(
       ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERAS(driverId), {
         params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
-          toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 150, eventId },
+          toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 97, eventId },
       })
     if (requestId !== cameraRouteRequestId || !cameraRouteOpen.value) return
     cameraRouteAnalysis.value = 'successResult' in response.data ? response.data.successResult : response.data
