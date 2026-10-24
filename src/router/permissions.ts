@@ -8,6 +8,7 @@ const pagePermissions: { pattern: RegExp; any: string[] }[] = [
   { pattern: /^\/alpr-camera\/history(?:\/|$)/, any: ['route_eld.alpr_history'] },
   { pattern: /^\/vehicles(?:\/|$)/, any: ['vehicle.manage'] },
   { pattern: /^\/drivers(?:\/|$)/, any: ['route_eld.drivers'] },
+  { pattern: /^\/driver-alerts(?:\/|$)/, any: ['route_eld.live_tracking'] },
   { pattern: /^\/notifications(?:\/|$)/, any: ['route_eld.alerts.station', 'route_eld.alerts.alpr', 'route_eld.alerts.speed', 'route_eld.alerts.violation'] },
   { pattern: /^\/chat(?:\/|$)/, any: ['chat.manage'] },
   { pattern: /^\/ifta(?:\/|$)/, any: ['route_eld.ifta_reports'] },
