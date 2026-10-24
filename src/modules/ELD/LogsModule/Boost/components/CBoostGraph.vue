@@ -42,11 +42,11 @@
 
     <div class="relative grid grid-cols-[52px_minmax(0,1fr)_62px]">
       <div
-        v-if="isGraphLoading || isCoDriverLoading"
+        v-if="isGraphLoading"
         class="absolute inset-0 z-30 flex items-center justify-center gap-2 bg-background/80 text-xs text-muted-foreground backdrop-blur-[1px]"
       >
         <Loader2 class="h-4 w-4 animate-spin" />
-        {{ isGraphLoading ? 'Loading session event graph' : 'Loading co-driver graph' }}
+        Loading session event graph
       </div>
 
       <svg
@@ -465,7 +465,6 @@ const props = withDefaults(
     coDriverEvents?: RouteEldHosEvent[]
     coDriverName?: string | null
     isGraphLoading?: boolean
-    isCoDriverLoading?: boolean
   }>(),
   {
     events: () => [],
@@ -480,7 +479,6 @@ const props = withDefaults(
     coDriverEvents: () => [],
     coDriverName: null,
     isGraphLoading: false,
-    isCoDriverLoading: false,
   }
 )
 const emit = defineEmits<{

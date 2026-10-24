@@ -36,7 +36,27 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const session = ref<RouteEldEventSession | null>(null)
   const selectedDriverId = ref('')
   const coDriverSyncError = ref<string | null>(null)
-  const coDriverSyncAttempts = new Set<string>()
+  const coDriverSyncAttempts = new Map<string, number>()
+  const coDriverSyncAttemptTtlMs = 30 * 60 * 1000
+  const coDriverSyncAttemptKey = (sessionId: string) => `route-eld:co-driver-sync:${sessionId}`
+  function hasRecentCoDriverSyncAttempt(sessionId: string) {
+    const attemptedInThisPage = coDriverSyncAttempts.get(sessionId)
+    if (attemptedInThisPage && Date.now() - attemptedInThisPage < coDriverSyncAttemptTtlMs) return true
+    try {
+      const attemptedAt = Number(sessionStorage.getItem(coDriverSyncAttemptKey(sessionId)))
+      return attemptedAt > 0 && Date.now() - attemptedAt < coDriverSyncAttemptTtlMs
+    } catch {
+      return false
+    }
+  }
+  function recordCoDriverSyncAttempt(sessionId: string) {
+    coDriverSyncAttempts.set(sessionId, Date.now())
+    try {
+      sessionStorage.setItem(coDriverSyncAttemptKey(sessionId), String(Date.now()))
+    } catch { /* In-memory tracking still prevents repeated attempts in this page. */ }
+
+  }
+  
   const workspace = ref<RouteEldWorkspace | null>(null)
   const profileForms = ref<RouteEldProfileForm[]>([])
   const schedule = ref<RouteEldSchedule | null>(null)
@@ -198,10 +218,13 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         eventEditOptions.value = result.editOptions ?? { vehicles: [], elds: [] }
       const currentSession = session.value
       const currentTabId = activeTabId.value
-      if (currentTabId && currentSession.status === 'DRAFT' && !currentSession.coDriverId &&
-        !coDriverSyncAttempts.has(currentSession.id) && result.dailyLogs.some(log =>
+      if (currentTabId && canEditWorkingSession.value && !isMutating.value &&
+        !currentSession.coDriverId && !hasRecentCoDriverSyncAttempt(currentSession.id) &&
+        result.dailyLogs.some(log =>
           Boolean(log.coDriverId || log.coDriverEmail || log.coDriverName))) {
-        coDriverSyncAttempts.add(currentSession.id)
+        assertCanMutate()
+        recordCoDriverSyncAttempt(currentSession.id)
+        isMutating.value = true
         try {
           const syncResponse = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
             ApiEndpoints.ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER(currentSession.id, currentTabId)
@@ -216,6 +239,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
           if (session.value?.id === currentSession.id)
             coDriverSyncError.value = error?.response?.data?.message || error?.message ||
               'The existing Boost session could not load its co-driver.'
+        } finally {
+          isMutating.value = false
         }
       }
     }
@@ -234,7 +259,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
 
   async function loadSession(sessionId: string, preferredTabId?: string | null) {
     const version = ++sessionLoadVersion
-    coDriverSyncAttempts.delete(sessionId)
     coDriverSyncError.value = null
     isLoading.value = true
     try {

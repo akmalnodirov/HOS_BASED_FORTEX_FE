@@ -96,7 +96,6 @@
         :co-driver-events="coDriverRenderEnabled ? coDriverGraphEvents : []"
         :co-driver-name="activeDriverId === session?.driverId ? session?.coDriverName : session?.driverName"
         :is-graph-loading="isGraphLoading"
-        :is-co-driver-loading="showCoDrivers && (isCoDriverLoading || !coDriverRenderEnabled)"
         @selected-event="onGraphEventSelect"
         @boost-select="onGraphBoostSelect"
       >
@@ -120,8 +119,7 @@
               />
             </span>
             Both
-            <LoaderCircle v-if="isCoDriverLoading" class="h-3.5 w-3.5 animate-spin" />
-            <span v-else-if="showCoDrivers" class="max-w-28 truncate">
+            <span v-if="showCoDrivers" class="max-w-28 truncate">
               {{ activeDriverId === session?.driverId ? session?.coDriverName : session?.driverName }}
             </span>
           </button>
@@ -502,7 +500,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronDown,
   ChevronUp,
-  LoaderCircle,
   MapPin,
   Plus,
   Route as RouteIcon,
@@ -629,7 +626,6 @@ const {
   editEventForm,
   editDailyForm,
   isGraphLoading,
-  isCoDriverLoading,
   isDailyEventsLoading,
   isEditEventLoading,
   isEditDailyFormLoading,

@@ -71,10 +71,12 @@ export function useRouteEldLogDetail() {
     recentBatchPromise = null
   }
 
-  function loadDay(id: string, date: string): Promise<RouteEldLogDetail | null> {
+  function loadDay(id: string, date: string, fresh = false): Promise<RouteEldLogDetail | null> {
     const key = detailKey(id, date)
-    const cached = detailCache.get(key)
-    if (cached) return Promise.resolve(cached)
+    if (!fresh) {
+      const cached = detailCache.get(key)
+      if (cached) return Promise.resolve(cached)
+    }
     const pending = pendingDetails.get(key)
     if (pending) return pending
 
@@ -84,7 +86,7 @@ export function useRouteEldLogDetail() {
       { params: { date }, signal: cacheController.signal }
     ).then((response) => {
       const value = response.data?.successResult ?? null
-      if (value && generation === cacheGeneration) detailCache.set(key, value)
+      if (value && !fresh && generation === cacheGeneration) detailCache.set(key, value)
       return value
     }).finally(() => {
       if (pendingDetails.get(key) === request) pendingDetails.delete(key)
@@ -108,7 +110,8 @@ export function useRouteEldLogDetail() {
     ).then((response) => {
       if (generation !== cacheGeneration) return
       for (const value of response.data?.successResult ?? []) {
-        detailCache.set(detailKey(id, value.logDate.replaceAll('/', '-')), value)
+        const dateKey = value.logDate.replaceAll('/', '-')
+        if (dateKey !== to) detailCache.set(detailKey(id, dateKey), value)
       }
     }).finally(() => {
       if (recentBatchPromise === request) recentBatchPromise = null
@@ -267,12 +270,12 @@ export function useRouteEldLogDetail() {
       const batch = recentMode ? preloadRecentDays(id, generation) : null
       const { from, to } = recentRange()
       let selected: RouteEldLogDetail | null
-      if (batch && date >= from && date <= to) {
+      if (batch && date >= from && date <= to && date !== to) {
         try { await batch } catch { /* Retry the selected day through its one-day endpoint. */ }
         selected = detailCache.get(detailKey(id, date)) ?? await loadDay(id, date)
       } else {
         if (batch) void batch.catch(() => {})
-        selected = await loadDay(id, date)
+        selected = await loadDay(id, date, date === to)
       }
       if (requestId !== selectionRequestId || generation !== cacheGeneration) return
       detail.value = selected

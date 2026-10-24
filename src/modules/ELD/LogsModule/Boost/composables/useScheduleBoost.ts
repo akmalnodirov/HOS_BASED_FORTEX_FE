@@ -411,16 +411,23 @@ export function useScheduleBoost() {
     isLoading,
     isMutating,
   } = storeToRefs(store)
+
   const driverId = computed(() => String(route.params.id || ''))
   const activeDriverId = computed(() => selectedDriverId.value || session.value?.driverId || '')
   const activeCalculations = computed(() =>
-    workspace.value?.calculationsByDriver?.[activeDriverId.value] ?? workspace.value?.calculations
+    workspace.value?.calculationsByDriver?.[activeDriverId.value] ??
+    (activeDriverId.value === session.value?.driverId ? workspace.value?.calculations : undefined)
   )
-  watch(() => session.value?.id, () => { selectedDriverId.value = '' })
+
   const screenResolution = ref(Math.max(900, document.documentElement.clientWidth - 90))
   const selectedEventId = ref('')
   const selectedRowIds = ref<string[]>([])
   const showCoDrivers = ref(false)
+  watch(() => session.value?.id, () => {
+    selectedDriverId.value = ''
+    showCoDrivers.value = false
+  })
+  
   const coDriverRenderEnabled = computed(() => showCoDrivers.value && Boolean(session.value?.coDriverId))
   const dragDropEnabled = ref(false)
   const boostModalOpen = ref(false)
@@ -454,42 +461,12 @@ export function useScheduleBoost() {
   )
   const otherWorkspaceEvents = computed(() =>
     [...(workspace.value?.events ?? [])]
-      .filter((item) => (item.ownerDriverId || session.value?.driverId) !== activeDriverId.value)
+      .filter((item) => !item.isDeleted && (item.ownerDriverId || session.value?.driverId) !== activeDriverId.value)
       .sort((a, b) => a.event.timestamp - b.event.timestamp)
   )
   const latestPeriodCoDriver = computed(() => {
-    if (!session.value) return null
-    if (session.value.coDriverId) return {
-      id: session.value.coDriverId,
-      name: session.value.coDriverName || 'Co-driver',
-      date: session.value.toDate,
-      priority: 2,
-    }
-    return (
-      [
-        ...(schedule.value?.dailyLogs ?? []).map((log) => ({
-          id: log.coDriverId?.trim() || log.coDriverEmail?.trim() || log.coDriverName?.trim() || '',
-          name: log.coDriverName?.trim() || log.coDriverEmail?.trim() || 'Co-driver',
-          date: normalizeDateKey(log.logDate),
-          priority: 0,
-        })),
-        ...profileForms.value.map((form) => ({
-          id: form.coDriverId?.trim() || form.coDriverName?.trim() || '',
-          name: form.coDriverName?.trim() || 'Co-driver',
-          date: normalizeDateKey(form.logDate),
-          priority: 1,
-        })),
-      ]
-        .filter(
-          (item) =>
-            item.id && item.date >= session.value!.fromDate && item.date <= session.value!.toDate
-        )
-        .sort(
-          (first, second) =>
-            first.date.localeCompare(second.date) || first.priority - second.priority
-        )
-        .at(-1) ?? null
-    )
+    if (!session.value?.coDriverId) return null
+    return { id: session.value.coDriverId, name: session.value.coDriverName || 'Co-driver' }
   })
   const coDriverGraphEvents = computed(() =>
     otherWorkspaceEvents.value.map((item) => item.event)
@@ -1701,7 +1678,6 @@ export function useScheduleBoost() {
     editEventForm,
     editDailyForm,
     isGraphLoading: isLoading,
-    isCoDriverLoading: ref(false),
     isDailyEventsLoading: isLoading,
     isEditEventLoading: isActionLoading,
     isEditDailyFormLoading: isActionLoading,

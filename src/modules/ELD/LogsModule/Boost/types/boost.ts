@@ -623,7 +623,6 @@ export interface RouteEldWorkspace {
   events: RouteEldWorkspaceEvent[]
   calculations: RouteEldScheduleCalculations
   calculationsByDriver?: Record<string, RouteEldScheduleCalculations>
-  freezePeriodsByDriver?: Record<string, Array<Record<string, unknown>>>
   reassignedEvents: Array<{
     event: RouteEldHosEvent
     type: string

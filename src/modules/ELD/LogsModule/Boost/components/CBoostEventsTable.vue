@@ -758,7 +758,6 @@ const changeStatusClass = (value?: string) => {
   if (normalized === 'INSERTED') return `${base} bg-emerald-50 text-emerald-700`
   if (normalized === 'REASSIGNED' || normalized === 'REPLICATED')
     return `${base} bg-blue-50 text-blue-700`
-  if (normalized === 'CO_DRIVER') return `${base} bg-violet-50 text-violet-700`
   return `${base} bg-slate-100 text-slate-600 dark:bg-muted dark:text-muted-foreground`
 }
 
