@@ -378,6 +378,7 @@ const pageTitle = computed(() => {
     '/alerts': 'Alerts',
     '/vehicles': 'Vehicles',
     '/drivers': 'Drivers',
+    '/driver-alerts': 'Alerts',
     '/ifta': 'IFTA',
     '/vehicle-reports': 'Vehicle reports',
     '/route-eld-alerts': 'Alerts',
