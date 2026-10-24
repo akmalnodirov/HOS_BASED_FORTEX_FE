@@ -752,8 +752,10 @@ const cameraSources = computed<CameraSource[]>(() => {
     .sort((a, b) => a.event.timestamp - b.event.timestamp)
   return located.map((item, index) => ({
       eventId: item.event.id,
-      signature: [located[index - 1]?.event, item.event, located[index + 1]?.event]
-        .map((event) => event ? `${event.latitude}:${event.longitude}` : '').join('|'),
+      signature: [located[index - 1]?.event, item.event, located[index + 1]?.event,
+        located.slice(index + 1).find((next) => ['OFF', 'SB', 'D', 'ON'].includes(next.event.eventCategory))?.event]
+        .map((event) => event ? `${event.latitude}:${event.longitude}:${event.timestamp}:${event.eventCode}` : '')
+        .join('|'),
     }))
 })
 const cameraChecksPending = new Map<string, string>()
@@ -793,7 +795,7 @@ const runCameraCheckQueue = () => {
               RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
             >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
               { eventIds: batch.sources.map((source) => source.eventId) },
-              { params: { radiusMetres: 150 }, signal: controller.signal })
+              { params: { radiusMetres: 97 }, signal: controller.signal })
             const results = 'successResult' in response.data
               ? response.data.successResult : response.data
             cameraCheckErrorShown = false
@@ -1466,7 +1468,7 @@ const openCameraRoute = async (eventId: string) => {
     const response = await api.get<
       RouteEldEventCameraAnalysis | ApiEnvelope<RouteEldEventCameraAnalysis>
     >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERAS(sessionId, tabId), {
-      params: { radiusMetres: 150, eventId },
+      params: { radiusMetres: 97, eventId },
     })
     if (requestId === cameraRouteRequestId && cameraRouteOpen.value && cameraRouteEventId.value === eventId &&
         session.value?.id === sessionId && store.activeTabId === tabId) {
