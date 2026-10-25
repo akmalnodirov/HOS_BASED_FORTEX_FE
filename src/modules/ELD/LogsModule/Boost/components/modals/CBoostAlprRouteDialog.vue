@@ -165,7 +165,7 @@ interface RoutePoint {
 interface ApiEnvelope<T> {
   successResult: T
 }
-const props = defineProps<{ open: boolean; sessionId: string | null; tabId: string | null }>()
+const props = defineProps<{ open: boolean; sessionId: string | null; tabId: string | null; driverId: string }>()
 const emit = defineEmits<{ (event: 'update:open', open: boolean): void }>()
 const NEW_ROUTE = '__new__'
 const api = useApi()
@@ -285,7 +285,9 @@ async function loadContext() {
   try {
     const response = await api.get<
       RouteEldAlprRouteContext | ApiEnvelope<RouteEldAlprRouteContext>
-    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_ALPR_ROUTES(props.sessionId, props.tabId))
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_ALPR_ROUTES(props.sessionId, props.tabId), {
+      params: { driverId: props.driverId },
+    })
     context.value = unwrap(response.data)
   } catch {
     loadError.value = true
@@ -355,6 +357,7 @@ async function analyzeRoute() {
     >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_ALPR_ROUTES(props.sessionId, props.tabId), {
       destination: endpoint,
       stops: stops.value,
+      driverId: props.driverId,
     })
     localAnalysis.value = unwrap(response.data)
     selectedRouteIndex.value = Math.max(
@@ -386,7 +389,7 @@ function formatDate(value: string) {
   return dayjs(value).format('MMM D, YYYY h:mm A')
 }
 watch(
-  () => [props.open, props.sessionId, props.tabId] as const,
+  () => [props.open, props.sessionId, props.tabId, props.driverId] as const,
   ([open]) => {
     if (!open) return
     selectedHistoryId.value = NEW_ROUTE

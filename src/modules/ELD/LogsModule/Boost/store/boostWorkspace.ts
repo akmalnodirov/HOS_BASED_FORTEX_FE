@@ -15,7 +15,6 @@ import type {
   RouteEldWorkspace,
   RouteEldWorkspaceEvent,
   RouteEldSessionOperation,
-  RouteEldCoDriverSchedule,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
 } from '../types/boost'
@@ -35,6 +34,29 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const api = useApi()
   const sessions = ref<RouteEldEventSessionListItem[]>([])
   const session = ref<RouteEldEventSession | null>(null)
+  const selectedDriverId = ref('')
+  const coDriverSyncError = ref<string | null>(null)
+  const coDriverSyncAttempts = new Map<string, number>()
+  const coDriverSyncAttemptTtlMs = 30 * 60 * 1000
+  const coDriverSyncAttemptKey = (sessionId: string) => `route-eld:co-driver-sync:${sessionId}`
+  function hasRecentCoDriverSyncAttempt(sessionId: string) {
+    const attemptedInThisPage = coDriverSyncAttempts.get(sessionId)
+    if (attemptedInThisPage && Date.now() - attemptedInThisPage < coDriverSyncAttemptTtlMs) return true
+    try {
+      const attemptedAt = Number(sessionStorage.getItem(coDriverSyncAttemptKey(sessionId)))
+      return attemptedAt > 0 && Date.now() - attemptedAt < coDriverSyncAttemptTtlMs
+    } catch {
+      return false
+    }
+  }
+  function recordCoDriverSyncAttempt(sessionId: string) {
+    coDriverSyncAttempts.set(sessionId, Date.now())
+    try {
+      sessionStorage.setItem(coDriverSyncAttemptKey(sessionId), String(Date.now()))
+    } catch { /* In-memory tracking still prevents repeated attempts in this page. */ }
+
+  }
+  
   const workspace = ref<RouteEldWorkspace | null>(null)
   const profileForms = ref<RouteEldProfileForm[]>([])
   const schedule = ref<RouteEldSchedule | null>(null)
@@ -42,8 +64,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const responsibleUsers = ref<RouteEldResponsibleUser[]>([])
   const coDrivers = ref<RouteEldResponsibleUser[]>([])
   const reassignTargets = ref<RouteEldDriverOption[]>([])
-  const coDriverSchedule = ref<RouteEldCoDriverSchedule | null>(null)
-  const coDriverScheduleLoading = ref(false)
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
   const isMutating = ref(false)
@@ -64,9 +84,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const activeTabId = ref<string | null>(null)
   const workspaceCache = new Map<string, RouteEldWorkspace>()
   const profileFormsCache = new Map<string, RouteEldProfileForm[]>()
-  const coDriverScheduleCache = new Map<string, RouteEldCoDriverSchedule>()
-  const coDriverSchedulePending = new Map<string, Promise<RouteEldCoDriverSchedule>>()
-  let requestedCoDriverScheduleKey = ''
   let sessionLoadVersion = 0
   let synchronizationVersion = 0
 
@@ -197,7 +214,35 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     const result = unwrap(response.data)
     if (session.value?.driverId === driverId && session.value.fromDate === fromDate && session.value.toDate === toDate) {
       schedule.value = result
-      eventEditOptions.value = result.editOptions ?? { vehicles: [], elds: [] }
+      if (!selectedDriverId.value || selectedDriverId.value === driverId)
+        eventEditOptions.value = result.editOptions ?? { vehicles: [], elds: [] }
+      const currentSession = session.value
+      const currentTabId = activeTabId.value
+      if (currentTabId && canEditWorkingSession.value && !isMutating.value &&
+        !currentSession.coDriverId && !hasRecentCoDriverSyncAttempt(currentSession.id) &&
+        result.dailyLogs.some(log =>
+          Boolean(log.coDriverId || log.coDriverEmail || log.coDriverName))) {
+        assertCanMutate()
+        recordCoDriverSyncAttempt(currentSession.id)
+        isMutating.value = true
+        try {
+          const syncResponse = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
+            ApiEndpoints.ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER(currentSession.id, currentTabId)
+          )
+          if (session.value?.id === currentSession.id && activeTabId.value) {
+            const synced = unwrap(syncResponse.data)
+            if (activeTabId.value === currentTabId) await acceptWorkspaceResponse(synced)
+            else await synchronizeWorkspace(currentSession.id, activeTabId.value, true)
+          }
+          if (session.value?.id === currentSession.id) coDriverSyncError.value = null
+        } catch (error: any) {
+          if (session.value?.id === currentSession.id)
+            coDriverSyncError.value = error?.response?.data?.message || error?.message ||
+              'The existing Boost session could not load its co-driver.'
+        } finally {
+          isMutating.value = false
+        }
+      }
     }
     return result
   }
@@ -206,12 +251,15 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     const response = await api.get<
       RouteEldEventEditOptions | ApiEnvelope<RouteEldEventEditOptions>
     >(ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS(driverId))
-    eventEditOptions.value = unwrap(response.data) ?? { vehicles: [], elds: [] }
-    return eventEditOptions.value
+    const options = unwrap(response.data) ?? { vehicles: [], elds: [] }
+    if ((selectedDriverId.value || session.value?.driverId) === driverId)
+      eventEditOptions.value = options
+    return options
   }
 
   async function loadSession(sessionId: string, preferredTabId?: string | null) {
     const version = ++sessionLoadVersion
+    coDriverSyncError.value = null
     isLoading.value = true
     try {
       const response = await api.get<RouteEldEventSession | ApiEnvelope<RouteEldEventSession>>(
@@ -508,7 +556,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     if (!session.value || !activeTabId.value) return null
     return mutateWorkspace(
       'post',
-      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX(session.value.id, activeTabId.value)
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX(session.value.id, activeTabId.value) +
+        `?driverId=${encodeURIComponent(selectedDriverId.value || session.value.driverId)}`
     )
   }
 
@@ -547,6 +596,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         ApiEndpoints.ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS(sessionId),
         {
           logDate: form.logDate,
+          driverId: form.ownerDriverId || session.value.driverId,
           coDriverId: form.coDriverId || null,
           coDriverName: form.coDriverName || null,
           trailers: form.trailers,
@@ -572,50 +622,10 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId)
       ),
     ])
-    responsibleUsers.value = unwrap(usersResponse.data) ?? []
-    coDrivers.value = unwrap(coDriversResponse.data) ?? []
-  }
-
-  async function fetchCoDriverSchedule(
-    driverId: string,
-    coDriverId: string,
-    fromDate: string,
-    toDate: string
-  ) {
-    const key = `${driverId}:${coDriverId}:${fromDate}:${toDate}`
-    requestedCoDriverScheduleKey = key
-    const cached = coDriverScheduleCache.get(key)
-    if (cached) {
-      coDriverSchedule.value = cached
-      coDriverScheduleLoading.value = false
-      return cached
+    if ((selectedDriverId.value || session.value?.driverId) === driverId) {
+      responsibleUsers.value = unwrap(usersResponse.data) ?? []
+      coDrivers.value = unwrap(coDriversResponse.data) ?? []
     }
-    coDriverScheduleLoading.value = true
-    let pending = coDriverSchedulePending.get(key)
-    if (!pending) {
-      pending = api.get<RouteEldCoDriverSchedule | ApiEnvelope<RouteEldCoDriverSchedule>>(
-        ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVER_SCHEDULE(driverId),
-        { params: { coDriverId, fromDate, toDate } }
-      ).then((response) => {
-        const result = unwrap(response.data)
-        coDriverScheduleCache.set(key, result)
-        return result
-      }).finally(() => coDriverSchedulePending.delete(key))
-      coDriverSchedulePending.set(key, pending)
-    }
-    try {
-      const result = await pending
-      if (requestedCoDriverScheduleKey === key) coDriverSchedule.value = result
-      return result
-    } finally {
-      if (requestedCoDriverScheduleKey === key) coDriverScheduleLoading.value = false
-    }
-  }
-
-  function clearCoDriverSchedule() {
-    requestedCoDriverScheduleKey = ''
-    coDriverSchedule.value = null
-    coDriverScheduleLoading.value = false
   }
 
   async function fetchReassignTargets(driverId: string) {
@@ -632,7 +642,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     if (!session.value || !activeTabId.value) return null
     const response = await api.post<RouteEldAiAdvice | ApiEnvelope<RouteEldAiAdvice>>(
       ApiEndpoints.ROUTE_ELD_EVENT_SESSION_AI_ADVICE(session.value.id, activeTabId.value),
-      { adviceType }
+      { adviceType, driverId: selectedDriverId.value || session.value.driverId }
     )
     return unwrap(response.data)
   }
@@ -657,6 +667,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         tabId,
         normalizeList,
         applyCertificationFix,
+        driverId: selectedDriverId.value || session.value.driverId,
       })
       await refreshEventDependencies(sessionId, tabId).catch(() => {})
       return unwrap(response.data)
@@ -788,6 +799,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     ++synchronizationVersion
     sessions.value = []
     session.value = null
+    selectedDriverId.value = ''
+    coDriverSyncError.value = null
     workspace.value = null
     profileForms.value = []
     schedule.value = null
@@ -795,18 +808,18 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     responsibleUsers.value = []
     coDrivers.value = []
     reassignTargets.value = []
-    clearCoDriverSchedule()
     profileFormEditRequest.value = null
     activeTabId.value = null
     workspaceCache.clear()
     profileFormsCache.clear()
-    coDriverScheduleCache.clear()
-    coDriverSchedulePending.clear()
+    coDriverSyncAttempts.clear()
   }
 
   return {
     sessions,
     session,
+    selectedDriverId,
+    coDriverSyncError,
     workspace,
     profileForms,
     schedule,
@@ -814,8 +827,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     responsibleUsers,
     coDrivers,
     reassignTargets,
-    coDriverSchedule,
-    coDriverScheduleLoading,
     profileFormEditRequest,
     activeTabId,
     activeTab,
@@ -842,8 +853,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     reassignEvents,
     updateProfileForm,
     fetchDriverOptions,
-    fetchCoDriverSchedule,
-    clearCoDriverSchedule,
     fetchReassignTargets,
     analyzeAiAdvice,
     normalize,

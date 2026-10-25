@@ -36,9 +36,13 @@ export function useRouteEldLogDetail() {
   const isBoostPage = computed(() => route.name === 'ELDBoost')
   const headerDate = ref(resolveDate(route.query.date))
   const detailDate = computed(() =>
-    isBoostPage.value ? dayjs().startOf('day') : headerDate.value.startOf('day')
+    isBoostPage.value ? timeZoneHelper.convertToTimeZone().startOf('day') : headerDate.value.startOf('day')
   )
   const detail = ref<RouteEldLogDetail | null>(null)
+  const detailMatchesSelection = computed(() =>
+    detail.value?.driverId.toLowerCase() === driverId.value.toLowerCase() &&
+    detail.value?.logDate.replaceAll('/', '-') === detailDate.value.format('YYYY-MM-DD')
+  )
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedEventId = ref<string | null>(null)
@@ -47,7 +51,74 @@ export function useRouteEldLogDetail() {
   const trackingCollapse = ref(true)
   const signatureImageUrl = ref<string | null>(null)
   const screenResolution = ref(1440)
-  let controller: AbortController | null = null
+  const detailCache = new Map<string, RouteEldLogDetail>()
+  const pendingDetails = new Map<string, Promise<RouteEldLogDetail | null>>()
+  let cacheController = new AbortController()
+  let cacheGeneration = 0
+  let selectionRequestId = 0
+  let recentBatchAttempted = false
+  let recentBatchPromise: Promise<void> | null = null
+
+  const detailKey = (id: string, date: string) => `${id}:${date}`
+
+  function invalidateDetailCache() {
+    cacheController.abort()
+    cacheController = new AbortController()
+    cacheGeneration++
+    detailCache.clear()
+    pendingDetails.clear()
+    recentBatchAttempted = false
+    recentBatchPromise = null
+  }
+
+  function loadDay(id: string, date: string, fresh = false): Promise<RouteEldLogDetail | null> {
+    const key = detailKey(id, date)
+    if (!fresh) {
+      const cached = detailCache.get(key)
+      if (cached) return Promise.resolve(cached)
+    }
+    const pending = pendingDetails.get(key)
+    if (pending) return pending
+
+    const generation = cacheGeneration
+    const request = api.get<{ successResult: RouteEldLogDetail }>(
+      ApiEndpoints.ROUTE_ELD_LOG_DETAIL(id),
+      { params: { date }, signal: cacheController.signal }
+    ).then((response) => {
+      const value = response.data?.successResult ?? null
+      if (value && !fresh && generation === cacheGeneration) detailCache.set(key, value)
+      return value
+    }).finally(() => {
+      if (pendingDetails.get(key) === request) pendingDetails.delete(key)
+    })
+    pendingDetails.set(key, request)
+    return request
+  }
+
+  function recentRange() {
+    const to = timeZoneHelper.convertToTimeZone().startOf('day')
+    return { from: to.subtract(6, 'day').format('YYYY-MM-DD'), to: to.format('YYYY-MM-DD') }
+  }
+
+  function preloadRecentDays(id: string, generation: number): Promise<void> {
+    if (recentBatchAttempted) return recentBatchPromise ?? Promise.resolve()
+    recentBatchAttempted = true
+    const { from, to } = recentRange()
+    const request = api.get<{ successResult: RouteEldLogDetail[] }>(
+      ApiEndpoints.ROUTE_ELD_LOG_DETAILS(id),
+      { params: { fromDate: from, toDate: to }, signal: cacheController.signal, _skipErrorHandling: true }
+    ).then((response) => {
+      if (generation !== cacheGeneration) return
+      for (const value of response.data?.successResult ?? []) {
+        const dateKey = value.logDate.replaceAll('/', '-')
+        if (dateKey !== to) detailCache.set(detailKey(id, dateKey), value)
+      }
+    }).finally(() => {
+      if (recentBatchPromise === request) recentBatchPromise = null
+    })
+    recentBatchPromise = request
+    return request
+  }
 
   const events = computed(() => {
     const values = [...(detail.value?.events ?? [])]
@@ -87,6 +158,17 @@ export function useRouteEldLogDetail() {
       dailyOnDuty: totals.ON,
     }
   })
+  const headerDailySummary = computed<DailySummaryResponse | null>(() => {
+    if (!detailMatchesSelection.value) return null
+    const summary = dailySummary.value
+    const routeSummary = detail.value?.dailySummary
+    if (!summary || !routeSummary) return summary
+    return {
+      ...summary,
+      dailyDriving: routeSummary.timeDrivenMilliseconds / 1000,
+      dailyOnDuty: routeSummary.timeOnDutyMilliseconds / 1000,
+    }
+  })
   const dailyTimeRemainder = computed(() => ({
     breakDuration: clockSeconds(detail.value?.hos?.break),
     drivingDuration: clockSeconds(detail.value?.hos?.drive),
@@ -100,6 +182,14 @@ export function useRouteEldLogDetail() {
     mapProfileForm(detail.value)
   )
   const driverInfo = computed(() => {
+    if (!detailMatchesSelection.value) return null
+    const routeSummary = detail.value?.dailySummary
+    const violations = routeSummary
+      ? routeSummary.violations
+      : (detail.value?.violations ?? []).map((violation) => ({
+          regulation: violation.title || violation.type,
+          startTime: new Date(violation.startedAt).toISOString(),
+        }))
     const latestDuty = [...events.value]
       .reverse()
       .find((event) => event.recordStatus === 'ACTIVE' && dutyCategories.has(event.eventCategory))
@@ -117,10 +207,11 @@ export function useRouteEldLogDetail() {
       connectionStatus: detail.value?.hos?.connectionStatus ?? 'NOT_CONNECTED',
       status: true,
       workedDurationInSeconds:
-        (dailySummary.value?.dailyDriving ?? 0) + (dailySummary.value?.dailyOnDuty ?? 0),
+        (headerDailySummary.value?.dailyDriving ?? 0) + (headerDailySummary.value?.dailyOnDuty ?? 0),
       signaturePath: driverDailyForm.value?.signaturePath || undefined,
-      hasViolation: (detail.value?.hos?.violationCount ?? 0) > 0,
-      violations: detail.value?.hos?.violations ?? [],
+      isSigned: routeSummary?.isSigned,
+      hasViolation: (routeSummary?.violationCount ?? violations.length) > 0,
+      violations,
       timeZone: detail.value?.timeZone ?? null,
       lastEventCode: mapped?.code ?? null,
       lastEventType: mapped?.type ?? null,
@@ -132,7 +223,7 @@ export function useRouteEldLogDetail() {
       return {
         dateOfViolations: date.format('YYYY-MM-DD'),
         violations:
-          index === 7 && (detail.value?.hos?.violationCount ?? 0) > 0
+          index === 7 && detailMatchesSelection.value && (detail.value?.dailySummary?.violationCount ?? 0) > 0
             ? [{ startedAt: date.format(), description: { shortName: 'HOS' } }]
             : [],
       }
@@ -163,37 +254,43 @@ export function useRouteEldLogDetail() {
   const mapCenter = computed(() => trackingCenter(detail.value?.trackingPoints ?? []))
   const zoomMap = computed(() => trackingZoom(detail.value?.trackingPoints ?? []))
 
-  async function fetchDetail() {
+  async function fetchDetail(forceRefresh = false) {
     if (!driverId.value) return
-    controller?.abort()
-    const requestController = new AbortController()
-    controller = requestController
+    if (forceRefresh) invalidateDetailCache()
+    const id = driverId.value
+    const date = detailDate.value.format('YYYY-MM-DD')
+    const requestId = ++selectionRequestId
+    const generation = cacheGeneration
     loading.value = true
     error.value = null
     selectedEventId.value = null
     selectedEvent.value = null
     try {
-      const response = await api.get<{ successResult: RouteEldLogDetail }>(
-        ApiEndpoints.ROUTE_ELD_LOG_DETAIL(driverId.value),
-        {
-          params: { date: detailDate.value.format('YYYY-MM-DD') },
-          signal: requestController.signal,
-        }
-      )
-      if (controller !== requestController) return
-      detail.value = response.data?.successResult ?? null
+      const recentMode = route.name === 'ELDLogDetail' || route.name === 'ELDInsertInfoLog'
+      const batch = recentMode ? preloadRecentDays(id, generation) : null
+      const { from, to } = recentRange()
+      let selected: RouteEldLogDetail | null
+      if (batch && date >= from && date <= to && date !== to) {
+        try { await batch } catch { /* Retry the selected day through its one-day endpoint. */ }
+        selected = detailCache.get(detailKey(id, date)) ?? await loadDay(id, date)
+      } else {
+        if (batch) void batch.catch(() => {})
+        selected = await loadDay(id, date, date === to)
+      }
+      if (requestId !== selectionRequestId || generation !== cacheGeneration) return
+      detail.value = selected
       if (!detail.value) error.value = 'No Route ELD log data was returned for this driver.'
       trackingTooltips.value = Object.fromEntries(
         (dailyTrackings.value?.trackingEventResponse ?? []).map((event) => [event.eventId, false])
       )
     } catch (exception: any) {
       if (exception?.name === 'CanceledError' || exception?.name === 'AbortError') return
-      if (controller !== requestController) return
+      if (requestId !== selectionRequestId || generation !== cacheGeneration) return
       detail.value = null
       error.value =
         exception?.response?.data?.message ?? 'Route ELD log details could not be loaded.'
     } finally {
-      if (controller === requestController) loading.value = false
+      if (requestId === selectionRequestId && generation === cacheGeneration) loading.value = false
     }
   }
 
@@ -251,16 +348,30 @@ export function useRouteEldLogDetail() {
         headerDate.value = next
     }
   )
-  watch([driverId, () => detailDate.value.format('YYYY-MM-DD'), () => route.name], fetchDetail, {
-    immediate: true,
-  })
+  watch(
+    [driverId, () => detailDate.value.format('YYYY-MM-DD'), () => route.name],
+    ([id, , mode], previous) => {
+      const previousDriver = previous?.[0]
+      const previousMode = previous?.[2]
+      if (previousDriver && previousDriver !== id) invalidateDetailCache()
+      if (previousMode === 'ELDBoost' && mode !== 'ELDBoost') invalidateDetailCache()
+
+      if (mode === 'ELDBoost') {
+        void fetchDetail(true)
+        return
+      }
+
+      void fetchDetail()
+    },
+    { immediate: true }
+  )
   watch(
     () => detail.value?.profileForm?.signature,
     (value) => void fetchSignature(value),
     { immediate: true }
   )
   onBeforeUnmount(() => {
-    controller?.abort()
+    invalidateDetailCache()
     if (signatureImageUrl.value) URL.revokeObjectURL(signatureImageUrl.value)
   })
 
@@ -270,6 +381,7 @@ export function useRouteEldLogDetail() {
     error,
     chartData,
     dailySummary,
+    headerDailySummary,
     dailyPixelViolations: computed(() => []),
     weeklyViolations,
     dailyTimeRemainder,

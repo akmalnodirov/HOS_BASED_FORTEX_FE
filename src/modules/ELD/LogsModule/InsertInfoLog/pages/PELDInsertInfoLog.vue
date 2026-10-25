@@ -95,7 +95,7 @@ async function save(values: Omit<InsertInfoLogRequest, 'timestamp' | 'timeZone'>
     return
   }
   try {
-    await fetchDetail()
+    await fetchDetail(true)
   } catch {
     toast.warning('Log inserted, but the graph could not be refreshed. Reload this page to see it.')
   } finally { saving.value = false }

@@ -157,7 +157,7 @@
                   </div>
                 </PopoverContent>
               </Popover>
-              <p v-if="!dateWithinSession" class="text-xs text-red-600">
+              <p v-if="!readonly && !dateWithinSession" class="text-xs text-red-600">
                 Event time must remain within the session period.
               </p>
             </div>

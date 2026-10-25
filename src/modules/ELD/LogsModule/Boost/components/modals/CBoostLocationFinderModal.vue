@@ -237,6 +237,7 @@ async function doSearch() {
         location: location.value.trim() || null,
         latitude: coordinatesComplete.value ? parsedLatitude.value : null,
         longitude: coordinatesComplete.value ? parsedLongitude.value : null,
+        driverId: store.selectedDriverId || store.session?.driverId,
       }
     )
     const result = response.data?.successResult ?? response.data
