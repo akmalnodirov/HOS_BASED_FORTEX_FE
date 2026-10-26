@@ -833,8 +833,8 @@ const emit = defineEmits<{
 }>()
 
 const copyLocationCoordinates = async (latitude: number, longitude: number) => {
-  await copyCoordinates(latitude, longitude)
-  toast.success('Coordinates copied')
+  if (await copyCoordinates(latitude, longitude)) toast.success('Coordinates copied')
+  else toast.error('These coordinates are out of range. Fix the event before copying them.')
 }
 
 const copyCellValue = async (value: string, label: string) => {

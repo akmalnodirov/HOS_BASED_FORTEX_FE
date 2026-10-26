@@ -74,6 +74,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
 import { useGeoLocationsStore } from '@/modules/Overview/store/geoLocations'
+import {
+  copyCoordinates as writeCoordinates,
+  LATITUDE_LIMIT,
+  LONGITUDE_LIMIT,
+  parseCoordinate,
+  readCoordinates,
+} from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
 import type { InsertInfoLogRequest, InsertInfoOption } from '../types'
 
 const props = defineProps<{
@@ -116,10 +123,8 @@ watch(activeUsers, users => {
 let geocodeTimer: ReturnType<typeof setTimeout> | undefined
 watch([latitude, longitude], ([latText, lonText]) => {
   if (geocodeTimer) clearTimeout(geocodeTimer)
-  const lat = coordinateNumber(latText), lon = coordinateNumber(lonText)
-  if (lat === null || lon === null ||
-      !Number.isFinite(lat) || !Number.isFinite(lon) ||
-      lat < -90 || lat > 90 || lon < -180 || lon > 180) return
+  const lat = parseCoordinate(String(latText), LATITUDE_LIMIT), lon = parseCoordinate(String(lonText), LONGITUDE_LIMIT)
+  if (lat === null || lon === null) return
   const priorLocation = calculatedLocation.value
   geocodeTimer = setTimeout(async () => {
     const location = await geoStore.getCalculatedAddress({ latitude: lat, longitude: lon })
@@ -151,15 +156,12 @@ function appendNote(note: string) {
 function optionalNumber(value: string | number): number | null {
   return String(value).trim() === '' ? null : Number(value)
 }
-function coordinateNumber(value: string | number): number | null {
-  return optionalNumber(String(value).replace(',', '.'))
-}
 function save() {
-  const lat = coordinateNumber(latitude.value), lon = coordinateNumber(longitude.value)
+  const latText = String(latitude.value).trim(), lonText = String(longitude.value).trim()
+  const lat = parseCoordinate(latText, LATITUDE_LIMIT), lon = parseCoordinate(lonText, LONGITUDE_LIMIT)
   const odometer = optionalNumber(odometerMiles.value), engine = optionalNumber(engineHours.value)
-  if ((lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
-      (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) ||
-      (lat === null) !== (lon === null)) { toast.error('Enter a valid latitude and longitude pair.'); return }
+  if ((latText !== '' && lat === null) || (lonText !== '' && lon === null) ||
+      (latText === '') !== (lonText === '')) { toast.error('Enter a valid latitude and longitude pair.'); return }
   if ((odometer !== null && (!Number.isFinite(odometer) || odometer < 0)) ||
       (engine !== null && (!Number.isFinite(engine) || engine < 0))) {
     toast.error('Enter valid odometer and engine hours.'); return
@@ -174,19 +176,15 @@ function save() {
   })
 }
 async function copyCoordinates() {
-  if (String(latitude.value).trim() === '' || String(longitude.value).trim() === '') {
-    toast.warning('No coordinates to copy'); return
-  }
-  try { await navigator.clipboard.writeText(`${coordinateNumber(latitude.value)}, ${coordinateNumber(longitude.value)}`); toast.success('Coordinates copied') }
-  catch { toast.error('Could not copy coordinates') }
+  const lat = parseCoordinate(String(latitude.value), LATITUDE_LIMIT), lon = parseCoordinate(String(longitude.value), LONGITUDE_LIMIT)
+  if (lat === null || lon === null) { toast.warning('No valid coordinates to copy'); return }
+  await writeCoordinates(lat, lon); toast.success('Coordinates copied')
 }
 async function pasteCoordinates() {
-  try {
-    const values = (await navigator.clipboard.readText()).split(',').map(value => value.trim())
-    if (values.length !== 2 || !values.every(value => value && Number.isFinite(Number(value)))) throw new Error('Invalid coordinates')
-    latitude.value = values[0]; longitude.value = values[1]
-    toast.success('Coordinates pasted')
-  } catch { toast.error('Clipboard must contain latitude, longitude') }
+  const coordinates = await readCoordinates()
+  if (!coordinates) { toast.error('Clipboard must contain latitude, longitude'); return }
+  latitude.value = String(coordinates.latitude); longitude.value = String(coordinates.longitude)
+  toast.success('Coordinates pasted')
 }
 function clear() {
   selectStatus('DS_OFF'); recordOrigin.value = 'OTHER_USER'; responsibleUserId.value = activeUsers.value[0]?.id ?? ''

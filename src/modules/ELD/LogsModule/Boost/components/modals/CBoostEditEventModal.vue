@@ -314,13 +314,13 @@
         </fieldset>
 
           <div class="grid grid-cols-3 gap-2">
-            <Button type="button" variant="outline" class="gap-2" :disabled="form.latitude == null || form.longitude == null || latitudeInvalid || longitudeInvalid" @click="copyCoords">
+            <Button type="button" variant="outline" class="gap-2" :disabled="form.latitude == null || form.longitude == null || coordinatesBlocked" @click="copyCoords">
               <Copy class="w-4 h-4" /> Copy
             </Button>
             <Button type="button" variant="outline" class="gap-2" :disabled="readonly" @click="pasteCoords">
               <ClipboardPaste class="w-4 h-4" /> Paste
             </Button>
-            <Button type="button" variant="outline" class="gap-2" @click="openMap">
+            <Button type="button" variant="outline" class="gap-2" :disabled="coordinatesBlocked" @click="openMap">
               <MapPin class="w-4 h-4" /> Map
             </Button>
           </div>
@@ -418,7 +418,14 @@ import type {
 } from '../../types/boost.ts'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { copyCoordinates, readCoordinates } from '../../utils/coordinateClipboard'
+import {
+  copyCoordinates,
+  isCoordinateDraft,
+  LATITUDE_LIMIT,
+  LONGITUDE_LIMIT,
+  parseCoordinate,
+  readCoordinates,
+} from '../../utils/coordinateClipboard'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -487,33 +494,41 @@ function coordinateText(value: number | string | null) {
   return value === null || value === '' ? '' : String(value)
 }
 
-function parseCoordinateText(text: string, limit: number): number | null {
-  const value = text.trim().replace(',', '.')
-  if (value === '') return null
-  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(value)) return NaN
-  const coordinate = Number(value)
-  return Math.abs(coordinate) <= limit ? coordinate : NaN
-}
-
 const latitudeText = ref('')
 const longitudeText = ref('')
-const latitudeInvalid = computed(() => Number.isNaN(parseCoordinateText(latitudeText.value, 90)))
-const longitudeInvalid = computed(() => Number.isNaN(parseCoordinateText(longitudeText.value, 180)))
+const coordinateFields = {
+  latitude: { text: latitudeText, limit: LATITUDE_LIMIT },
+  longitude: { text: longitudeText, limit: LONGITUDE_LIMIT },
+}
+type CoordinateField = keyof typeof coordinateFields
+
+function isCoordinateBlocked(field: CoordinateField) {
+  const { text, limit } = coordinateFields[field]
+  return text.value.trim() !== '' && parseCoordinate(text.value, limit) === null
+}
+function isCoordinateInvalid(field: CoordinateField) {
+  return isCoordinateBlocked(field) && !isCoordinateDraft(coordinateFields[field].text.value)
+}
+function syncCoordinateText(field: CoordinateField) {
+  const { text, limit } = coordinateFields[field]
+  if (parseCoordinate(text.value, limit) !== coordinateValue(props.form[field]))
+    text.value = coordinateText(props.form[field])
+}
+
+const latitudeInvalid = computed(() => isCoordinateInvalid('latitude'))
+const longitudeInvalid = computed(() => isCoordinateInvalid('longitude'))
+const coordinatesBlocked = computed(
+  () => isCoordinateBlocked('latitude') || isCoordinateBlocked('longitude')
+)
 
 watch(
   () => props.form.latitude,
-  (value) => {
-    if (parseCoordinateText(latitudeText.value, 90) !== coordinateValue(value))
-      latitudeText.value = coordinateText(value)
-  },
+  () => syncCoordinateText('latitude'),
   { immediate: true }
 )
 watch(
   () => props.form.longitude,
-  (value) => {
-    if (parseCoordinateText(longitudeText.value, 180) !== coordinateValue(value))
-      longitudeText.value = coordinateText(value)
-  },
+  () => syncCoordinateText('longitude'),
   { immediate: true }
 )
 
@@ -804,12 +819,15 @@ function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
   const value = raw === '' ? null : parseFloat(raw)
   patch({ [field]: value } as Partial<BoostEventStatusForm>)
 }
-function onCoordinateInput(field: 'latitude' | 'longitude', e: Event) {
-  const text = (e.target as HTMLInputElement).value
-  if (field === 'latitude') latitudeText.value = text
-  else longitudeText.value = text
-  const coordinate = parseCoordinateText(text, field === 'latitude' ? 90 : 180)
-  if (Number.isNaN(coordinate) || coordinate === coordinateValue(props.form[field])) return
+function onCoordinateInput(field: CoordinateField, e: Event) {
+  const { text, limit } = coordinateFields[field]
+  text.value = (e.target as HTMLInputElement).value
+  if (isCoordinateBlocked(field)) {
+    cancelReverseGeocode()
+    return
+  }
+  const coordinate = text.value.trim() === '' ? null : parseCoordinate(text.value, limit)
+  if (coordinate === coordinateValue(props.form[field])) return
   patch({ [field]: coordinate } as Partial<BoostEventStatusForm>)
   scheduleReverseGeocode(
     field === 'latitude' ? coordinate : coordinateValue(props.form.latitude),
@@ -825,7 +843,7 @@ const isSubmitDisabled = computed(() => {
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
-  if (latitudeInvalid.value || longitudeInvalid.value) return true
+  if (coordinatesBlocked.value) return true
   if (isCertifiedVisible.value) return false
   const { positioning, latitude, longitude, locationNote } = props.form
   if (
@@ -838,16 +856,20 @@ const isSubmitDisabled = computed(() => {
 
 async function copyCoords() {
   const { latitude, longitude } = props.form
-  if (latitude != null && longitude != null) {
-    await copyCoordinates(Number(latitude), Number(longitude))
+  if (
+    latitude != null &&
+    longitude != null &&
+    (await copyCoordinates(Number(latitude), Number(longitude)))
+  )
     toast.success('Coordinates copied')
-  }
 }
 
 async function pasteCoords() {
   const eventId = props.form.eventId
   const coordinates = await readCoordinates()
   if (!coordinates || !props.open || props.readonly || props.form.eventId !== eventId) return
+  latitudeText.value = String(coordinates.latitude)
+  longitudeText.value = String(coordinates.longitude)
   if (
     coordinateValue(props.form.latitude) === coordinates.latitude &&
     coordinateValue(props.form.longitude) === coordinates.longitude
