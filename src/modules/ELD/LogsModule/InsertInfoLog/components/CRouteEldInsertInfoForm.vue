@@ -28,8 +28,8 @@
     <div class="rounded-md border border-border/70 bg-muted/20 p-4">
       <h3 class="mb-4 text-sm font-medium">Location</h3>
       <div class="grid gap-4 md:grid-cols-2">
-      <div class="space-y-1.5"><Label>Latitude</Label><Input v-model="latitude" type="number" step="any" placeholder="Latitude" /></div>
-      <div class="space-y-1.5"><Label>Longitude</Label><Input v-model="longitude" type="number" step="any" placeholder="Longitude" /></div>
+      <div class="space-y-1.5"><Label>Latitude</Label><Input v-model="latitude" type="text" inputmode="decimal" placeholder="Latitude" /></div>
+      <div class="space-y-1.5"><Label>Longitude</Label><Input v-model="longitude" type="text" inputmode="decimal" placeholder="Longitude" /></div>
       <div class="space-y-1.5 md:col-span-2"><Label>Calculated location</Label><Input v-model="calculatedLocation" placeholder="Location description" /></div>
       <div class="flex gap-2 md:col-span-2">
         <Button type="button" variant="outline" size="sm" @click="copyCoordinates"><Copy class="mr-2 h-4 w-4" />Copy</Button>
@@ -116,8 +116,8 @@ watch(activeUsers, users => {
 let geocodeTimer: ReturnType<typeof setTimeout> | undefined
 watch([latitude, longitude], ([latText, lonText]) => {
   if (geocodeTimer) clearTimeout(geocodeTimer)
-  const lat = Number(latText), lon = Number(lonText)
-  if (String(latText).trim() === '' || String(lonText).trim() === '' ||
+  const lat = coordinateNumber(latText), lon = coordinateNumber(lonText)
+  if (lat === null || lon === null ||
       !Number.isFinite(lat) || !Number.isFinite(lon) ||
       lat < -90 || lat > 90 || lon < -180 || lon > 180) return
   const priorLocation = calculatedLocation.value
@@ -151,8 +151,11 @@ function appendNote(note: string) {
 function optionalNumber(value: string | number): number | null {
   return String(value).trim() === '' ? null : Number(value)
 }
+function coordinateNumber(value: string | number): number | null {
+  return optionalNumber(String(value).replace(',', '.'))
+}
 function save() {
-  const lat = optionalNumber(latitude.value), lon = optionalNumber(longitude.value)
+  const lat = coordinateNumber(latitude.value), lon = coordinateNumber(longitude.value)
   const odometer = optionalNumber(odometerMiles.value), engine = optionalNumber(engineHours.value)
   if ((lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
       (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) ||
@@ -174,7 +177,7 @@ async function copyCoordinates() {
   if (String(latitude.value).trim() === '' || String(longitude.value).trim() === '') {
     toast.warning('No coordinates to copy'); return
   }
-  try { await navigator.clipboard.writeText(`${latitude.value}, ${longitude.value}`); toast.success('Coordinates copied') }
+  try { await navigator.clipboard.writeText(`${coordinateNumber(latitude.value)}, ${coordinateNumber(longitude.value)}`); toast.success('Coordinates copied') }
   catch { toast.error('Could not copy coordinates') }
 }
 async function pasteCoordinates() {
