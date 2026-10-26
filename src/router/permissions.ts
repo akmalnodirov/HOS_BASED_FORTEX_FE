@@ -1,4 +1,5 @@
 const pagePermissions: { pattern: RegExp; any: string[] }[] = [
+  { pattern: /^\/report(?:\/|$)/, any: ['report.view', 'report.manage'] },
   { pattern: /^\/initial\/clients(?:\/|$)/, any: ['clients.manage'] },
   { pattern: /^\/overview(?:\/|$)/, any: ['route_eld.live_tracking'] },
   { pattern: /^\/eld\/logs(?:\/|$)/, any: ['route_eld.logs.view'] },

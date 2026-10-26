@@ -1,4 +1,26 @@
 export class ApiEndpoints {
+  private static readonly REPORT_URL = '/report/api'
+  static readonly REPORT_TASKS = `${this.REPORT_URL}/task-management/process`
+  static readonly REPORT_TASK_STATISTICS = `${this.REPORT_URL}/statistics/logbookers/filter`
+  static readonly REPORT_ACTIVITY = `${this.REPORT_URL}/driver-activities/filter`
+  static readonly REPORT_CHECKER = `${this.REPORT_URL}/checker-tasks/filter`
+  static readonly REPORT_ASSISTANT = `${this.REPORT_URL}/task-management/assistant-process`
+  static readonly REPORT_COMPANIES = `${this.REPORT_URL}/companies`
+  static readonly REPORT_DRIVERS = `${this.REPORT_URL}/drivers`
+  static readonly REPORT_USERS = `${this.REPORT_URL}/users`
+  static readonly REPORT_ROUTE_TASK = `${this.REPORT_URL}/route-task`
+  static readonly REPORT_TASK_CREATE = `${this.REPORT_ROUTE_TASK}/queue`
+  static readonly REPORT_TASK_UPDATE = (id: string) => `${this.REPORT_ROUTE_TASK}/${id}`
+  static readonly REPORT_TASK_HISTORY = (id: string) => `${this.REPORT_ROUTE_TASK}/${id}/history`
+  static readonly REPORT_ASSISTANT_CREATE = `${this.REPORT_ROUTE_TASK}/add-assistant`
+  static readonly REPORT_ASSISTANT_UPDATE = (id: string) => `${this.REPORT_ROUTE_TASK}/update-assistant/${id}`
+  static readonly REPORT_CHECKER_TASKS = `${this.REPORT_URL}/checker-tasks`
+  static readonly REPORT_CHECKER_TASK = (id: string) => `${this.REPORT_CHECKER_TASKS}/${id}`
+  static readonly REPORT_CHECKER_UPLOADS = (id: string) => `${this.REPORT_CHECKER_TASK(id)}/uploads`
+  static readonly REPORT_CHECKER_UPLOAD = (id: string) => `${this.REPORT_CHECKER_TASKS}/uploads/${id}`
+  static readonly REPORT_CHECKER_FILE = (fileName: string) => `${this.REPORT_URL}/checker-files/${fileName}`
+  static readonly REPORT_DRIVER_ACTIVITIES = `${this.REPORT_URL}/driver-activities`
+  static readonly REPORT_DRIVER_ACTIVITY = (id: string) => `${this.REPORT_DRIVER_ACTIVITIES}/${id}`
   // Base URLs
   private static readonly BASE_URL = '/api'
   private static readonly MONITORING_URL = `${this.BASE_URL}/monitoring`

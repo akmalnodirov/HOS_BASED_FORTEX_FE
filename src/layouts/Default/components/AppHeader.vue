@@ -391,6 +391,10 @@ const pageTitle = computed(() => {
     '/eld/weight-stations': 'Weight stations',
     '/alpr-camera/route': 'ALPR Camera / Route',
     '/alpr-camera/history': 'ALPR Camera / History',
+    '/report/tasks': 'Report / Board (Tasks)',
+    '/report/activity': 'Report / Activity',
+    '/report/checker': 'Report / Checker',
+    '/report/assistant': 'Report / Assistant',
 
     '/tools/activity': 'Tools / Activity',
     '/tools/monitoring': 'Tools / Monitoring',

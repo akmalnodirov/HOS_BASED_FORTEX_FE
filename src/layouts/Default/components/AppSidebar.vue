@@ -319,6 +319,17 @@ const allMenuItems: MenuItem[] = [
           { id: 'users-permissions', label: 'Permissions', icon: null, path: '/users/permissions' },
         ],
       },
+      {
+        id: 'report',
+        label: 'REPORT BOARD',
+        icon: '/icons/menu.svg',
+        children: [
+          { id: 'report-tasks', label: 'Tasks', icon: null, path: '/report/tasks' },
+          { id: 'report-activity', label: 'Activity', icon: null, path: '/report/activity' },
+          { id: 'report-checker', label: 'Checker', icon: null, path: '/report/checker' },
+          { id: 'report-assistant', label: 'Assistant', icon: null, path: '/report/assistant' },
+        ],
+      },
     ],
   },
 ]
