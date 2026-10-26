@@ -275,24 +275,29 @@
             <div class="space-y-1">
               <label class="text-sm font-medium">Latitude</label>
               <Input
-                type="number"
-                step="any"
-                :model-value="form.latitude ?? ''"
-                @input="onNumberInput('latitude', $event)"
+                type="text"
+                inputmode="decimal"
+                :model-value="latitudeText"
+                :aria-invalid="latitudeInvalid || undefined"
+                @input="onCoordinateInput('latitude', $event)"
                 placeholder="Latitude"
               />
             </div>
             <div class="space-y-1">
               <label class="text-sm font-medium">Longitude</label>
               <Input
-                type="number"
-                step="any"
-                :model-value="form.longitude ?? ''"
-                @input="onNumberInput('longitude', $event)"
+                type="text"
+                inputmode="decimal"
+                :model-value="longitudeText"
+                :aria-invalid="longitudeInvalid || undefined"
+                @input="onCoordinateInput('longitude', $event)"
                 placeholder="Longitude"
               />
             </div>
           </div>
+          <p v-if="!readonly && (latitudeInvalid || longitudeInvalid)" class="text-xs text-red-600">
+            Latitude must be between -90 and 90 and longitude between -180 and 180.
+          </p>
 
           <div class="space-y-1">
             <label class="text-sm font-medium">Calculated location</label>
@@ -309,13 +314,13 @@
         </fieldset>
 
           <div class="grid grid-cols-3 gap-2">
-            <Button type="button" variant="outline" class="gap-2" :disabled="form.latitude == null || form.longitude == null" @click="copyCoords">
+            <Button type="button" variant="outline" class="gap-2" :disabled="form.latitude == null || form.longitude == null || coordinatesBlocked" @click="copyCoords">
               <Copy class="w-4 h-4" /> Copy
             </Button>
             <Button type="button" variant="outline" class="gap-2" :disabled="readonly" @click="pasteCoords">
               <ClipboardPaste class="w-4 h-4" /> Paste
             </Button>
-            <Button type="button" variant="outline" class="gap-2" @click="openMap">
+            <Button type="button" variant="outline" class="gap-2" :disabled="coordinatesBlocked" @click="openMap">
               <MapPin class="w-4 h-4" /> Map
             </Button>
           </div>
@@ -413,7 +418,14 @@ import type {
 } from '../../types/boost.ts'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { copyCoordinates, readCoordinates } from '../../utils/coordinateClipboard'
+import {
+  copyCoordinates,
+  isCoordinateDraft,
+  LATITUDE_LIMIT,
+  LONGITUDE_LIMIT,
+  parseCoordinate,
+  readCoordinates,
+} from '../../utils/coordinateClipboard'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -478,6 +490,48 @@ function coordinateValue(value: number | string | null): number | null {
   return Number.isFinite(coordinate) ? coordinate : null
 }
 
+function coordinateText(value: number | string | null) {
+  return value === null || value === '' ? '' : String(value)
+}
+
+const latitudeText = ref('')
+const longitudeText = ref('')
+const coordinateFields = {
+  latitude: { text: latitudeText, limit: LATITUDE_LIMIT },
+  longitude: { text: longitudeText, limit: LONGITUDE_LIMIT },
+}
+type CoordinateField = keyof typeof coordinateFields
+
+function isCoordinateBlocked(field: CoordinateField) {
+  const { text, limit } = coordinateFields[field]
+  return text.value.trim() !== '' && parseCoordinate(text.value, limit) === null
+}
+function isCoordinateInvalid(field: CoordinateField) {
+  return isCoordinateBlocked(field) && !isCoordinateDraft(coordinateFields[field].text.value)
+}
+function syncCoordinateText(field: CoordinateField) {
+  const { text, limit } = coordinateFields[field]
+  if (parseCoordinate(text.value, limit) !== coordinateValue(props.form[field]))
+    text.value = coordinateText(props.form[field])
+}
+
+const latitudeInvalid = computed(() => isCoordinateInvalid('latitude'))
+const longitudeInvalid = computed(() => isCoordinateInvalid('longitude'))
+const coordinatesBlocked = computed(
+  () => isCoordinateBlocked('latitude') || isCoordinateBlocked('longitude')
+)
+
+watch(
+  () => props.form.latitude,
+  () => syncCoordinateText('latitude'),
+  { immediate: true }
+)
+watch(
+  () => props.form.longitude,
+  () => syncCoordinateText('longitude'),
+  { immediate: true }
+)
+
 function cancelReverseGeocode() {
   if (geocodeTimer) clearTimeout(geocodeTimer)
   geocodeTimer = null
@@ -533,7 +587,10 @@ watch(() => props.open, (open) => {
   if (!open) {
     cancelReverseGeocode()
     geocodeError.value = ''
+    return
   }
+  latitudeText.value = coordinateText(props.form.latitude)
+  longitudeText.value = coordinateText(props.form.longitude)
 })
 onBeforeUnmount(cancelReverseGeocode)
 
@@ -760,17 +817,22 @@ function onPositioningChange(v: unknown) {
 function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
   const raw = (e.target as HTMLInputElement).value
   const value = raw === '' ? null : parseFloat(raw)
-  if (field === 'latitude' || field === 'longitude') {
-    const coordinate = value !== null && Number.isFinite(value) ? value : null
-    if (coordinate === coordinateValue(props.form[field])) return
-    patch({ [field]: coordinate } as Partial<BoostEventStatusForm>)
-    scheduleReverseGeocode(
-      field === 'latitude' ? coordinate : coordinateValue(props.form.latitude),
-      field === 'longitude' ? coordinate : coordinateValue(props.form.longitude)
-    )
+  patch({ [field]: value } as Partial<BoostEventStatusForm>)
+}
+function onCoordinateInput(field: CoordinateField, e: Event) {
+  const { text, limit } = coordinateFields[field]
+  text.value = (e.target as HTMLInputElement).value
+  if (isCoordinateBlocked(field)) {
+    cancelReverseGeocode()
     return
   }
-  patch({ [field]: value } as Partial<BoostEventStatusForm>)
+  const coordinate = text.value.trim() === '' ? null : parseCoordinate(text.value, limit)
+  if (coordinate === coordinateValue(props.form[field])) return
+  patch({ [field]: coordinate } as Partial<BoostEventStatusForm>)
+  scheduleReverseGeocode(
+    field === 'latitude' ? coordinate : coordinateValue(props.form.latitude),
+    field === 'longitude' ? coordinate : coordinateValue(props.form.longitude)
+  )
 }
 function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
   patch({ [field]: (e.target as HTMLInputElement).value || null } as Partial<BoostEventStatusForm>)
@@ -781,6 +843,7 @@ const isSubmitDisabled = computed(() => {
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
+  if (coordinatesBlocked.value) return true
   if (isCertifiedVisible.value) return false
   const { positioning, latitude, longitude, locationNote } = props.form
   if (
@@ -793,16 +856,20 @@ const isSubmitDisabled = computed(() => {
 
 async function copyCoords() {
   const { latitude, longitude } = props.form
-  if (latitude != null && longitude != null) {
-    await copyCoordinates(Number(latitude), Number(longitude))
+  if (
+    latitude != null &&
+    longitude != null &&
+    (await copyCoordinates(Number(latitude), Number(longitude)))
+  )
     toast.success('Coordinates copied')
-  }
 }
 
 async function pasteCoords() {
   const eventId = props.form.eventId
   const coordinates = await readCoordinates()
   if (!coordinates || !props.open || props.readonly || props.form.eventId !== eventId) return
+  latitudeText.value = String(coordinates.latitude)
+  longitudeText.value = String(coordinates.longitude)
   if (
     coordinateValue(props.form.latitude) === coordinates.latitude &&
     coordinateValue(props.form.longitude) === coordinates.longitude
