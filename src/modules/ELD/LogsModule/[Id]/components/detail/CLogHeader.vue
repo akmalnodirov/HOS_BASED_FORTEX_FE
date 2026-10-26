@@ -252,7 +252,7 @@ function formatViolationTime(value: string) {
     ET: 'America/New_York', CT: 'America/Chicago', MT: 'America/Denver',
     PT: 'America/Los_Angeles', AT: 'America/Halifax', NT: 'America/St_Johns',
     AKT: 'America/Anchorage', HT: 'Pacific/Honolulu', AZ: 'America/Phoenix',
-    SK: 'America/Regina',
+    SK: 'America/Regina', MST: 'America/Phoenix',
   } as Record<string, string>)[props.driverInfo?.timeZone?.trim().toUpperCase() ?? '']
     ?? props.driverInfo?.timeZone
     ?? 'America/Chicago'

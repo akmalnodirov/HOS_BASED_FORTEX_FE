@@ -204,6 +204,7 @@ function timeZoneName(code?: string | null) {
       AKT: 'America/Anchorage',
       HT: 'Pacific/Honolulu',
       AZ: 'America/Phoenix',
+      MST: 'America/Phoenix',
       SK: 'America/Regina',
     } as Record<string, string>
   )[normalized?.toUpperCase() ?? ''] ?? 'America/Chicago'

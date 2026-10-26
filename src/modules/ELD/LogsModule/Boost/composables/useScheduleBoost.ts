@@ -135,6 +135,7 @@ const ROUTE_ELD_TIME_ZONES: Record<string, string> = {
   AKT: 'America/Anchorage',
   HT: 'Pacific/Honolulu',
   AZ: 'America/Phoenix',
+  MST: 'America/Phoenix',
   SK: 'America/Regina',
 }
 
