@@ -1102,8 +1102,9 @@ export function useScheduleBoost() {
         : timestampFromRouteEldZonedLocal(localDateTime, event?.timeZone ?? workspaceTimeZone.value),
       logDate: form.startDate.replaceAll('-', '/'),
       eventCode,
-      recordOrigin:
-        event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
+      recordOrigin: /^DR_CERT_/i.test(eventCode)
+        ? null
+        : event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
           ? 'OTHER_USER'
           : requestedRecordOrigin,
       recordStatus: form.recordStatus,

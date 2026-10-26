@@ -103,11 +103,14 @@
             <div class="space-y-1">
               <label class="text-sm font-medium">Origin</label>
               <Select
-                :model-value="String(form.origin ?? '')"
+                :model-value="isCertificationSelected ? '' : String(form.origin ?? '')"
+                :disabled="isCertificationSelected"
                 @update:model-value="onOriginChange"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Origin" />
+                  <SelectValue
+                    :placeholder="isCertificationSelected ? 'No origin' : 'Select Origin'"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">Auto (ELD)</SelectItem>
@@ -116,7 +119,13 @@
                   <SelectItem value="4">Unidentified driver</SelectItem>
                 </SelectContent>
               </Select>
-              <p v-if="requiresOtherUserOrigin" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
+              <p v-if="isCertificationSelected" class="mt-1 text-[10px] text-muted-foreground">
+                Certifications are saved without an origin, like in the Route ELD app.
+              </p>
+              <p
+                v-else-if="requiresOtherUserOrigin"
+                class="mt-1 text-[10px] text-amber-700 dark:text-amber-400"
+              >
                 Origin changed to Other user because this provider-generated event type was modified.
               </p>
               <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
@@ -744,9 +753,9 @@ const isStatuslessEvent = computed(
 const showRecordStatus = computed(
   () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
 )
+const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
 const fixedOrigin = computed<number | null>(() => {
   if (requiresOtherUserOrigin.value) return 3
-  if (/^DR_CERT_\d+$/.test(selectedEventKey.value)) return 2
   if (
     ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
       selectedEventKey.value
@@ -764,9 +773,11 @@ const fixedOrigin = computed<number | null>(() => {
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
-  const statusless = /^DR_CERT_\d+$/.test(ev.id) || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
-  const driverOrigin = /^DR_CERT_\d+$/.test(ev.id) ||
-    ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(ev.id)
+  const certification = /^DR_CERT_\d+$/.test(ev.id)
+  const statusless = certification || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
+  const driverOrigin = ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
+    ev.id
+  )
   const modifiedProviderEvent = Boolean(
     props.form.eventId &&
     props.form.originalIsEditable === false &&
@@ -776,7 +787,7 @@ function onEventChange(key: unknown) {
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
     recordStatus: statusless ? 'NONE' : 'ACTIVE',
-    origin: modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
+    origin: certification ? null : modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
   })
 }
 
