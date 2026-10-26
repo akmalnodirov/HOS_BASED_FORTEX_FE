@@ -38,8 +38,8 @@
       </div>
     </div>
     <div class="grid gap-4 md:grid-cols-3">
-      <div class="space-y-1.5"><Label>Odometer (mi)</Label><Input v-model="odometerMiles" type="number" min="0" step="any" placeholder="Odometer" /></div>
-      <div class="space-y-1.5"><Label>Engine hours</Label><Input v-model="engineHours" type="number" min="0" step="any" placeholder="Engine hours" /></div>
+      <div class="space-y-1.5"><Label>Odometer (mi)</Label><Input v-model="odometerMiles" type="text" inputmode="decimal" placeholder="Odometer" /></div>
+      <div class="space-y-1.5"><Label>Engine hours</Label><Input v-model="engineHours" type="text" inputmode="decimal" placeholder="Engine hours" /></div>
       <div class="space-y-1.5">
         <Label>Vehicle</Label>
         <Select v-model="vehicleId"><SelectTrigger><SelectValue placeholder="No vehicle" /></SelectTrigger>
@@ -81,6 +81,7 @@ import {
   parseCoordinate,
   readCoordinates,
 } from '@/modules/ELD/LogsModule/Boost/utils/coordinateClipboard'
+import { parseMeasurement } from '@/modules/ELD/LogsModule/Boost/utils/decimalInput'
 import type { InsertInfoLogRequest, InsertInfoOption } from '../types'
 
 const props = defineProps<{
@@ -153,17 +154,14 @@ function appendNote(note: string) {
   const combined = [...parts, note].join(', ')
   if (combined.length <= 100) notes.value = combined
 }
-function optionalNumber(value: string | number): number | null {
-  return String(value).trim() === '' ? null : Number(value)
-}
 function save() {
   const latText = String(latitude.value).trim(), lonText = String(longitude.value).trim()
   const lat = parseCoordinate(latText, LATITUDE_LIMIT), lon = parseCoordinate(lonText, LONGITUDE_LIMIT)
-  const odometer = optionalNumber(odometerMiles.value), engine = optionalNumber(engineHours.value)
+  const odometerText = String(odometerMiles.value).trim(), engineText = String(engineHours.value).trim()
+  const odometer = parseMeasurement(odometerText), engine = parseMeasurement(engineText)
   if ((latText !== '' && lat === null) || (lonText !== '' && lon === null) ||
       (latText === '') !== (lonText === '')) { toast.error('Enter a valid latitude and longitude pair.'); return }
-  if ((odometer !== null && (!Number.isFinite(odometer) || odometer < 0)) ||
-      (engine !== null && (!Number.isFinite(engine) || engine < 0))) {
+  if ((odometerText !== '' && odometer === null) || (engineText !== '' && engine === null)) {
     toast.error('Enter valid odometer and engine hours.'); return
   }
   emit('save', {
