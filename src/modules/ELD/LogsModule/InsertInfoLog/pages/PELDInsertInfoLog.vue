@@ -50,6 +50,7 @@ const zones: Record<string, string> = {
   ET: 'America/New_York', CT: 'America/Chicago', MT: 'America/Denver',
   PT: 'America/Los_Angeles', AT: 'America/Halifax', HT: 'Pacific/Honolulu',
   NT: 'America/St_Johns', AKT: 'America/Anchorage', AZ: 'America/Phoenix', SK: 'America/Regina',
+  MST: 'America/Phoenix',
 }
 
 type ApiEnvelope<T> = T | { successResult: T }
