@@ -119,8 +119,8 @@ const applyOdometer = ref(false)
 const odometerOffset = ref(false)
 const trailers = ref('')
 const documents = ref('')
-const deltaSeconds = ref('')
-const odometerMiles = ref('')
+const deltaSeconds = ref<string | number>('')
+const odometerMiles = ref<string | number>('')
 
 const parsedDelta = computed(() => Number(deltaSeconds.value))
 const parsedOdometer = computed(() => Number(odometerMiles.value))
@@ -130,14 +130,14 @@ const validationError = computed(() => {
   if (props.sourceEvents.some((event) => event.isFrozen || !isRouteEldEventWithinSession(event, props.session!)))
     return 'Frozen events and events outside the session period cannot be updated.'
   if (applyTime.value) {
-    if (!deltaSeconds.value.trim() || !Number.isInteger(parsedDelta.value) || parsedDelta.value === 0)
+    if (!String(deltaSeconds.value).trim() || !Number.isInteger(parsedDelta.value) || parsedDelta.value === 0)
       return 'Enter a non-zero time adjustment in whole seconds.'
     if (props.sourceEvents.some((event) =>
       !isRouteEldTimestampWithinSession(event.timestamp + parsedDelta.value * 1000, event.timeZone, props.session!)
     )) return 'The adjusted event times must remain within the session period.'
   }
   if (applyOdometer.value) {
-    if (!odometerMiles.value.trim() || !Number.isFinite(parsedOdometer.value))
+    if (!String(odometerMiles.value).trim() || !Number.isFinite(parsedOdometer.value))
       return 'Enter a valid odometer value.'
     if (!odometerOffset.value && parsedOdometer.value < 0)
       return 'Odometer cannot be negative.'
