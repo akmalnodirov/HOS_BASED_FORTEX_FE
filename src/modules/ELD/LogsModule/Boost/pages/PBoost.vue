@@ -220,6 +220,7 @@
       :can-delete="allowed('route_eld.log_details.events.delete')"
       :can-multi-update="allowed('route_eld.log_details.events.multi_update')"
       :can-boost="allowed('route_eld.log_details.boost')"
+      :can-repair="allowed('route_eld.log_details.boost')"
       :can-normalize="allowed('route_eld.log_details.normalize')"
       :can-certification="allowed('route_eld.log_details.certification_fix')"
       :can-reassign="allowed('route_eld.log_details.reassign_replicate')"
@@ -229,12 +230,19 @@
         selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
       "
       :duration-title="durationSelectionError"
+      :repair-disabled="!selectedRepairEvent || !canEditSession"
+      :repair-title="
+        selectedRepairEvent
+          ? 'Generate repair options for the selected event'
+          : 'Select an event from the graph or table first'
+      "
       :reassign-disabled="!selectedRowIds.length || !canEditSession"
       :normalize-disabled="!canEditSession"
       :selected-count="selectedRowIds.length"
       @dragdrop-change="dragDropEnabled = $event"
       @delete-click="deleteSelectedBoostEvents"
       @duration-click="openDurationModal"
+      @repair-click="openRepairModal"
       @reassign-click="openReassignModal"
       @multi-update-click="multiUpdateModalOpen = true"
       @normalize-click="openNormalize"
@@ -398,6 +406,23 @@
       @reset-error="durationFailureReason = ''"
       @submit="runDurationBoost"
     />
+    <CBoostRepairModal
+      v-model:open="repairOpen"
+      :loading="repairGenerating"
+      :applying-option-id="applyingRepairOptionId"
+      :selected-event="selectedRepairEvent"
+      :violations="workspace?.calculations.violations ?? []"
+      :result="repairResult"
+      :error="repairFailureReason"
+      :from-date="session?.fromDate ?? ''"
+      :to-date="session?.toDate ?? ''"
+      :time-zone="workspaceTimeZone"
+      :session-created-at="session?.createdAt ?? null"
+      @reset-error="repairFailureReason = ''"
+      @change-request="resetRepairRequest"
+      @generate="generateRepairOptions"
+      @apply="applyRepairOption"
+    />
 
     <CBoostAlprRouteDialog
       v-model:open="alprRouteOpen"
@@ -560,10 +585,12 @@ import type {
   RouteEldCertificationReport,
   RouteEldEventCameraAnalysis,
   RouteEldEventCameraPresence,
+  GenerateRouteEldRepairRequest,
   RouteEldHosEvent,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
   RouteEldSessionOperation,
+  RouteEldRepairRequestResponse,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
 import CBoostGraphHeaderControls from '../components/CBoostGraphHeaderControls.vue'
@@ -584,6 +611,7 @@ import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
 import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
+import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
 import CBoostCertificationModal from '../components/modals/CBoostCertificationModal.vue'
 import CBoostAlprRouteDialog from '../components/modals/CBoostAlprRouteDialog.vue'
 import CBoostEventTableColumnSettings from '../components/CBoostEventTableColumnSettings.vue'
@@ -718,6 +746,11 @@ interface ApiEnvelope<T> {
 const certificationReport = ref<RouteEldCertificationReport | null>(null)
 const durationOpen = ref(false)
 const durationFailureReason = ref('')
+const repairOpen = ref(false)
+const repairGenerating = ref(false)
+const applyingRepairOptionId = ref('')
+const repairFailureReason = ref('')
+const repairResult = ref<RouteEldRepairRequestResponse | null>(null)
 const reassignTargetsLoading = ref(false)
 const eventEditorReadonly = ref(false)
 const cameraRouteOpen = ref(false)
@@ -798,6 +831,9 @@ const graphEvents = computed(() =>
     .filter((item) => !item.isDeleted &&
       (item.ownerDriverId || session.value?.driverId) === activeDriverId.value)
     .map((item) => item.event)
+)
+const selectedRepairEvent = computed(
+  () => graphEvents.value.find((event) => event.id === selectedEventId.value) ?? null
 )
 type CameraSource = { eventId: string; signature: string }
 const cameraSources = computed<CameraSource[]>(() => {
@@ -1674,6 +1710,48 @@ const openDurationModal = () => {
   }
   durationFailureReason.value = ''
   durationOpen.value = true
+}
+const openRepairModal = () => {
+  if (!canEditSession.value) return
+  if (!selectedRepairEvent.value) {
+    toast.error('Select an event from the graph or events table first.')
+    return
+  }
+  repairResult.value = null
+  repairFailureReason.value = ''
+  applyingRepairOptionId.value = ''
+  repairOpen.value = true
+}
+const resetRepairRequest = () => {
+  repairResult.value = null
+  repairFailureReason.value = ''
+}
+const generateRepairOptions = async (request: GenerateRouteEldRepairRequest) => {
+  repairGenerating.value = true
+  repairFailureReason.value = ''
+  try {
+    repairResult.value = await store.generateRepair(request)
+  } catch (error) {
+    repairFailureReason.value = getApiErrorMessage(error, 'Repair options could not be generated.')
+  } finally {
+    repairGenerating.value = false
+  }
+}
+const applyRepairOption = async (optionId: string) => {
+  const repairId = repairResult.value?.id
+  if (!repairId || applyingRepairOptionId.value) return
+  applyingRepairOptionId.value = optionId
+  repairFailureReason.value = ''
+  try {
+    await store.applyRepair(repairId, optionId)
+    repairOpen.value = false
+    repairResult.value = null
+    toast.success('Repair option applied to the active working tab.')
+  } catch (error) {
+    repairFailureReason.value = getApiErrorMessage(error, 'The repair option could not be applied.')
+  } finally {
+    applyingRepairOptionId.value = ''
+  }
 }
 const openInsertModal = async () => {
   if (!canEditSession.value) return
