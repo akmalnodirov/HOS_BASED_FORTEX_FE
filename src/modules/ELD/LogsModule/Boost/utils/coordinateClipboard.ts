@@ -1,13 +1,13 @@
+import { parseDecimal } from './decimalInput'
+
 let retainedCoordinates = ''
 
 export const LATITUDE_LIMIT = 90
 export const LONGITUDE_LIMIT = 180
 
 export function parseCoordinate(text: string, limit: number): number | null {
-  const value = text.trim().replace(',', '.')
-  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(value)) return null
-  const coordinate = Number(value)
-  return Math.abs(coordinate) <= limit ? coordinate : null
+  const coordinate = parseDecimal(text)
+  return coordinate !== null && Math.abs(coordinate) <= limit ? coordinate : null
 }
 
 export function isCoordinateDraft(text: string) {

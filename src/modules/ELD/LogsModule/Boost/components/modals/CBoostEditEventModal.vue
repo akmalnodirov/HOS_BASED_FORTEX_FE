@@ -213,23 +213,32 @@
             <div class="col-span-3 space-y-1">
               <label class="text-sm font-medium">Odometer</label>
               <Input
-                type="number"
-                :model-value="form.odometer ?? ''"
-                @input="onNumberInput('odometer', $event)"
+                type="text"
+                inputmode="decimal"
+                :model-value="odometerText"
+                :aria-invalid="odometerInvalid || undefined"
+                @input="onMeasurementInput('odometer', $event)"
                 placeholder="Odometer"
               />
             </div>
             <div class="col-span-3 space-y-1">
               <label class="text-sm font-medium">Engine Hours</label>
               <Input
-                type="number"
-                step="0.1"
-                :model-value="form.engineHours ?? ''"
-                @input="onNumberInput('engineHours', $event)"
+                type="text"
+                inputmode="decimal"
+                :model-value="engineHoursText"
+                :aria-invalid="engineHoursInvalid || undefined"
+                @input="onMeasurementInput('engineHours', $event)"
                 placeholder="Engine hrs"
               />
             </div>
           </div>
+          <p
+            v-if="!readonly && (odometerInvalid || engineHoursInvalid)"
+            class="text-xs text-red-600"
+          >
+            Odometer and engine hours must be numbers of zero or more.
+          </p>
 
           <div class="border-t pt-4">
             <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -426,6 +435,7 @@ import {
   parseCoordinate,
   readCoordinates,
 } from '../../utils/coordinateClipboard'
+import { isMeasurementDraft, parseMeasurement } from '../../utils/decimalInput'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -490,47 +500,62 @@ function coordinateValue(value: number | string | null): number | null {
   return Number.isFinite(coordinate) ? coordinate : null
 }
 
-function coordinateText(value: number | string | null) {
+function fieldText(value: number | string | null) {
   return value === null || value === '' ? '' : String(value)
 }
 
 const latitudeText = ref('')
 const longitudeText = ref('')
-const coordinateFields = {
-  latitude: { text: latitudeText, limit: LATITUDE_LIMIT },
-  longitude: { text: longitudeText, limit: LONGITUDE_LIMIT },
+const odometerText = ref('')
+const engineHoursText = ref('')
+const decimalFields = {
+  latitude: {
+    text: latitudeText,
+    parse: (text: string) => parseCoordinate(text, LATITUDE_LIMIT),
+    isDraft: isCoordinateDraft,
+  },
+  longitude: {
+    text: longitudeText,
+    parse: (text: string) => parseCoordinate(text, LONGITUDE_LIMIT),
+    isDraft: isCoordinateDraft,
+  },
+  odometer: { text: odometerText, parse: parseMeasurement, isDraft: isMeasurementDraft },
+  engineHours: { text: engineHoursText, parse: parseMeasurement, isDraft: isMeasurementDraft },
 }
-type CoordinateField = keyof typeof coordinateFields
+type DecimalField = keyof typeof decimalFields
+type CoordinateField = Extract<DecimalField, 'latitude' | 'longitude'>
+type MeasurementField = Extract<DecimalField, 'odometer' | 'engineHours'>
+const decimalFieldNames = Object.keys(decimalFields) as DecimalField[]
 
-function isCoordinateBlocked(field: CoordinateField) {
-  const { text, limit } = coordinateFields[field]
-  return text.value.trim() !== '' && parseCoordinate(text.value, limit) === null
+function isFieldBlocked(field: DecimalField) {
+  const { text, parse } = decimalFields[field]
+  return text.value.trim() !== '' && parse(text.value) === null
 }
-function isCoordinateInvalid(field: CoordinateField) {
-  return isCoordinateBlocked(field) && !isCoordinateDraft(coordinateFields[field].text.value)
+function isFieldInvalid(field: DecimalField) {
+  const { text, isDraft } = decimalFields[field]
+  return isFieldBlocked(field) && !isDraft(text.value)
 }
-function syncCoordinateText(field: CoordinateField) {
-  const { text, limit } = coordinateFields[field]
-  if (parseCoordinate(text.value, limit) !== coordinateValue(props.form[field]))
-    text.value = coordinateText(props.form[field])
+function syncFieldText(field: DecimalField) {
+  const { text, parse } = decimalFields[field]
+  if (parse(text.value) !== coordinateValue(props.form[field]))
+    text.value = fieldText(props.form[field])
 }
 
-const latitudeInvalid = computed(() => isCoordinateInvalid('latitude'))
-const longitudeInvalid = computed(() => isCoordinateInvalid('longitude'))
-const coordinatesBlocked = computed(
-  () => isCoordinateBlocked('latitude') || isCoordinateBlocked('longitude')
+const latitudeInvalid = computed(() => isFieldInvalid('latitude'))
+const longitudeInvalid = computed(() => isFieldInvalid('longitude'))
+const odometerInvalid = computed(() => isFieldInvalid('odometer'))
+const engineHoursInvalid = computed(() => isFieldInvalid('engineHours'))
+const coordinatesBlocked = computed(() => isFieldBlocked('latitude') || isFieldBlocked('longitude'))
+const measurementsBlocked = computed(
+  () => isFieldBlocked('odometer') || isFieldBlocked('engineHours')
 )
 
-watch(
-  () => props.form.latitude,
-  () => syncCoordinateText('latitude'),
-  { immediate: true }
-)
-watch(
-  () => props.form.longitude,
-  () => syncCoordinateText('longitude'),
-  { immediate: true }
-)
+for (const field of decimalFieldNames)
+  watch(
+    () => props.form[field],
+    () => syncFieldText(field),
+    { immediate: true }
+  )
 
 function cancelReverseGeocode() {
   if (geocodeTimer) clearTimeout(geocodeTimer)
@@ -589,8 +614,8 @@ watch(() => props.open, (open) => {
     geocodeError.value = ''
     return
   }
-  latitudeText.value = coordinateText(props.form.latitude)
-  longitudeText.value = coordinateText(props.form.longitude)
+  for (const field of decimalFieldNames)
+    decimalFields[field].text.value = fieldText(props.form[field])
 })
 onBeforeUnmount(cancelReverseGeocode)
 
@@ -814,19 +839,22 @@ function onPositioningChange(v: unknown) {
   })
 }
 
-function onNumberInput(field: keyof BoostEventStatusForm, e: Event) {
-  const raw = (e.target as HTMLInputElement).value
-  const value = raw === '' ? null : parseFloat(raw)
-  patch({ [field]: value } as Partial<BoostEventStatusForm>)
+function onMeasurementInput(field: MeasurementField, e: Event) {
+  const { text, parse } = decimalFields[field]
+  text.value = (e.target as HTMLInputElement).value
+  if (isFieldBlocked(field)) return
+  const value = text.value.trim() === '' ? null : parse(text.value)
+  if (value !== coordinateValue(props.form[field]))
+    patch({ [field]: value } as Partial<BoostEventStatusForm>)
 }
 function onCoordinateInput(field: CoordinateField, e: Event) {
-  const { text, limit } = coordinateFields[field]
+  const { text, parse } = decimalFields[field]
   text.value = (e.target as HTMLInputElement).value
-  if (isCoordinateBlocked(field)) {
+  if (isFieldBlocked(field)) {
     cancelReverseGeocode()
     return
   }
-  const coordinate = text.value.trim() === '' ? null : parseCoordinate(text.value, limit)
+  const coordinate = text.value.trim() === '' ? null : parse(text.value)
   if (coordinate === coordinateValue(props.form[field])) return
   patch({ [field]: coordinate } as Partial<BoostEventStatusForm>)
   scheduleReverseGeocode(
@@ -843,7 +871,7 @@ const isSubmitDisabled = computed(() => {
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
-  if (coordinatesBlocked.value) return true
+  if (coordinatesBlocked.value || measurementsBlocked.value) return true
   if (isCertifiedVisible.value) return false
   const { positioning, latitude, longitude, locationNote } = props.form
   if (
