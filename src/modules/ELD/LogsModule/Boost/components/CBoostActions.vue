@@ -73,6 +73,18 @@
           </Button>
 
           <Button
+            v-if="canRepair"
+            variant="outline"
+            size="sm"
+            class="h-9.5 px-4 text-sm"
+            :disabled="repairDisabled || actionPending"
+            :title="repairTitle || 'Generate repair options for the selected event'"
+            @click="$emit('repair-click')"
+          >
+            <span>Repair</span>
+          </Button>
+
+          <Button
             v-if="canNormalize"
             variant="outline"
             size="sm"
@@ -146,6 +158,7 @@ const props = withDefaults(
     canDelete?: boolean
     canMultiUpdate?: boolean
     canBoost?: boolean
+    canRepair?: boolean
     canNormalize?: boolean
     canCertification?: boolean
     canReassign?: boolean
@@ -154,6 +167,8 @@ const props = withDefaults(
     reassignDisabled?: boolean
     durationDisabled?: boolean
     durationTitle?: string
+    repairDisabled?: boolean
+    repairTitle?: string
     normalizeDisabled?: boolean
     selectedCount?: number
   }>(),
@@ -164,6 +179,7 @@ const props = withDefaults(
     canDelete: false,
     canMultiUpdate: false,
     canBoost: false,
+    canRepair: false,
     canNormalize: false,
     canCertification: false,
     canReassign: false,
@@ -172,6 +188,8 @@ const props = withDefaults(
     reassignDisabled: false,
     durationDisabled: false,
     durationTitle: '',
+    repairDisabled: false,
+    repairTitle: '',
     normalizeDisabled: false,
     selectedCount: 0,
   }
@@ -188,6 +206,7 @@ const emit = defineEmits<{
   (e: 'normalize-click'): void
   (e: 'certification-click'): void
   (e: 'duration-click'): void
+  (e: 'repair-click'): void
 }>()
 
 const showDeleteConfirm = ref(false)

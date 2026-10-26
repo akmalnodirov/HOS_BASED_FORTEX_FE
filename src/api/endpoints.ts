@@ -310,6 +310,15 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/boost`
   static readonly ROUTE_ELD_EVENT_SESSION_DURATION_BOOST = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
+    sessionId: string,
+    tabId: string,
+    repairId: string,
+    optionId: string
+  ) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}/options/${optionId}/apply`
   static readonly ROUTE_ELD_EVENT_SESSION_REASSIGN = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
   static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>

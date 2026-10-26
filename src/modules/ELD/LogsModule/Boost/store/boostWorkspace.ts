@@ -17,6 +17,8 @@ import type {
   RouteEldSessionOperation,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
+  GenerateRouteEldRepairRequest,
+  RouteEldRepairRequestResponse,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -647,6 +649,50 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     return unwrap(response.data)
   }
 
+  async function generateRepair(request: GenerateRouteEldRepairRequest) {
+    if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
+    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIRS(session.value.id, activeTabId.value),
+        request
+      )
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function applyRepair(repairId: string, optionId: string) {
+    if (!session.value || !activeTabId.value) return null
+    assertEditableSession()
+    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY(
+          sessionId,
+          tabId,
+          repairId,
+          optionId
+        ),
+        null
+      )
+      await synchronizeWorkspace(sessionId, tabId, true)
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function normalize(normalizeList: RouteEldNormalizeType[], applyCertificationFix: boolean) {
     if (!session.value || !activeTabId.value) return null
     if (!canEditWorkingSession.value) {
@@ -855,6 +901,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     fetchDriverOptions,
     fetchReassignTargets,
     analyzeAiAdvice,
+    generateRepair,
+    applyRepair,
     normalize,
     submitOrRollback,
     activeOperation,
