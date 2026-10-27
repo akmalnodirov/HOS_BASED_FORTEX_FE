@@ -68,6 +68,26 @@
             </p>
           </div>
 
+          <div class="rounded-md border p-3">
+            <div class="flex items-start gap-3">
+              <Checkbox
+                id="boost-repair-consider-alpr"
+                :model-value="considerAlpr"
+                :disabled="loading"
+                @update:model-value="considerAlpr = Boolean($event)"
+              />
+              <div class="space-y-1">
+                <Label for="boost-repair-consider-alpr" class="cursor-pointer text-sm">
+                  Consider ALPR warnings
+                </Label>
+                <p class="text-xs text-muted-foreground">
+                  Exclude repair options that transfer time across an event detected near an ALPR
+                  camera.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <p
             v-if="displayError"
             class="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700"
@@ -187,10 +207,20 @@
                         {{ row.durationMs == null ? '—' : formatDuration(row.durationMs) }}
                       </td>
                       <td class="px-3 py-2">
-                        <span class="font-medium">{{ row.event.eventName }}</span>
-                        <span class="ml-1 font-mono text-[10px] text-muted-foreground">{{
-                          row.event.eventCode
-                        }}</span>
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-medium">{{ row.event.eventName }}</span>
+                          <span class="font-mono text-[10px] text-muted-foreground">{{
+                            row.event.eventCode
+                          }}</span>
+                          <span
+                            v-if="row.hasAlprCamera"
+                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-red-50 text-red-600 dark:bg-red-950/35 dark:text-red-400"
+                            title="ALPR camera near this event"
+                            aria-label="ALPR camera near this event"
+                          >
+                            <Camera class="h-4 w-4" />
+                          </span>
+                        </div>
                       </td>
                       <td
                         class="max-w-80 truncate px-3 py-2"
@@ -246,9 +276,11 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch } from 'vue'
-import { Loader2 } from 'lucide-vue-next'
+import { Camera, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -371,6 +403,7 @@ const submitAttempted = ref(false)
 const hours = ref(0)
 const minutes = ref(0)
 const seconds = ref(0)
+const considerAlpr = ref(false)
 const requiresDuration = computed(() => Boolean(kind.value && durationKinds.has(kind.value)))
 const allowsAutomaticDuration = computed(() =>
   Boolean(kind.value && automaticDurationKinds.has(kind.value))
@@ -411,6 +444,7 @@ watch(kind, () => {
   emit('reset-error')
 })
 watch([hours, minutes, seconds], () => emit('reset-error'))
+watch(considerAlpr, () => emit('reset-error'))
 watch(
   () => props.open,
   (open) => {
@@ -421,6 +455,7 @@ watch(
     hours.value = 0
     minutes.value = 0
     seconds.value = 0
+    considerAlpr.value = false
   }
 )
 
@@ -440,6 +475,7 @@ const submit = () => {
     targetEventId: props.selectedEvent.id,
     targetTimestamp: props.selectedEvent.timestamp,
     requestedDurationSeconds: requiresDuration.value ? durationSeconds.value : 0,
+    considerAlpr: considerAlpr.value,
   })
 }
 

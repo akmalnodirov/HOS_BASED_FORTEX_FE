@@ -646,6 +646,7 @@ export interface GenerateRouteEldRepairRequest {
   targetEventId: string
   targetTimestamp: number
   requestedDurationSeconds: number
+  considerAlpr: boolean
 }
 
 export interface RouteEldRepairOperation {
@@ -660,6 +661,7 @@ export interface RouteEldRepairPreviewEvent {
   event: RouteEldHosEvent
   isDeleted: boolean
   changeStatus: 'UNCHANGED' | 'CHANGED' | 'DELETED'
+  hasAlprCamera: boolean
 }
 
 export interface RouteEldRepairOptionPreview {
