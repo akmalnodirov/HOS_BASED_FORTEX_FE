@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
+import { useDarkMode } from '@/composables/useDarkMode'
 import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/custom/modal'
@@ -10,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cycleRule as formatCycleRule, hours as formatCarrierHours, minutes as formatCarrierMinutes } from '@/modules/Company/utils/routeEldCarrierSettings'
 import type { RouteEldCompanyProfileResponse } from '@/modules/Company/types/routeEldCompanyProfile'
-import type { RouteEldLogDetail } from '@/modules/ELD/LogsModule/[Id]/types/routeEldDetail'
+import type { RouteEldHosStatus, RouteEldLogDetail } from '@/modules/ELD/LogsModule/[Id]/types/routeEldDetail'
+import CHosClockRings from '@/modules/ELD/LogsModule/[Id]/components/detail/CHosClockRings.vue'
 import { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
 
 type Border = 'none' | 'usca' | 'high'
@@ -24,6 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const api = useApi()
 const authStore = useAuthStore()
+const { isDarkMode } = useDarkMode()
 
 const tripMiles = ref<number | string>('')
 const hoursUsed = ref<number | string>(0)
@@ -43,6 +46,7 @@ const dailyResetHours = ref<number | null>(null)
 const cycleLimitHours = ref<number | null>(null)
 const cycleRemainingHours = ref<number | null>(null)
 const cycleRestartHours = ref<number | null>(null)
+const hosStatus = ref<RouteEldHosStatus | null>(null)
 let loadVersion = 0
 
 const borderOptions: { value: Border; label: string; delay: number }[] = [
@@ -96,8 +100,43 @@ const eta = computed(() =>
   dailyResetsOutsideCycle.value * (dailyResetHours.value ?? 0) +
   cycleResets.value * (cycleRestartHours.value ?? 0) + borderDelay.value
 )
+const etaNote = computed(() => {
+  const parts = ['drive']
+  if (breaks.value) parts.push(`${formatCompactHours(breaks.value * (breakMinutes.value ?? 0) / 60)} breaks`)
+  if (dailyResetsOutsideCycle.value) parts.push(`${formatCompactHours(dailyResetsOutsideCycle.value * (dailyResetHours.value ?? 0))} reset`)
+  if (cycleResets.value) parts.push(`${formatCompactHours(cycleResets.value * (cycleRestartHours.value ?? 0))} cycle restart`)
+  if (borderDelay.value) parts.push(`${formatCompactHours(borderDelay.value)} border`)
+  return parts.join(' + ')
+})
+const clockStats = computed(() => [
+  { label: 'Break', clock: hosStatus.value?.break, color: '#D28E3D', lightBg: '#F5E9DA', darkBg: '#3d2e1f' },
+  { label: 'Drive', clock: hosStatus.value?.drive, color: '#6082E0', lightBg: '#D6E1FF', darkBg: '#1e2b4d' },
+  { label: 'Shift', clock: hosStatus.value?.shift, color: '#589E67', lightBg: '#DCF5E2', darkBg: '#1f3024' },
+  { label: 'Cycle', clock: hosStatus.value?.cycle, color: '#AF4B4B', lightBg: '#F7E3E3', darkBg: '#3d1f1f' },
+].map(({ label, clock, color, lightBg, darkBg }) => ({
+  label,
+  value: clock ? formatClock(clock.remainingMilliseconds) : '—',
+  color,
+  innerBg: isDarkMode.value ? darkBg : lightBg,
+  progress: clock?.limitMilliseconds
+    ? Math.min(100, Math.max(0, clock.remainingMilliseconds / clock.limitMilliseconds * 100)) : 0,
+})))
+
 function formatHours(hours: number) {
-  return `${hours.toFixed(1)}h`
+  const rounded = Math.round(Math.max(0, hours) * 10) / 10
+  if (rounded < 24) return `${rounded.toFixed(1)}h`
+  const days = Math.floor(rounded / 24)
+  return `${days}d ${formatCompactHours(rounded - days * 24)}`
+}
+
+function formatCompactHours(hours: number) {
+  const rounded = Math.round(hours * 10) / 10
+  return `${rounded}h`
+}
+
+function formatClock(milliseconds: number) {
+  const totalMinutes = Math.floor(Math.max(0, milliseconds) / 60_000)
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`
 }
 
 function companyDate(timeZoneId: string) {
@@ -130,6 +169,7 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
   cycleLimitHours.value = null
   cycleRemainingHours.value = null
   cycleRestartHours.value = null
+  hosStatus.value = null
   sourceError.value = ''
   loading.value = true
 
@@ -156,6 +196,7 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
     )
     if (version !== loadVersion) return
     const detail = detailResponse.data.successResult
+    hosStatus.value = detail?.hos ?? null
     const clockHours = (milliseconds: number | undefined) =>
       milliseconds != null && milliseconds > 0 ? milliseconds / 3_600_000 : null
     driveLimitHours.value = clockHours(detail?.hos?.drive?.limitMilliseconds)
@@ -238,17 +279,26 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
 
         <div class="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/20 py-3">
           <div class="min-w-0 px-3">
-            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Drive time</p>
+            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Drive hours needed</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ canCalculate ? formatHours(driveHours) : '—' }}</p>
+            <p class="mt-1 text-[11px] leading-snug text-muted-foreground">at selected speed</p>
           </div>
           <div class="min-w-0 px-3">
-            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Estimated ETA</p>
+            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Realistic ETA</p>
             <p class="mt-1 text-lg font-semibold text-[#D28E3D]">{{ canCalculate ? formatHours(eta) : '—' }}</p>
+            <p class="mt-1 text-[11px] leading-snug text-muted-foreground">{{ canCalculate ? etaNote : 'Enter trip miles to calculate' }}</p>
           </div>
           <div class="min-w-0 px-3">
-            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Breaks</p>
+            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Breaks required</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ canCalculate ? breaks : '—' }}</p>
+            <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {{ breakMinutes ?? '—' }} min per {{ breakAfterHours != null ? formatCompactHours(breakAfterHours) : '—' }} drive
+            </p>
           </div>
+        </div>
+
+        <div class="overflow-x-auto pb-1">
+          <CHosClockRings :stats="clockStats" distributed />
         </div>
       </div>
     </ModalContent>
