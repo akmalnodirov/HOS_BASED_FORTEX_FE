@@ -58,6 +58,7 @@ import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { getCompanyId } from '@/utils/company'
 import type { RouteEldCompanyProfileResponse, RouteEldCompanyTerminal } from '../types/routeEldCompanyProfile'
+import { codeName, cycleRule, hours, minutes } from '../utils/routeEldCarrierSettings'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -98,21 +99,6 @@ function address(street: string | null, city: string | null, state: string | nul
 function timeZone(id: string | null) {
   const names: Record<string, string> = { ET: 'Eastern', CT: 'Central', MT: 'Mountain', PT: 'Pacific', AT: 'Atlantic', HT: 'Hawaii' }
   return id ? `${names[id] ? `${names[id]} Time` : id}${names[id] ? ` (${id})` : ''}` : '—'
-}
-function codeName(id: string | null) {
-  return id ? id.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) : '—'
-}
-function cycleRule(id: string | null) {
-  const match = /^US_(\d+)_(\d+)$/.exec(id || '')
-  return match ? `US ${match[1]} hours / ${match[2]} days` : codeName(id)
-}
-function hours(id: string | null) {
-  const match = /^H(\d+)$/.exec(id || '')
-  return match ? `${match[1]} hours` : codeName(id)
-}
-function minutes(id: string | null) {
-  const match = /^M(\d+)$/.exec(id || '')
-  return match ? `${match[1]} minutes` : codeName(id)
 }
 function logStart(offset: number | null) {
   if (offset === null) return '—'
