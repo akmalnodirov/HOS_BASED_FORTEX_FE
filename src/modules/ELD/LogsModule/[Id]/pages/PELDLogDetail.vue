@@ -27,6 +27,15 @@
       <div class="flex items-center justify-between py-4">
         <div class="flex flex-wrap items-center gap-3">
           <h3 class="text-xl font-semibold text-foreground">Events</h3>
+          <button
+            v-if="frozenEventCount"
+            type="button"
+            class="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:border-blue-400 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+            @click="frozenDialogOpen = true"
+          >
+            <LockKeyhole class="h-3.5 w-3.5" />
+            DOT inspected events ({{ frozenEventCount }})
+          </button>
           <CLogEventIssues
             :event-issues="eventIssues"
             :events="graphEvents"
@@ -114,6 +123,11 @@
       :selected-event-id="cameraRouteEventId"
       :analysis="cameraRouteAnalysis"
     />
+    <CDotInspectedEventsModal
+      v-model:open="frozenDialogOpen"
+      :rows="frozenEventRows"
+      @select-event="selectFrozenEvent"
+    />
   </div>
 </template>
 
@@ -121,6 +135,7 @@
 import { computed, inject, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { LockKeyhole } from 'lucide-vue-next'
 import CLogGraph from '../components/detail/CLogGraph.vue'
 import CLogEventsTable from '../components/detail/CLogEventsTable.vue'
 import CLogSignature from '../components/detail/CLogSignature.vue'
@@ -130,6 +145,7 @@ import CLogEventIssues from '../components/detail/CLogEventIssues.vue'
 import CLogEventTableColumnSettings from '../components/detail/CLogEventTableColumnSettings.vue'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import CBoostEventCameraDialog from '../../Boost/components/modals/CBoostEventCameraDialog.vue'
+import CDotInspectedEventsModal from '../../Boost/components/modals/CDotInspectedEventsModal.vue'
 import type { RouteEldEventCameraAnalysis, RouteEldEventCameraPresence, RouteEldHosEvent } from '../../Boost/types/boost'
 import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
 import type { RouteEldEvent } from '../types/routeEldDetail'
@@ -144,6 +160,7 @@ const logDetail = inject('logDetail') as ReturnType<typeof useRouteEldLogDetail>
 const eventsTable = ref<{ focusEvent: (eventId: string) => Promise<boolean> } | null>(null)
 const graphSection = ref<HTMLElement | null>(null)
 const statusFilter = ref('ACTIVE')
+const frozenDialogOpen = ref(false)
 const {
   columnOptions: eventTableColumnOptions,
   visibility: eventTableColumnVisibility,
@@ -194,6 +211,32 @@ const filteredDisplayEvents = computed(() =>
     ? displayEvents.value
     : displayEvents.value.filter((event) => normalizedStatus(event) === statusFilter.value)
 )
+const frozenEventRows = computed(() => displayEvents.value
+  .filter((event) => event.isFrozen)
+  .map((event) => ({
+    id: String(event.id || event.eventId),
+    event: event.eventName || 'Event',
+    time: formatTime(event.dateTime, 'MMM D, h:mm:ss a'),
+    sequenceId: decimalSequenceId(event.sequenceId),
+    source: event.freezeSource,
+  })))
+const frozenEventCount = computed(() => frozenEventRows.value.length)
+watch(() => [route.params.id, headerDate.value.format('YYYY-MM-DD')], () => {
+  frozenDialogOpen.value = false
+})
+
+function decimalSequenceId(value?: string | null) {
+  const normalized = value?.trim().replace(/^0x/i, '')
+  return normalized && /^[0-9a-f]+$/i.test(normalized)
+    ? BigInt(`0x${normalized}`).toString(10)
+    : value || '—'
+}
+
+async function selectFrozenEvent(eventId: string) {
+  frozenDialogOpen.value = false
+  statusFilter.value = '__all__'
+  await handleGraphEvent({ eventId })
+}
 
 const cameraCache = cameraPresenceCache
 const cameraEvents = computed(() => (detail.value?.events ?? []).filter((event) =>

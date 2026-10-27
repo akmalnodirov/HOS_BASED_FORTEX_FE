@@ -63,6 +63,16 @@
             <span class="text-muted-foreground">·</span>
             <span class="text-amber-600">Warnings: {{ warningCount }}</span>
           </Button>
+          <Button
+            v-if="frozenEventCount"
+            variant="outline"
+            size="sm"
+            class="h-9 border-blue-200 bg-blue-50 px-3 text-xs text-blue-700 hover:border-blue-400 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+            @click="frozenDialogOpen = true"
+          >
+            <LockKeyhole class="mr-1.5 h-3.5 w-3.5" />
+            DOT inspected events ({{ frozenEventCount }})
+          </Button>
           <!-- <div class="min-w-0">
             <h2 class="text-sm font-semibold">Duty-status graph</h2>
             <p class="text-xs text-muted-foreground">{{ sessionPeriodLabel }}</p>
@@ -167,6 +177,7 @@
 
     <section class="border-y border-border bg-background">
       <CBoostEventsTable
+        ref="boostEventsTableRef"
         :events="filteredDailyEvents"
         :loading="isDailyEventsLoading"
         :selected-event-id="selectedEventId"
@@ -278,6 +289,11 @@
       v-model:open="showErrorWarningModal"
       :rows="errorWarningRows"
       @row-click="handleErrorWarningRowClick"
+    />
+    <CDotInspectedEventsModal
+      v-model:open="frozenDialogOpen"
+      :rows="frozenEventRows"
+      @select-event="selectFrozenEvent"
     />
     <CBoostViolationModal
       v-model:open="showViolationModal"
@@ -494,12 +510,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronDown,
   ChevronUp,
+  LockKeyhole,
   MapPin,
   Plus,
   Route as RouteIcon,
@@ -545,6 +562,7 @@ import CBoostGraph from '../components/CBoostGraph.vue'
 import CBoostEventsTable from '../components/CBoostEventsTable.vue'
 import CBoostActions from '../components/CBoostActions.vue'
 import CBoostErrorWarningModal from '../components/modals/CBoostErrorWarningModal.vue'
+import CDotInspectedEventsModal from '../components/modals/CDotInspectedEventsModal.vue'
 import CBoostViolationModal from '../components/modals/CBoostViolationModal.vue'
 import CBoostMoveTimeModal from '../components/modals/CBoostMoveTimeModal.vue'
 import CBoostReassignModal from '../components/modals/CBoostReassignModal.vue'
@@ -655,9 +673,11 @@ const {
 } = boost
 
 const boostGraphRef = ref<InstanceType<typeof CBoostGraph> | null>(null)
+const boostEventsTableRef = ref<InstanceType<typeof CBoostEventsTable> | null>(null)
 const showGraph = ref(true)
 const changeFilter = ref('__all__')
 const statusFilter = ref('ACTIVE')
+const frozenDialogOpen = ref(false)
 const driverFilter = ref('__main__')
 const showLocationFinderModal = ref(false)
 const showErrorWarningModal = ref(false)
@@ -1245,6 +1265,29 @@ const filteredDailyEvents = computed(() => {
     ),
   }))
 })
+const frozenEventRows = computed(() => dailyEvents.value.flatMap((group) => group.events
+  .filter((event) => event.isFrozen && event.actionState !== 4)
+  .map((event) => ({
+    id: event.eventId,
+    event: event.eventName || 'Event',
+    time: dayjs(event.startTime).format('MMM D, h:mm:ss A'),
+    sequenceId: event.sequenceId || '—',
+    source: event.freezeSource,
+    driver: session.value?.coDriverId ? event.driverFullName : undefined,
+  }))))
+const frozenEventCount = computed(() => frozenEventRows.value.length)
+watch([() => session.value?.id, () => store.activeTabId], () => {
+  frozenDialogOpen.value = false
+})
+async function selectFrozenEvent(eventId: string) {
+  frozenDialogOpen.value = false
+  statusFilter.value = '__all__'
+  changeFilter.value = '__all__'
+  driverFilter.value = '__all__'
+  await nextTick()
+  await boostEventsTableRef.value?.focusEvent(eventId)
+  handleErrorWarningRowClick(eventId)
+}
 watch(activeDriverId, () => {
   if (driverFilter.value !== '__all__')
     driverFilter.value = activeDriverId.value === session.value?.driverId ? '__main__' : '__co_driver__'
