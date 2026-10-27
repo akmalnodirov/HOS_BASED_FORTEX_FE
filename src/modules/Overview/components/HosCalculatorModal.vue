@@ -210,7 +210,7 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
       hoursUsed.value = Math.round(Math.max(0,
         shiftLimitHours.value - detail.hos.shift.remainingMilliseconds / 3_600_000
       ) * 100) / 100
-    else sourceError.value = 'Shift hours are unavailable. Enter them manually.'
+    else sourceError.value = 'The Shift clock is unavailable for this driver; ETA cannot be calculated.'
 
     dailyResetHours.value = shiftLimitHours.value != null && shiftLimitHours.value < 24
       ? 24 - shiftLimitHours.value : null
@@ -218,7 +218,7 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
         !breakAfterHours.value || !dailyResetHours.value ||
         !cycleLimitHours.value || cycleRemainingHours.value == null ||
         !cycleRestartHours.value || !breakMinutes.value)
-      sourceError.value += `${sourceError.value ? ' ' : ''}HOS limits or company settings are unavailable; ETA cannot be calculated.`
+      sourceError.value ||= 'HOS limits or company settings are unavailable; ETA cannot be calculated.'
   } catch (error) {
     if (version === loadVersion)
       sourceError.value = error instanceof Error ? error.message : 'HOS settings could not be loaded.'
@@ -260,7 +260,7 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
           </div>
           <div class="space-y-1.5">
             <Label for="eta-hours-used">Shift used today (h)</Label>
-            <Input id="eta-hours-used" v-model.number="hoursUsed" type="number" min="0" step="any" />
+            <Input id="eta-hours-used" v-model.number="hoursUsed" type="number" min="0" step="any" :disabled="loading || shiftLimitHours == null" />
           </div>
           <div class="space-y-1.5">
             <Label for="eta-speed">Avg speed (mph)</Label>
