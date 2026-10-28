@@ -219,12 +219,13 @@
       :driver-id="driverId"
       :driver-name="tracking?.driver.driverName || 'Driver'"
       :suggested-speed="suggestedSpeed"
+      :origin="calculatorOrigin"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { CalendarDate } from '@internationalized/date'
@@ -271,6 +272,51 @@ const orderedPoints = computed(() =>
 )
 const firstPoint = computed(() => orderedPoints.value[0] ?? null)
 const lastPoint = computed(() => orderedPoints.value.at(-1) ?? null)
+const calculatorPoint = computed(() =>
+  tracking.value?.driver.latestPoint ?? (isToday.value ? lastPoint.value : null)
+)
+function detailedLocation(value: string | null) {
+  const location = value?.trim() || ''
+  return location && !/^[A-Z]{2}$/i.test(location) ? location : null
+}
+const calculatorOrigin = computed(() => {
+  const point = calculatorPoint.value
+  if (!point || !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude) ||
+      Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) return null
+  const matchingPoint = isToday.value
+    ? [...orderedPoints.value].reverse().find((candidate) =>
+        candidate.id === point.id ||
+        (Math.abs(candidate.timestamp - point.timestamp) <= 5 * 60_000 &&
+          Math.abs(candidate.latitude - point.latitude) < 0.0003 &&
+          Math.abs(candidate.longitude - point.longitude) < 0.0003))
+    : null
+  const location = detailedLocation(point.location)
+    || detailedLocation(matchingPoint?.location ?? null)
+    || historyAddresses[historyPointKey(point)]
+    || null
+  return { latitude: point.latitude, longitude: point.longitude, timestamp: point.timestamp, location }
+})
+watch(
+  () => [calculatorOpen.value, driverId.value, calculatorPoint.value?.latitude,
+    calculatorPoint.value?.longitude, calculatorPoint.value?.timestamp] as const,
+  ([open]) => { if (open) void resolveCalculatorLocation() }
+)
+async function resolveCalculatorLocation() {
+  const point = calculatorPoint.value
+  if (!point || !calculatorOrigin.value || calculatorOrigin.value.location) return
+  const key = historyPointKey(point)
+  if (historyAddressLoading[key]) return
+  historyAddressLoading[key] = true
+  try {
+    const address = await geoLocationsStore.getCalculatedAddress({
+      latitude: point.latitude,
+      longitude: point.longitude,
+    })
+    if (address) historyAddresses[key] = address
+  } finally {
+    historyAddressLoading[key] = false
+  }
+}
 const suggestedSpeed = computed(() => {
   const movingSpeeds = isToday.value
     ? orderedPoints.value.map((point) => point.speed).filter((speed): speed is number => speed != null && speed > 0)
