@@ -935,6 +935,20 @@ const isGroupOpen = (date: string) => openItems.value.includes(`group-${date}`)
 
 const scrollContainer = ref<HTMLElement | null>(null)
 
+async function focusEvent(eventId: string) {
+  const group = props.events.find((item) => item.events.some((event) => event.eventId === eventId))
+  if (!group) return false
+  const groupKey = `group-${group.date}`
+  if (!openItems.value.includes(groupKey)) openItems.value = [...openItems.value, groupKey]
+  await nextTick()
+  const row = Array.from(scrollContainer.value?.querySelectorAll<HTMLElement>('[data-event-id]') ?? [])
+    .find((element) => element.dataset.eventId === eventId)
+  row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  return !!row
+}
+
+defineExpose({ focusEvent })
+
 watch(
   () => props.highlightedEventId,
   async (eventId) => {

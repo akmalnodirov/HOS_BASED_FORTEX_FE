@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { LoaderCircle } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useDarkMode } from '@/composables/useDarkMode'
@@ -14,14 +15,50 @@ import type { RouteEldCompanyProfileResponse } from '@/modules/Company/types/rou
 import type { RouteEldHosStatus, RouteEldLogDetail } from '@/modules/ELD/LogsModule/[Id]/types/routeEldDetail'
 import CHosClockRings from '@/modules/ELD/LogsModule/[Id]/components/detail/CHosClockRings.vue'
 import { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
+import CAlprLocationInput from '@/modules/AlprCamera/components/CAlprLocationInput.vue'
+import type { AlprLocation } from '@/modules/AlprCamera/types'
 
 type Border = 'none' | 'usca' | 'high'
+type RouteOrigin = { latitude: number; longitude: number; timestamp: number; location: string | null }
+type CacheEntry<T> = { value: T; expiresAt: number }
+
+const HOS_CACHE_MS = 10 * 60_000
+const CARRIER_CACHE_MS = 30 * 60_000
+const companyCache = new Map<string, CacheEntry<RouteEldCompanyProfileResponse>>()
+const companyPending = new Map<string, Promise<RouteEldCompanyProfileResponse>>()
+const hosCache = new Map<string, CacheEntry<RouteEldLogDetail>>()
+const hosPending = new Map<string, Promise<RouteEldLogDetail>>()
+
+function cachedRequest<T>(
+  cache: Map<string, CacheEntry<T>>,
+  pending: Map<string, Promise<T>>,
+  key: string,
+  ttl: number,
+  fetcher: () => Promise<T>
+): Promise<T> {
+  const entry = cache.get(key)
+  if (entry && entry.expiresAt > Date.now()) return Promise.resolve(entry.value)
+  cache.delete(key)
+  const activeRequest = pending.get(key)
+  if (activeRequest) return activeRequest
+  const request = fetcher().then((value) => {
+    for (const [cachedKey, cachedEntry] of cache) {
+      if (cachedEntry.expiresAt <= Date.now()) cache.delete(cachedKey)
+    }
+    if (cache.size >= 50) cache.delete(cache.keys().next().value!)
+    cache.set(key, { value, expiresAt: Date.now() + ttl })
+    return value
+  }).finally(() => pending.delete(key))
+  pending.set(key, request)
+  return request
+}
 
 const props = defineProps<{
   open: boolean
   driverId: string
   driverName: string
   suggestedSpeed: number | null
+  origin: RouteOrigin | null
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const api = useApi()
@@ -29,6 +66,13 @@ const authStore = useAuthStore()
 const { isDarkMode } = useDarkMode()
 
 const tripMiles = ref<number | string>('')
+const destinationLabel = ref('')
+const destination = ref<AlprLocation | null>(null)
+const routeOrigin = ref<RouteOrigin | null>(null)
+const routeMiles = ref<number | null>(null)
+const distanceSource = ref<'none' | 'route' | 'manual'>('none')
+const routeLoading = ref(false)
+const routeError = ref('')
 const hoursUsed = ref<number | string>(0)
 const avgSpeed = ref<number | string>(60)
 const border = ref<Border>('none')
@@ -48,6 +92,100 @@ const cycleRemainingHours = ref<number | null>(null)
 const cycleRestartHours = ref<number | null>(null)
 const hosStatus = ref<RouteEldHosStatus | null>(null)
 let loadVersion = 0
+let routeVersion = 0
+
+const displayedOrigin = computed(() => routeOrigin.value ?? props.origin)
+const originLocation = computed(() => {
+  const origin = displayedOrigin.value
+  if (!origin) return ''
+  return origin.location?.trim() || `${origin.latitude.toFixed(5)}, ${origin.longitude.toFixed(5)}`
+})
+const originChanged = computed(() => destination.value && routeOrigin.value && props.origin &&
+  (routeOrigin.value.latitude !== props.origin.latitude ||
+    routeOrigin.value.longitude !== props.origin.longitude))
+
+function setTripMiles(value: string | number) {
+  routeVersion++
+  routeLoading.value = false
+  routeError.value = ''
+  routeMiles.value = null
+  distanceSource.value = 'manual'
+  tripMiles.value = value
+}
+
+function clearDestination() {
+  routeVersion++
+  if (distanceSource.value === 'route') {
+    tripMiles.value = ''
+    distanceSource.value = 'none'
+  }
+  destination.value = null
+  routeOrigin.value = null
+  routeMiles.value = null
+  routeLoading.value = false
+  routeError.value = ''
+}
+
+async function waitForDirectionsService() {
+  if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
+    throw new Error('Map routing is unavailable. Enter trip miles manually.')
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 6_000) {
+    const maps = (window as any).google?.maps
+    if (maps?.DirectionsService) return maps
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error('Map routing is unavailable. Enter trip miles manually.')
+}
+
+async function calculateRouteMiles() {
+  const selected = destination.value
+  const origin = props.origin
+  const version = ++routeVersion
+  if (distanceSource.value === 'route') {
+    tripMiles.value = ''
+    distanceSource.value = 'none'
+  }
+  routeMiles.value = null
+  routeLoading.value = false
+  routeError.value = ''
+  if (!selected) return
+  if (!origin) {
+    routeError.value = 'No last known driver location is available. Enter trip miles manually.'
+    return
+  }
+  routeOrigin.value = { ...origin }
+  routeLoading.value = true
+  try {
+    const maps = await waitForDirectionsService()
+    if (version !== routeVersion || !props.open) return
+    const result = await new maps.DirectionsService().route({
+      origin: { lat: origin.latitude, lng: origin.longitude },
+      destination: { lat: selected.latitude, lng: selected.longitude },
+      travelMode: maps.TravelMode.DRIVING,
+      provideRouteAlternatives: false,
+    })
+    if (version !== routeVersion || !props.open) return
+    const legs = result?.routes?.[0]?.legs
+    if (!legs?.length || legs.some((leg: any) => !Number.isFinite(leg.distance?.value)))
+      throw new Error('No driving route was found. Enter trip miles manually.')
+    const miles = Math.round(legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0) / 1609.344 * 10) / 10
+    routeMiles.value = miles
+    tripMiles.value = miles
+    distanceSource.value = 'route'
+  } catch (error) {
+    if (version === routeVersion && props.open)
+      routeError.value = error instanceof Error ? error.message : 'Road distance could not be calculated.'
+  } finally {
+    if (version === routeVersion) routeLoading.value = false
+  }
+}
+
+function selectDestination(location: AlprLocation) {
+  destination.value = location
+  destinationLabel.value = location.label
+  void calculateRouteMiles()
+}
 
 const borderOptions: { value: Border; label: string; delay: number }[] = [
   { value: 'none', label: 'None', delay: 0 },
@@ -150,9 +288,17 @@ function companyDate(timeZoneId: string) {
 
 watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
   const version = ++loadVersion
+  routeVersion++
   if (!open || !driverId) return
 
   tripMiles.value = ''
+  destinationLabel.value = ''
+  destination.value = null
+  routeOrigin.value = null
+  routeMiles.value = null
+  distanceSource.value = 'none'
+  routeLoading.value = false
+  routeError.value = ''
   hoursUsed.value = ''
   avgSpeed.value = props.suggestedSpeed && props.suggestedSpeed > 0
     ? Math.round(props.suggestedSpeed * 10) / 10 : 60
@@ -176,11 +322,14 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
   try {
     const companyId = authStore.companyId || getCompanyId()
     if (!companyId) throw new Error('Select a company to load its HOS settings.')
-    const companyResponse = await api.get<{ successResult: RouteEldCompanyProfileResponse }>(
-      ApiEndpoints.ROUTE_ELD_COMPANY_PROFILE(companyId)
-    )
+    const principal = authStore.user?.id || authStore.getTokens() || ''
+    const companyResponse = await cachedRequest(companyCache, companyPending,
+      `${principal}:${companyId}`, CARRIER_CACHE_MS,
+      async () => (await api.get<{ successResult: RouteEldCompanyProfileResponse }>(
+        ApiEndpoints.ROUTE_ELD_COMPANY_PROFILE(companyId)
+      )).data.successResult)
     if (version !== loadVersion) return
-    const profile = companyResponse.data.successResult?.profile
+    const profile = companyResponse?.profile
     if (!profile?.timeZoneId) throw new Error('The company time zone is unavailable.')
 
     cycleRule.value = profile.cycleRuleId
@@ -190,12 +339,14 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
     cycleRestartHours.value = Number(/^H(\d+)$/.exec(profile.restartId ?? '')?.[1]) || null
     cycleLimitHours.value = Number(/^[A-Z]+_(\d+)_(\d+)$/.exec(profile.cycleRuleId ?? '')?.[1]) || null
 
-    const detailResponse = await api.get<{ successResult: RouteEldLogDetail }>(
-      ApiEndpoints.ROUTE_ELD_LOG_DETAIL(driverId),
-      { params: { date: companyDate(profile.timeZoneId) } }
-    )
+    const date = companyDate(profile.timeZoneId)
+    const detail = await cachedRequest(hosCache, hosPending,
+      `${principal}:${companyId}:${driverId}:${date}`, HOS_CACHE_MS,
+      async () => (await api.get<{ successResult: RouteEldLogDetail }>(
+        ApiEndpoints.ROUTE_ELD_LOG_DETAIL(driverId),
+        { params: { date } }
+      )).data.successResult)
     if (version !== loadVersion) return
-    const detail = detailResponse.data.successResult
     hosStatus.value = detail?.hos ?? null
     const clockHours = (milliseconds: number | undefined) =>
       milliseconds != null && milliseconds > 0 ? milliseconds / 3_600_000 : null
@@ -253,10 +404,35 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
         <p v-if="loading" class="text-xs text-muted-foreground">Loading HOS data…</p>
         <p v-else-if="sourceError" class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">{{ sourceError }}</p>
 
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <Label>Destination</Label>
+            <button v-if="destination && origin" type="button" class="text-xs font-medium text-primary hover:underline" :disabled="routeLoading" @click="calculateRouteMiles">
+              Recalculate
+            </button>
+          </div>
+          <CAlprLocationInput
+            v-model="destinationLabel"
+            placeholder="Search a destination or enter coordinates"
+            @select="selectDestination"
+            @clear="clearDestination"
+          />
+          <p class="text-[11px] text-muted-foreground">
+            <template v-if="displayedOrigin">
+              From last known driver location: {{ originLocation }} · {{ new Date(displayedOrigin.timestamp).toLocaleString() }}
+              <span v-if="originChanged"> · New location available</span>
+            </template>
+            <template v-else>Last known driver location unavailable; enter miles manually.</template>
+          </p>
+          <p v-if="routeLoading" class="flex items-center gap-1.5 text-xs text-muted-foreground"><LoaderCircle class="h-3.5 w-3.5 animate-spin" /> Calculating road distance…</p>
+          <p v-else-if="routeError" class="text-xs text-amber-700 dark:text-amber-300">{{ routeError }}</p>
+          <p v-else-if="routeMiles != null" class="text-xs text-muted-foreground">Road route: {{ routeMiles }} mi</p>
+        </div>
+
         <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
           <div class="space-y-1.5">
             <Label for="eta-trip-miles">Trip miles</Label>
-            <Input id="eta-trip-miles" v-model.number="tripMiles" type="number" min="0" step="any" placeholder="Enter distance" />
+            <Input id="eta-trip-miles" :model-value="tripMiles" type="number" min="0" step="any" placeholder="Enter distance" @update:model-value="setTripMiles" />
           </div>
           <div class="space-y-1.5">
             <Label for="eta-hours-used">Shift used today (h)</Label>
