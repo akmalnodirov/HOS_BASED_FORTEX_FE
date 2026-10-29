@@ -664,9 +664,16 @@ export interface RouteEldRepairPreviewEvent {
   hasAlprCamera: boolean
 }
 
+export interface RouteEldRepairPreviewProfileForm {
+  logDate: string
+  trailers: string[]
+  shippingDocuments: string[]
+}
+
 export interface RouteEldRepairOptionPreview {
   events: RouteEldRepairPreviewEvent[]
   calculations: RouteEldScheduleCalculations
+  profileForms: RouteEldRepairPreviewProfileForm[]
 }
 
 export interface RouteEldRepairOption {
