@@ -178,6 +178,44 @@
                 />
               </div>
 
+              <div v-if="option.preview.profileForms.length" class="border-b bg-muted/10 p-4">
+                <h4
+                  class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  Profile forms
+                </h4>
+                <div class="max-h-48 overflow-auto rounded-md border bg-background">
+                  <table class="w-full min-w-150 border-collapse text-left text-xs">
+                    <thead class="sticky top-0 z-10 bg-muted">
+                      <tr class="border-b">
+                        <th class="px-3 py-2 font-medium text-muted-foreground">Date</th>
+                        <th class="px-3 py-2 font-medium text-muted-foreground">Trailers</th>
+                        <th class="px-3 py-2 font-medium text-muted-foreground">
+                          Shipping documents
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="profileForm in option.preview.profileForms"
+                        :key="profileForm.logDate"
+                        class="border-b last:border-b-0"
+                      >
+                        <td class="whitespace-nowrap px-3 py-2 font-medium">
+                          {{ profileForm.logDate }}
+                        </td>
+                        <td class="px-3 py-2">
+                          {{ profileForm.trailers.join(', ') || '—' }}
+                        </td>
+                        <td class="px-3 py-2">
+                          {{ profileForm.shippingDocuments.join(', ') || '—' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="max-h-96 overflow-auto">
                 <table class="w-full min-w-225 border-collapse text-left text-xs">
                   <thead class="sticky top-0 z-10 bg-muted">
