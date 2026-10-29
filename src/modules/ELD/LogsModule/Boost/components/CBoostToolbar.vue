@@ -48,15 +48,16 @@
             @click="$emit('update:driver-id', driver.id || '')"
           >{{ driver.name }}</button>
         </div>
-        <!-- <Button
+        <Button
+          v-if="allowAssistant"
           variant="outline"
           size="sm"
           class="h-9 px-4 text-xs text-blue-600"
           :disabled="!selectedTab"
-          @click="$emit('ai-advice-click')"
+          @click="$emit('assistant-click')"
         >
-          <Sparkles class="mr-2 h-4 w-4" /> AI Advice
-        </Button> -->
+          <Sparkles class="mr-2 h-4 w-4" /> Assistant
+        </Button>
         <Button
           v-if="primarySessionAction && (primarySessionAction === 'submit' ? allowSubmit : allowRollback)"
           size="sm"
@@ -99,7 +100,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Plus, X } from 'lucide-vue-next'
+import { Plus, Sparkles, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -123,6 +124,7 @@ const props = withDefaults(
     canManageTabs?: boolean
     allowSubmit?: boolean
     allowRollback?: boolean
+    allowAssistant?: boolean
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
     driverId?: string
@@ -142,6 +144,7 @@ const props = withDefaults(
     canManageTabs: false,
     allowSubmit: false,
     allowRollback: false,
+    allowAssistant: false,
     tabs: () => [],
     selectedTab: null,
     driverId: '',
@@ -159,6 +162,7 @@ const emit = defineEmits<{
   (e: 'select-tab', tab: TabResponse): void
   (e: 'remove-tab', tabId: string): void
   (e: 'ai-advice-click'): void
+  (e: 'assistant-click'): void
   (e: 'update:driver-id', driverId: string): void
 }>()
 
