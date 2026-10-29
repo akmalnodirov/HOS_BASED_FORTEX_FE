@@ -11,6 +11,7 @@
       :can-manage-tabs="session?.status === 'DRAFT' && allowed('route_eld.log_details.tabs.manage')"
       :allow-submit="allowed('route_eld.log_details.submit')"
       :allow-rollback="allowed('route_eld.log_details.rollback')"
+      :allow-assistant="allowAssistant"
       :actions-pending="store.isBusy"
       :submit-loading="sessionActionLoading"
       :driver-id="activeDriverId"
@@ -25,6 +26,7 @@
       @select-tab="selectTab"
       @remove-tab="removeTab"
       @ai-advice-click="aiAdviceOpen = true"
+      @assistant-click="assistantOpen = true"
     />
     <div
       v-if="store.isSessionLocked && !sessionProgressOpen"
@@ -351,6 +353,14 @@
       :result="aiAdviceResult"
       @analyze="analyzeAiAdvice"
     />
+    <CRouteEldAssistantSheet
+      v-if="allowAssistant"
+      v-model:open="assistantOpen"
+      :session-id="session?.id ?? ''"
+      :tab-id="store.activeTabId ?? ''"
+      :driver-name="session?.driverName ?? ''"
+      :other-driver-selected="assistantOtherDriverSelected"
+    />
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
       :loading="store.isMutating"
@@ -553,6 +563,7 @@ import CBoostEditEventModal from '../components/modals/CBoostEditEventModal.vue'
 import CBoostEditDailyFormModal from '../components/modals/CBoostEditDailyFormModal.vue'
 import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.vue'
 import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
+import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostCertificationModal from '../components/modals/CBoostCertificationModal.vue'
@@ -580,6 +591,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const allowed = (code: string) => hasPermission(authStore.token, code)
+const allowAssistant = computed(() => allowed('route_eld.log_details.assistant'))
 const boost = useScheduleBoost()
 const {
   store,
@@ -665,6 +677,14 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
+const assistantOpen = ref(false)
+const assistantOtherDriverSelected = computed(() =>
+  Boolean(
+    session.value?.driverId &&
+    activeDriverId.value &&
+    activeDriverId.value !== session.value.driverId
+  )
+)
 const normalizeOpen = ref(false)
 const normalizeResult = ref<RouteEldNormalizeResponse | null>(null)
 const certificationOpen = ref(false)
@@ -729,7 +749,10 @@ const disableStableScrollbar = () => document.body.classList.remove(stableScroll
 
 onMounted(enableStableScrollbar)
 onActivated(enableStableScrollbar)
-onDeactivated(disableStableScrollbar)
+onDeactivated(() => {
+  disableStableScrollbar()
+  assistantOpen.value = false
+})
 onBeforeUnmount(() => {
   disableStableScrollbar()
   if (highlightTimer) clearTimeout(highlightTimer)
