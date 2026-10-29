@@ -253,6 +253,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
   static readonly ROUTE_ELD_LOG_DETAILS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/details`
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
+  static readonly ROUTE_ELD_EVENT_SESSION_FILTER_OPTIONS = `${this.ROUTE_ELD_EVENT_SESSIONS}/filter-options`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
   static readonly ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER = (sessionId: string, tabId: string) =>
@@ -330,8 +331,6 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
   static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
-  static readonly ROUTE_ELD_DRIVER_RESPONSIBLE_USERS = (driverId: string) =>
-    `${this.ROUTE_ELD_DRIVERS}/${driverId}/responsible-users`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVERS = (driverId: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${driverId}/co-drivers`
   static readonly ROUTE_ELD_NORMALIZE = `${this.BASE_URL}/route-eld/normalize`

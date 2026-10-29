@@ -45,6 +45,7 @@ export interface BoostUiEventRow {
   sequenceId: number
   driverFullName: string
   startTime: string
+  dateToCertify: string | null
   duration: number
   eventType: number
   eventCode: number
@@ -133,6 +134,7 @@ export const useBoost = () => {
         sequenceId: ev.sequenceId,
         driverFullName: driverInfo.value?.name ?? '',
         startTime: ev.dateTime,
+        dateToCertify: ev.certifiedDate,
         duration: ev.durationInSeconds,
         eventType: ev.eventType,
         eventCode: ev.eventCode,
