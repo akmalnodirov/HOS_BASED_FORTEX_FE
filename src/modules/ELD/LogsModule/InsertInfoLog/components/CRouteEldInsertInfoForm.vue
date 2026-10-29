@@ -18,12 +18,6 @@
         </Select>
         <p v-if="eventCode === 'DS_D'" class="text-xs text-muted-foreground">Driving logs use Auto (ELD) origin.</p>
       </div>
-      <div v-if="recordOrigin === 'OTHER_USER'" class="space-y-1.5">
-        <Label>Responsible Route ELD user</Label>
-        <Select v-model="responsibleUserId" :disabled="!activeUsers.length"><SelectTrigger><SelectValue :placeholder="activeUsers.length ? 'Select a user' : 'No active users available'" /></SelectTrigger>
-          <SelectContent :body-lock="false"><SelectItem v-for="user in activeUsers" :key="user.id" :value="user.id">{{ user.name }}</SelectItem></SelectContent>
-        </Select>
-      </div>
     </div>
     <div class="rounded-md border border-border/70 bg-muted/20 p-4">
       <h3 class="mb-4 text-sm font-medium">Location</h3>
@@ -56,7 +50,7 @@
     </div>
     <div class="flex justify-end gap-2">
       <Button type="button" variant="outline" @click="clear">Clear</Button>
-      <Button type="submit" :disabled="loading || !driverExternalId || (recordOrigin === 'OTHER_USER' && !responsibleUserId)">
+      <Button type="submit" :disabled="loading">
         {{ loading ? 'Saving…' : 'Save active log' }}
       </Button>
     </div>
@@ -86,8 +80,6 @@ import type { InsertInfoLogRequest, InsertInfoOption } from '../types'
 
 const props = defineProps<{
   startSeconds: number
-  driverExternalId: string
-  users: InsertInfoOption[]
   vehicles: InsertInfoOption[]
   loading: boolean
 }>()
@@ -107,7 +99,6 @@ const noteShortcuts = [
 ]
 const eventCode = ref('DS_OFF')
 const recordOrigin = ref<InsertInfoLogRequest['recordOrigin']>('OTHER_USER')
-const responsibleUserId = ref('')
 const vehicleId = ref('none')
 const latitude = ref<string | number>('')
 const longitude = ref<string | number>('')
@@ -116,11 +107,7 @@ const odometerMiles = ref<string | number>('')
 const engineHours = ref<string | number>('')
 const notes = ref('')
 const geoStore = useGeoLocationsStore()
-const activeUsers = computed(() => props.users.filter(user => user.active !== false))
 const timeText = computed(() => `${String(Math.floor(props.startSeconds / 3600)).padStart(2, '0')}:${String(Math.floor(props.startSeconds % 3600 / 60)).padStart(2, '0')}`)
-watch(activeUsers, users => {
-  if (!users.some(user => user.id === responsibleUserId.value)) responsibleUserId.value = users[0]?.id ?? ''
-}, { immediate: true })
 let geocodeTimer: ReturnType<typeof setTimeout> | undefined
 watch([latitude, longitude], ([latText, lonText]) => {
   if (geocodeTimer) clearTimeout(geocodeTimer)
@@ -166,7 +153,6 @@ function save() {
   }
   emit('save', {
     eventCode: eventCode.value, recordOrigin: recordOrigin.value,
-    responsibleUserId: recordOrigin.value === 'OTHER_USER' ? responsibleUserId.value : props.driverExternalId,
     vehicleId: vehicleId.value === 'none' ? null : vehicleId.value,
     latitude: lat, longitude: lon, calculatedLocation: calculatedLocation.value.trim() || null,
     odometerMiles: odometer, engineHours: engine,
@@ -185,7 +171,7 @@ async function pasteCoordinates() {
   toast.success('Coordinates pasted')
 }
 function clear() {
-  selectStatus('DS_OFF'); recordOrigin.value = 'OTHER_USER'; responsibleUserId.value = activeUsers.value[0]?.id ?? ''
+  selectStatus('DS_OFF'); recordOrigin.value = 'OTHER_USER'
   vehicleId.value = 'none'; latitude.value = ''; longitude.value = ''; calculatedLocation.value = ''
   odometerMiles.value = ''; engineHours.value = ''; notes.value = ''
   emit('update:start-seconds', 0)

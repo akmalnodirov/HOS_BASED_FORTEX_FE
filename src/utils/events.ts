@@ -359,9 +359,17 @@ export const getEventKey = (eventType: number, eventCode: number): string => {
 /**
  * Get event label from eventType and eventCode
  */
-export const getEventLabel = (eventType: number, eventCode: number): string => {
+export const getEventLabel = (
+  eventType: number,
+  eventCode: number,
+  dateToCertify: string | null = null
+): string => {
   const event = findEventByTypeAndCode(eventType, eventCode)
-  return event?.label || 'Unknown'
+  const label = event?.label ?? 'Unknown'
+  const certificationDate = dateToCertify?.trim().split('/').reverse().join('/')
+  return eventType === EventType.DriverCertification && certificationDate
+    ? `${label} (${certificationDate})`
+    : label
 }
 
 /**

@@ -14,20 +14,6 @@
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <fieldset :disabled="readonly" class="space-y-4 disabled:opacity-100">
-          <div v-if="!form.eventId" class="space-y-1">
-            <label class="text-sm font-medium">Responsible user</label>
-            <Select
-              :model-value="form.responsibleUserId ?? ''"
-              @update:model-value="patch({ responsibleUserId: String($event) })"
-            >
-              <SelectTrigger><SelectValue placeholder="Select responsible user" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="user in users" :key="user.id" :value="user.id">
-                  {{ user.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div class="grid grid-cols-12 gap-3">
             <div class="col-span-3 space-y-1">
               <label class="text-sm font-medium">Sequence ID</label>
@@ -432,7 +418,6 @@ import { allEvents } from '@/utils/events.ts'
 import type {
   BoostEventStatusForm,
   RouteEldEventEditOptions,
-  RouteEldResponsibleUser,
 } from '../../types/boost.ts'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
@@ -467,7 +452,6 @@ interface Props {
   open: boolean
   form: BoostEventStatusForm
   editOptions?: RouteEldEventEditOptions
-  users?: RouteEldResponsibleUser[]
   disableSleeperBerth?: boolean
   fromDate?: string
   toDate?: string
@@ -479,7 +463,6 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   readonly: false,
   editOptions: () => ({ vehicles: [], elds: [] }),
-  users: () => [],
   disableSleeperBerth: false,
   fromDate: '',
   toDate: '',
@@ -878,7 +861,6 @@ function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
 }
 
 const isSubmitDisabled = computed(() => {
-  if (!props.form.eventId && !props.form.responsibleUserId) return true
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true
