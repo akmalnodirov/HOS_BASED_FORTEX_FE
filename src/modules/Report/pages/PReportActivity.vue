@@ -122,8 +122,20 @@
                       {{ row.companyName }}
                     </div>
                   </td>
-                  <td v-for="column in columns" :key="column.date" class="px-2 py-3 text-center" :class="canManage ? 'cursor-pointer hover:bg-primary/10' : ''" @click="canManage && editActivity(row, column.date)">
-                    <Select v-if="canManage" :model-value="String(activityFor(row, column.date)?.status ?? 9)" @update:model-value="value => upsertActivityCell(row, column, Number(value))">
+                  <td
+                    v-for="column in columns"
+                    :key="column.date"
+                    class="px-2 py-3 text-center"
+                    :class="canManage ? 'cursor-pointer hover:bg-primary/10' : ''"
+                    @click="canManage && (editingCell = cellKey(row, column.date))"
+                  >
+                    <Select
+                      v-if="canManage && editingCell === cellKey(row, column.date)"
+                      :open="true"
+                      :model-value="String(activityFor(row, column.date)?.status ?? 9)"
+                      @update:open="open => { if (!open) editingCell = null }"
+                      @update:model-value="value => upsertActivityCell(row, column, Number(value))"
+                    >
                       <SelectTrigger class="h-8 min-w-28" @click.stop><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem v-for="(label, value) in activityStatuses" :key="value" :value="String(value)">{{ label }}</SelectItem></SelectContent>
                     </Select>
@@ -138,7 +150,12 @@
                   </td>
                 </tr>
               </template>
-              <tr v-if="!loading && !rows.length">
+              <tr v-if="!loading && loadError">
+                <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-destructive">
+                  {{ loadError }}
+                </td>
+              </tr>
+              <tr v-else-if="!loading && !rows.length">
                 <td
                   :colspan="columns.length + 2"
                   class="px-4 py-12 text-center text-muted-foreground"
@@ -174,12 +191,11 @@
         </div>
       </div>
     </div>
-    <CReportEditor v-model:open="editorOpen" kind="activity" :record="editingActivity" :companies="companies" :drivers="drivers" :users="[]" @saved="refresh(page)" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
 import { Loader2, RefreshCw } from 'lucide-vue-next'
@@ -193,7 +209,6 @@ import {
 } from '@/components/ui/select'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
-import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -218,6 +233,7 @@ type ActivityRow = ReportDriverActivityTable['rows'][number]
 const operations = useReportOperations()
 async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number], status: number) {
   if (!row.driverId) return
+  editingCell.value = null
   const existing = activityFor(row, column.date)
   const body = {
     driverId: row.driverId,
@@ -226,8 +242,11 @@ async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivity
     colNumber: existing?.colNumber ?? column.colNumber,
   }
   try {
-    if (existing?.id) await operations.updateActivity(existing.id, body)
-    else await operations.createActivity(body)
+    if (existing?.id && existing.id !== '00000000-0000-0000-0000-000000000000') {
+      await operations.updateActivity(existing.id, body)
+    } else {
+      await operations.createActivity(body)
+    }
     await refresh(page.value)
   } catch {
     toast.error('Could not update activity')
@@ -236,17 +255,12 @@ async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivity
 const authStore = useAuthStore()
 const canManage = computed(() => hasPermission(authStore.getTokens(), 'report.manage'))
 const { activityVersion } = useReportSocket()
-const editorOpen = ref(false)
-const editingActivity = ref<{ id?: string; driver?: { id: string }; status?: number; date?: string; colNumber?: number } | null>(null)
-function editActivity(row: ActivityRow | null, date: string) {
-  const existing = row ? activityFor(row, date) : undefined
-  editingActivity.value = { id: existing?.id, driver: row?.driverId ? { id: row.driverId } : undefined, status: existing?.status ?? 9, date, colNumber: existing?.colNumber ?? columns.value.find((item) => item.date === date)?.colNumber ?? 1 }
-  editorOpen.value = true
-}
-const result = ref<ReportDriverActivityTable>()
-const companies = ref<ReportOperationCompany[]>([])
-const drivers = ref<ReportOperationDriver[]>([])
+const editingCell = ref<string | null>(null)
+const result = shallowRef<ReportDriverActivityTable>()
+const companies = shallowRef<ReportOperationCompany[]>([])
+const drivers = shallowRef<ReportOperationDriver[]>([])
 const loading = ref(false)
+const loadError = ref('')
 const initialLoad = ref(true)
 const ready = ref(false)
 const companyId = ref('all')
@@ -258,6 +272,7 @@ const range = ref<DateRange>({
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let requestVersion = 0
+const activityCache = new WeakMap<ActivityRow, Map<string, ReportDriverActivity>>()
 
 const columns = computed<ReportDriverActivityTable['columns']>(() => {
   const start = dayjs(range.value.startTime).startOf('day')
@@ -269,6 +284,9 @@ const columns = computed<ReportDriverActivityTable['columns']>(() => {
     colNumber: index + 1,
   }))
 })
+const pageSize = computed(() =>
+  Math.max(5, Math.min(50, Math.floor(2000 / Math.max(columns.value.length, 1))))
+)
 const rows = computed(() => result.value?.rows ?? [])
 const driverRows = computed(() => rows.value.filter((row) => !!row.driverId))
 const displayRows = computed(() => {
@@ -325,7 +343,7 @@ watch(companyId, () => {
 function queueRefresh() {
   if (!ready.value) return
   if (refreshTimer) clearTimeout(refreshTimer)
-  refreshTimer = setTimeout(() => refresh(1), 0)
+  refreshTimer = setTimeout(() => refresh(1), 100)
 }
 
 function onRange(value: DateRange) {
@@ -342,10 +360,21 @@ function formatActivityDay(value: string): string {
   return dayjs(value).format('MM/DD/YYYY')
 }
 
+function cellKey(row: ActivityRow, date: string): string {
+  return `${row.driverId}-${activityDateKey(date)}`
+}
+
 function activityFor(row: ActivityRow, date: string): ReportDriverActivity | undefined {
-  const key = activityDateKey(date)
-  const values = Object.values(row.dateStatuses ?? {})
-  return values.find((activity) => activityDateKey(activity.date) === key)
+  let activities = activityCache.get(row)
+  if (!activities) {
+    activities = new Map<string, ReportDriverActivity>()
+    for (const activity of Object.values(row.dateStatuses ?? {})) {
+      const key = activityDateKey(activity.date)
+      if (!activities.has(key)) activities.set(key, activity)
+    }
+    activityCache.set(row, activities)
+  }
+  return activities.get(activityDateKey(date))
 }
 
 function activityLabel(status?: number): string {
@@ -360,6 +389,7 @@ function hasKnownActivity(row: ActivityRow, date: string): boolean {
 async function refresh(nextPage = page.value) {
   const version = ++requestVersion
   if (initialLoad.value) loading.value = true
+  loadError.value = ''
   page.value = Math.max(1, nextPage)
   try {
     const response = await operations.getActivity({
@@ -368,9 +398,11 @@ async function refresh(nextPage = page.value) {
       startTime: operationRangeStart(range.value.startTime),
       endTime: operationRangeEnd(range.value.endTime),
       pageNumber: page.value,
-      pageSize: 500,
+      pageSize: pageSize.value,
     })
     if (version === requestVersion) result.value = response
+  } catch {
+    if (version === requestVersion) loadError.value = 'Could not load activity. Please try again.'
   } finally {
     if (version === requestVersion) {
       loading.value = false
@@ -383,16 +415,20 @@ watch([companyId, driverId], queueRefresh)
 
 watch(activityVersion, queueRefresh)
 
-onMounted(async () => {
-  const lookups = await operations.getLookups()
-  companies.value = lookups.companies
-  drivers.value = lookups.drivers
+onMounted(() => {
   ready.value = true
-  await refresh(1)
+  void refresh(1)
+  void operations.getLookups().then((lookups) => {
+    companies.value = lookups.companies
+    drivers.value = lookups.drivers
+  }).catch(() => {
+    loadError.value = 'Could not load activity filters. Please try again.'
+  })
 })
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearTimeout(refreshTimer)
+  requestVersion += 1
 })
 </script>
 
