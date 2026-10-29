@@ -13,7 +13,7 @@ export function useReportOperations() {
   const getTaskStatistics = async (query: Query) =>
     (await api.get<ReportResponse<ReportTaskStatistics>>(ApiEndpoints.REPORT_TASK_STATISTICS, { params: query })).data.successResult
   const getActivity = async (query: Query) =>
-    (await api.get<ReportResponse<ReportDriverActivityTable>>(ApiEndpoints.REPORT_ACTIVITY, { params: query })).data.successResult
+    (await api.get<ReportResponse<ReportDriverActivityTable>>(ApiEndpoints.REPORT_ACTIVITY, { params: query, timeout: 30000 })).data.successResult
   const getChecker = async (query: Query) =>
     (await api.get<ReportResponse<ReportCheckerTask[]>>(ApiEndpoints.REPORT_CHECKER, { params: query })).data.successResult
   const getAssistant = async (query: Query) =>
