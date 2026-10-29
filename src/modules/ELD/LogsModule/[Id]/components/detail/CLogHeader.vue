@@ -163,29 +163,7 @@
           : 'flex items-center gap-5 2xl:gap-6'
       "
     >
-      <div v-for="stat in stats" :key="stat.label" class="flex flex-col items-center">
-        <span
-          class="progress-ring relative w-19.25 h-19.25 2xl:w-20.5 2xl:h-20.5 rounded-full flex items-center justify-center"
-          :style="{
-            '--progress-angle': `${stat.progress * 3.6}deg`,
-            '--progress-color': stat.color,
-          }"
-        >
-          <span
-            class="absolute w-[67px] h-[67px] 2xl:w-[72px] 2xl:h-[72px] rounded-full bg-white dark:bg-background"
-          ></span>
-          <span
-            class="absolute w-[63px] h-[63px] 2xl:w-[68px] 2xl:h-[68px] rounded-full transition-colors"
-            :style="{ backgroundColor: stat.innerBg }"
-          ></span>
-          <span class="relative flex flex-col items-center justify-center leading-tight">
-            <span class="text-base font-bold text-foreground">{{ stat.value }}</span>
-            <span class="text-[11px] font-semibold" :style="{ color: stat.color }">{{
-              stat.label
-            }}</span>
-          </span>
-        </span>
-      </div>
+      <CHosClockRings :stats="stats" :compact="isBoostLayout" />
     </div>
 
     <div v-if="isBoostLayout" class="min-w-0 justify-self-stretch">
@@ -200,6 +178,7 @@ import { Mail, Phone, Clock, AlertCircle, Wifi, WifiOff } from 'lucide-vue-next'
 import { formatDuration } from '@/utils/time.ts'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
 import type { DailySummaryResponse } from '@/modules/ELD/LogsModule/[Id]/types/chart.ts'
+import CHosClockRings from './CHosClockRings.vue'
 import { useRoute } from 'vue-router'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CEventBadge from './CEventBadge.vue'
@@ -373,29 +352,3 @@ const stats = computed(() => {
   ]
 })
 </script>
-
-<style scoped>
-@property --progress-deg {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-.progress-ring {
-  --progress-deg: 0deg;
-  background: conic-gradient(
-    var(--progress-color) var(--progress-deg),
-    #f0f0f0 var(--progress-deg)
-  );
-  animation: progress-fill 1s ease-out forwards;
-}
-
-@keyframes progress-fill {
-  from {
-    --progress-deg: 0deg;
-  }
-  to {
-    --progress-deg: var(--progress-angle);
-  }
-}
-</style>

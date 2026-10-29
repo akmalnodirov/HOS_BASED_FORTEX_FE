@@ -19,6 +19,16 @@
               variant="ghost"
               size="icon"
               class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
+              aria-label="Open HOS calculator"
+              title="HOS calculator"
+              @click="calculatorOpen = true"
+            >
+              <Clock class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
               :disabled="!tracking?.driver.vehicleId"
               @click="openShare"
             >
@@ -204,6 +214,12 @@
       @update:expire-at="liveState.expireAt = $event"
       @submit="submitLiveShare"
     />
+    <HosCalculatorModal
+      v-model:open="calculatorOpen"
+      :driver-id="driverId"
+      :driver-name="tracking?.driver.driverName || 'Driver'"
+      :suggested-speed="suggestedSpeed"
+    />
   </div>
 </template>
 
@@ -220,6 +236,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
 import LiveShareModal from '../components/LiveShareModal.vue'
+import HosCalculatorModal from '../components/HosCalculatorModal.vue'
 import RouteEldTrackingMap from '../components/RouteEldTrackingMap.vue'
 import type { RouteEldLiveTrackingPoint } from '../types'
 import {
@@ -238,6 +255,7 @@ const selectedDate = ref(today)
 const calendarOpen = ref(false)
 const { tracking, isLoading, isToday, error } = useRouteEldDriverTracking(driverId, selectedDate)
 const liveModal = ref(false)
+const calculatorOpen = ref(false)
 const saveLoading = ref(false)
 const generatedShareUrl = ref('')
 const historyAddresses = reactive<Record<string, string>>({})
@@ -253,6 +271,14 @@ const orderedPoints = computed(() =>
 )
 const firstPoint = computed(() => orderedPoints.value[0] ?? null)
 const lastPoint = computed(() => orderedPoints.value.at(-1) ?? null)
+const suggestedSpeed = computed(() => {
+  const movingSpeeds = isToday.value
+    ? orderedPoints.value.map((point) => point.speed).filter((speed): speed is number => speed != null && speed > 0)
+    : []
+  if (movingSpeeds.length)
+    return movingSpeeds.reduce((total, speed) => total + speed, 0) / movingSpeeds.length
+  return tracking.value?.driver.latestPoint?.speed ?? null
+})
 const historyEntries = computed(() =>
   orderedPoints.value
     .map((point, index, points) => {

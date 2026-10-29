@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getApiErrorMessage } from '@/composables/useAxiosService'
+import { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
 import type {
   BoostFreeTime,
   DailyDictionarySummaryResponse,
@@ -25,6 +26,8 @@ import type {
 import { useBoostWorkspaceStore } from '../store/boostWorkspace'
 import { useChartStore } from '@/modules/ELD/LogsModule/[Id]/store/chart'
 import type { DragColumnType } from './useDragDrop'
+
+export { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
 
 export interface BoostUiEventRow {
   eventId: string
@@ -123,30 +126,6 @@ const NUMERIC_TO_EVENT_CODE: Record<string, string> = {
   '7:2': 'MALF_CLEARED',
   '7:3': 'DIAG_LOGGED',
   '7:4': 'DIAG_CLEARED',
-}
-
-const ROUTE_ELD_TIME_ZONES: Record<string, string> = {
-  ET: 'America/New_York',
-  CT: 'America/Chicago',
-  MT: 'America/Denver',
-  PT: 'America/Los_Angeles',
-  AT: 'America/Halifax',
-  NT: 'America/St_Johns',
-  AKT: 'America/Anchorage',
-  HT: 'Pacific/Honolulu',
-  AZ: 'America/Phoenix',
-  MST: 'America/Phoenix',
-  SK: 'America/Regina',
-}
-
-export function resolveRouteEldScheduleTimeZone(value?: string | null) {
-  return (
-    ROUTE_ELD_TIME_ZONES[
-      String(value || '')
-        .trim()
-        .toUpperCase()
-    ] ?? ROUTE_ELD_TIME_ZONES.CT
-  )
 }
 
 export function routeEldSessionTimelineCutoff(
