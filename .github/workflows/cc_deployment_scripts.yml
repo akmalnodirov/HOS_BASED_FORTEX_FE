@@ -20,7 +20,7 @@ jobs:
 
       - name: npm install and build
         env:
-          FRONTEND_ENV: ${{ secrets.FDS_FRONTEND_ENV }}
+          FRONTEND_ENV: ${{ secrets.CC_FRONTEND_ENV }}
         run: |
           if [ -z "$FRONTEND_ENV" ]; then
             echo "::error::FRONTEND_ENV GitHub Secret is not configured"
