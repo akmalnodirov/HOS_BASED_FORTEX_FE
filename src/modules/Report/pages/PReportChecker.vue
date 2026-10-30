@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
+  <div class="h-[calc(100dvh-65px)] min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar
       title="Checker"
       subtitle="Checker task review"
@@ -70,7 +70,7 @@
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto overscroll-contain">
           <table class="w-full min-w-[1480px] text-sm">
             <thead class="sticky top-0 z-20 bg-muted text-muted-foreground shadow-sm">
               <tr class="border-b border-border text-left">
@@ -147,16 +147,16 @@
                 <td v-if="canManage" class="px-4 py-3"><div class="flex gap-1"><Button v-if="canEdit && !isCheckerLocked(row.status)" size="icon-sm" variant="ghost" title="Edit checker task" aria-label="Edit checker task" @click="editTask(row)"><Pencil class="h-4 w-4 text-muted-foreground" /></Button><Button v-if="canDelete" size="icon-sm" variant="ghost" title="Delete checker task" aria-label="Delete checker task" @click="taskToDelete = row"><Trash2 class="h-4 w-4 text-destructive" /></Button></div></td>
               </tr>
               <tr v-if="canCreate" class="border-b border-border bg-primary/5">
-                <td class="px-4 py-3 text-muted-foreground">+</td>
+                <td class="px-4 py-3 text-muted-foreground">New</td>
                 <td class="px-4 py-3"><Select v-model="draftEmployeeId"><SelectTrigger class="h-8 min-w-36"><SelectValue placeholder="Select employee" /></SelectTrigger><SelectContent><SelectItem v-for="user in users" :key="user.id" :value="user.id">{{ operationUserName(user) }}</SelectItem></SelectContent></Select></td>
                 <td class="px-4 py-3">{{ currentCheckerName }}</td>
-                <td class="px-4 py-3"><CReportStatusMenu :model-value="Number(draftStatus)" :options="checkerStatuses" @update:model-value="value => draftStatus = String(value)" /></td>
+                <td class="px-4 py-3"><CReportStatusMenu :model-value="draftStatus" :options="checkerStatuses" :loading="draftSaving" @update:model-value="saveDraft" /></td>
                 <td colspan="2" class="px-4 py-3 text-muted-foreground">Assigned when saved</td>
                 <td class="px-4 py-3"><CReportSearchSelect :model-value="draftDriverId" :options="driversForCompany(draftCompanyId)" empty-label="No driver" empty-value="none" size="sm" @update:model-value="selectDraftDriver" /></td>
                 <td class="px-4 py-3"><CReportSearchSelect :model-value="draftCompanyId" :options="companies" size="sm" placeholder="Select company" @update:model-value="selectDraftCompany" /></td>
                 <td class="px-4 py-3"><input v-model="draftNote" class="w-full min-w-40 bg-transparent border-b border-border outline-none" placeholder="Action / note" /></td>
                 <td colspan="2" class="px-4 py-3"></td>
-                <td class="px-4 py-3"><Button size="icon-sm" title="Add row" aria-label="Add row" :disabled="!draftEmployeeId || !draftCompany || draftSaving" @click="saveDraft"><Plus class="h-4 w-4" /></Button></td>
+                <td class="px-4 py-3"></td>
               </tr>
               <tr v-if="!loading && !rows.length">
                 <td colspan="11" class="px-4 py-12 text-center text-muted-foreground">
@@ -180,7 +180,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -246,7 +246,7 @@ const rows = ref<ReportCheckerTask[]>([])
 const draftEmployeeId = ref('')
 const draftDriverId = ref('none')
 const draftCompanyId = ref('')
-const draftStatus = ref('0')
+const draftStatus = ref<number | null>(null)
 const draftNote = ref('')
 const draftSaving = ref(false)
 const draftCompany = computed(() => companies.value.find((company) => company.id === draftCompanyId.value))
@@ -264,19 +264,25 @@ function selectDraftCompany(value: string) {
   draftCompanyId.value = value
   if (!driversForCompany(value).some((driver) => driver.id === draftDriverId.value)) draftDriverId.value = 'none'
 }
-async function saveDraft() {
-  if (!draftCompany.value || !draftEmployeeId.value) return
+async function saveDraft(selectedStatus: number) {
+  if (draftSaving.value) return
+  if (!draftCompany.value || !draftEmployeeId.value) {
+    toast.error('Select an employee and company before setting a status')
+    return
+  }
+  draftStatus.value = selectedStatus
   draftSaving.value = true
   try {
-    await operations.createCheckerTask({ logBookerId: draftEmployeeId.value, driverId: draftDriverId.value === 'none' ? null : draftDriverId.value, companyId: draftCompany.value.id, status: Number(draftStatus.value), note: draftNote.value })
+    await operations.createCheckerTask({ logBookerId: draftEmployeeId.value, driverId: draftDriverId.value === 'none' ? null : draftDriverId.value, companyId: draftCompany.value.id, status: selectedStatus, note: draftNote.value })
     draftEmployeeId.value = ''
     draftDriverId.value = 'none'
     draftCompanyId.value = ''
-    draftStatus.value = '0'
+    draftStatus.value = null
     draftNote.value = ''
     queueRefresh()
   } catch {
     toast.error('Could not add checker task')
+    draftStatus.value = null
   } finally {
     draftSaving.value = false
   }

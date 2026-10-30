@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
+  <div class="h-[calc(100dvh-65px)] min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar
       title="Activity"
       subtitle="Driver activity status by day"
@@ -30,7 +30,7 @@
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto overscroll-contain">
           <table
             class="w-full text-sm"
             :style="{ minWidth: `${Math.max(760, 312 + columns.length * 125)}px` }"
@@ -116,11 +116,11 @@
                       <PopoverTrigger as-child>
                         <button
                           type="button"
-                          class="inline-flex min-h-8 min-w-20 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
-                          :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'text-muted-foreground hover:bg-primary/10'"
+                          class="inline-flex min-h-8 min-w-24 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
+                          :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'border border-border text-muted-foreground hover:bg-primary/10'"
                           :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
                           :disabled="savingCell === cellKey(row, column)"
-                        >{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : '+' }}</button>
+                        >{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : 'Select status' }}</button>
                       </PopoverTrigger>
                       <PopoverContent class="w-44 p-1" align="start">
                         <button
@@ -136,14 +136,14 @@
                     <button
                       v-else-if="canChangeCell(row, column)"
                       type="button"
-                      class="inline-flex min-h-8 min-w-20 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
-                      :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'text-muted-foreground hover:bg-primary/10'"
+                      class="inline-flex min-h-8 min-w-24 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
+                      :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'border border-border text-muted-foreground hover:bg-primary/10'"
                       :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
                       :disabled="savingCell === cellKey(row, column)"
                       @click="editingCell = cellKey(row, column)"
                     >
                       <Loader2 v-if="savingCell === cellKey(row, column)" class="h-4 w-4 animate-spin" />
-                      <template v-else>{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : '+' }}</template>
+                      <template v-else>{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : 'Select status' }}</template>
                     </button>
                     <span v-else-if="hasKnownActivity(row, column)"
                       class="inline-flex min-w-20 justify-center rounded-full px-2 py-1 text-xs font-semibold"

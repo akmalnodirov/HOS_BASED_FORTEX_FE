@@ -11,12 +11,13 @@ interface StatusOption {
 
 const props = withDefaults(
   defineProps<{
-    modelValue: number
+    modelValue: number | null
     options: StatusOption[]
     disabledValues?: number[]
     loading?: boolean
+    placeholder?: string
   }>(),
-  { disabledValues: () => [] }
+  { disabledValues: () => [], placeholder: 'Select status' }
 )
 
 const emit = defineEmits<{
@@ -38,8 +39,8 @@ function select(value: number) {
       <button
         type="button"
         class="inline-flex min-h-8 min-w-32 items-center justify-center whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
-        :class="operationStatusClass(modelValue)"
-        :aria-label="`Change status from ${operationStatusLabel(modelValue)}`"
+        :class="modelValue === null ? 'border border-border bg-background text-muted-foreground' : operationStatusClass(modelValue)"
+        :aria-label="modelValue === null ? placeholder : `Change status from ${operationStatusLabel(modelValue)}`"
         :aria-busy="loading"
         :disabled="loading"
         @click.stop
@@ -47,10 +48,7 @@ function select(value: number) {
         @keydown.space.stop
       >
         <Loader2 v-if="loading" class="mr-2 h-3.5 w-3.5 animate-spin" />
-        {{
-          options.find((item) => item.value === modelValue)?.label ??
-          operationStatusLabel(modelValue)
-        }}
+        {{ modelValue === null ? placeholder : options.find((item) => item.value === modelValue)?.label ?? operationStatusLabel(modelValue) }}
       </button>
     </PopoverTrigger>
     <PopoverContent class="w-44 p-1" align="start">

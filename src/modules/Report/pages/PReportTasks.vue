@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
+  <div class="h-[calc(100dvh-65px)] min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar
       title="Tasks"
       subtitle="Route Report task overview"
@@ -63,7 +63,7 @@
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto overscroll-contain">
           <table class="w-full min-w-[1050px] text-sm">
             <thead class="sticky top-0 z-20 bg-muted text-muted-foreground shadow-sm">
               <tr class="border-b border-border text-left">
@@ -93,8 +93,8 @@
                   class="border-b border-border/60 hover:bg-muted/30 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                   tabindex="0"
                   @click="openTaskHistory(entry.routeTask.id)"
-                  @keydown.enter="openTaskHistory(entry.routeTask.id)"
-                  @keydown.space.prevent="openTaskHistory(entry.routeTask.id)"
+                  @keydown.enter.self="openTaskHistory(entry.routeTask.id)"
+                  @keydown.space.self.prevent="openTaskHistory(entry.routeTask.id)"
                 >
                   <td class="px-4 py-3 text-muted-foreground">{{ index + 1 }}</td>
                   <td class="px-4 py-3 font-medium" @click.stop>
@@ -131,7 +131,7 @@
                   </td>
                   <td class="px-4 py-3" @click.stop><CReportSearchSelect v-if="canEdit && !isTaskLocked(entry.routeTask.status)" :model-value="taskCompanyId(entry.routeTask)" :options="companies" size="sm" placeholder="Select company" @update:model-value="value => selectTaskCompany(entry.routeTask, value)" /><span v-if="pendingTaskCompanies[entry.routeTask.id]" class="text-xs text-muted-foreground">Select a driver to save</span><template v-else-if="!canEdit || isTaskLocked(entry.routeTask.status)">{{ entry.routeTask.company?.name ?? '—' }}</template></td>
                   <td class="px-4 py-3 max-w-xs whitespace-normal">
-                    <input v-if="canEdit && !isTaskLocked(entry.routeTask.status)" :value="entry.routeTask.notes ?? ''" class="w-full min-w-40 bg-transparent border-b border-transparent focus:border-primary outline-none" placeholder="Action / note" @click.stop @change.stop="event => updateTaskRow(entry.routeTask, { notes: (event.target as HTMLInputElement).value })" />
+                    <CReportNotePicker v-if="canEdit && !isTaskLocked(entry.routeTask.status)" :model-value="entry.routeTask.notes ?? ''" @commit="value => saveTaskNotes(entry.routeTask, value)" />
                     <template v-else>{{ entry.routeTask.notes || '—' }}</template>
                   </td>
                   <td v-if="canManage" class="px-4 py-3">
@@ -154,16 +154,16 @@
                 </tr>
               </template>
               <tr v-if="canCreate" class="border-b border-border bg-primary/5">
-                <td class="px-4 py-3 text-muted-foreground">+</td>
+                <td class="px-4 py-3 text-muted-foreground">New</td>
                 <td class="px-4 py-3">
                   <CReportSearchSelect :model-value="draftDriverId" :options="driversForCompany(draftCompanyId || (companyId === 'all' ? '' : companyId))" size="sm" placeholder="Select driver" @update:model-value="selectDraftDriver" />
                 </td>
                 <td class="px-4 py-3 text-muted-foreground">Current user</td>
-                <td class="px-4 py-3"><CReportStatusMenu :model-value="Number(draftStatus)" :options="routeTaskStatuses.slice(0, 4)" @update:model-value="value => draftStatus = String(value)" /></td>
+                <td class="px-4 py-3"><CReportStatusMenu :model-value="draftStatus" :options="routeTaskStatuses.slice(0, 4)" :loading="draftSaving" @update:model-value="saveDraft" /></td>
                 <td colspan="2" class="px-4 py-3 text-muted-foreground">Assigned when saved</td>
                 <td class="px-4 py-3"><CReportSearchSelect :model-value="draftCompanyId" :options="companies" size="sm" placeholder="Select company" @update:model-value="selectDraftCompany" /></td>
-                <td class="px-4 py-3"><input v-model="draftNotes" class="w-full min-w-40 bg-transparent border-b border-border outline-none" placeholder="Action / note" /></td>
-                <td class="px-4 py-3"><Button size="icon-sm" title="Add row" aria-label="Add row" :disabled="!draftDriverId || !draftCompany || draftSaving" @click="saveDraft"><Plus class="h-4 w-4" /></Button></td>
+                <td class="px-4 py-3"><CReportNotePicker v-model="draftNotes" /></td>
+                <td class="px-4 py-3"></td>
               </tr>
               <tr v-if="!loading && !rows.length">
                 <td colspan="8" class="px-4 py-12 text-center text-muted-foreground">
@@ -204,7 +204,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -217,6 +217,7 @@ import {
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
 import CReportTaskHistoryModal from '@/modules/Report/components/CReportTaskHistoryModal.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportNotePicker from '@/modules/Report/components/CReportNotePicker.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
@@ -259,28 +260,34 @@ const deleting = ref(false)
 const taskStatistics = ref<ReportTaskStatistics>()
 const draftDriverId = ref('')
 const draftCompanyId = ref('')
-const draftStatus = ref('0')
+const draftStatus = ref<number | null>(null)
 const draftNotes = ref('')
 const draftSaving = ref(false)
 const draftCompany = computed(() => companies.value.find((company) => company.id === draftCompanyId.value))
-async function saveDraft() {
-  if (!draftDriverId.value || !draftCompany.value) return
-  if (draftStatus.value === '2' && !draftNotes.value.trim()) {
+async function saveDraft(selectedStatus: number) {
+  if (draftSaving.value) return
+  if (!draftDriverId.value || !draftCompany.value) {
+    toast.error('Select a driver and company before setting a status')
+    return
+  }
+  if (selectedStatus === 2 && !draftNotes.value.trim()) {
     toast.error('Add a note before completing the task')
     return
   }
+  draftStatus.value = selectedStatus
   draftSaving.value = true
   try {
-    const body = { driverId: draftDriverId.value, companyId: draftCompany.value.id, status: Number(draftStatus.value), notes: draftNotes.value }
+    const body = { driverId: draftDriverId.value, companyId: draftCompany.value.id, status: selectedStatus, notes: draftNotes.value }
     if (body.status === 3) await operations.createAssistantTask(body)
     else await operations.createTask(body)
     draftDriverId.value = ''
     draftCompanyId.value = ''
-    draftStatus.value = '0'
+    draftStatus.value = null
     draftNotes.value = ''
     queueRefresh()
   } catch {
     toast.error('Could not add task')
+    draftStatus.value = null
   } finally {
     draftSaving.value = false
   }
@@ -448,6 +455,11 @@ async function updateTaskRow(task: ReportRouteTask, changes: { status?: number; 
   } finally {
     if (savingStatus) statusSavingIds.value = statusSavingIds.value.filter((id) => id !== task.id)
   }
+}
+
+function saveTaskNotes(task: ReportRouteTask, value: string) {
+  task.notes = value
+  void updateTaskRow(task, { notes: value })
 }
 
 function shiftName(shiftType: number): string {

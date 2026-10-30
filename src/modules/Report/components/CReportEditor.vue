@@ -52,7 +52,11 @@
           Column
           <Input v-model="form.colNumber" type="number" min="1" required class="h-10" />
         </label>
-        <label v-if="kind !== 'activity'" class="grid gap-1.5 text-sm">
+        <div v-if="kind === 'task' || kind === 'assistant'" class="grid gap-1.5 text-sm">
+          <span>Notes</span>
+          <CReportNotePicker v-model="form.note" />
+        </div>
+        <label v-if="kind === 'checker'" class="grid gap-1.5 text-sm">
           Note
           <Textarea v-model="form.note" rows="3" />
         </label>
@@ -82,6 +86,7 @@ import { CalendarDate } from '@internationalized/date'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportNotePicker from '@/modules/Report/components/CReportNotePicker.vue'
 import { useReportOperations } from '@/modules/Report/composables/useReportOperations'
 import { activityStatuses, checkerStatuses, routeTaskStatuses } from '@/modules/Report/utils/operations'
 import type { ReportOperationCompany, ReportOperationDriver, ReportOperationUser } from '@/modules/Report/types'

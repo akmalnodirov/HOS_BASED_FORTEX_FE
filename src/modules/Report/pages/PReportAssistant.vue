@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
+  <div class="h-[calc(100dvh-65px)] min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar
       title="Assistant"
       subtitle="Assistant task overview"
@@ -74,7 +74,7 @@
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto overscroll-contain">
           <table class="w-full min-w-[1200px] text-sm">
             <thead class="sticky top-0 z-20 bg-muted text-muted-foreground shadow-sm">
               <tr class="border-b border-border text-left">
@@ -140,20 +140,20 @@
                 </td>
                 <td class="px-4 py-3">{{ operationUserName(entry.routeTask.logBooker) }}</td>
                 <td class="px-4 py-3 max-w-xs whitespace-normal">
-                  <input v-if="canEdit && !isAssistantLocked(entry.routeTask.status)" :value="entry.routeTask.notes ?? ''" class="w-full min-w-40 bg-transparent border-b border-transparent focus:border-primary outline-none" placeholder="Action / note" @change="event => updateAssistantRow(entry.routeTask, { notes: (event.target as HTMLInputElement).value })" />
+                  <CReportNotePicker v-if="canEdit && !isAssistantLocked(entry.routeTask.status)" :model-value="entry.routeTask.notes ?? ''" @commit="value => saveAssistantNotes(entry.routeTask, value)" />
                   <template v-else>{{ entry.routeTask.notes || '—' }}</template>
                 </td>
                 <td v-if="canManage" class="px-4 py-3"><Button v-if="canEdit && !isAssistantLocked(entry.routeTask.status)" size="icon-sm" variant="ghost" title="Edit assistant task" aria-label="Edit assistant task" @click="editTask(entry.routeTask)"><Pencil class="h-4 w-4 text-muted-foreground" /></Button></td>
               </tr>
               <tr v-if="canCreate" class="border-b border-border bg-primary/5">
-                <td class="px-4 py-3 text-muted-foreground">+</td>
+                <td class="px-4 py-3 text-muted-foreground">New</td>
                 <td class="px-4 py-3"><CReportSearchSelect :model-value="draftDriverId" :options="driversForCompany(draftCompanyId || (companyId === 'all' ? '' : companyId))" size="sm" placeholder="Select driver" @update:model-value="selectDraftDriver" /></td>
                 <td class="px-4 py-3"><CReportSearchSelect :model-value="draftCompanyId" :options="companies" size="sm" placeholder="Select company" @update:model-value="selectDraftCompany" /></td>
                 <td class="px-4 py-3 text-muted-foreground">Current user</td>
-                <td class="px-4 py-3"><CReportStatusMenu :model-value="Number(draftStatus)" :options="routeTaskStatuses.slice(3)" :disabled-values="[5]" @update:model-value="value => draftStatus = String(value)" /></td>
+                <td class="px-4 py-3"><CReportStatusMenu :model-value="draftStatus" :options="routeTaskStatuses.slice(3)" :disabled-values="[5]" :loading="draftSaving" @update:model-value="saveDraft" /></td>
                 <td colspan="3" class="px-4 py-3 text-muted-foreground">Assigned when saved</td>
-                <td class="px-4 py-3"><input v-model="draftNotes" class="w-full min-w-40 bg-transparent border-b border-border outline-none" placeholder="Action / note" /></td>
-                <td class="px-4 py-3"><Button size="icon-sm" title="Add row" aria-label="Add row" :disabled="!draftDriverId || !draftCompany || draftSaving" @click="saveDraft"><Plus class="h-4 w-4" /></Button></td>
+                <td class="px-4 py-3"><CReportNotePicker v-model="draftNotes" /></td>
+                <td class="px-4 py-3"></td>
               </tr>
               <tr v-if="!loading && !rows.length">
                 <td colspan="9" class="px-4 py-12 text-center text-muted-foreground">
@@ -176,7 +176,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { Loader2, Pencil, Plus, RefreshCw } from 'lucide-vue-next'
+import { Loader2, Pencil, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -189,6 +189,7 @@ import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.v
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportNotePicker from '@/modules/Report/components/CReportNotePicker.vue'
 import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -224,22 +225,28 @@ function editTask(task: ReportTaskState['routeTask'] | null) { editingTask.value
 const rows = ref<ReportTaskState[]>([])
 const draftDriverId = ref('')
 const draftCompanyId = ref('')
-const draftStatus = ref('3')
+const draftStatus = ref<number | null>(null)
 const draftNotes = ref('')
 const draftSaving = ref(false)
 const draftCompany = computed(() => companies.value.find((company) => company.id === draftCompanyId.value))
-async function saveDraft() {
-  if (!draftDriverId.value || !draftCompany.value) return
+async function saveDraft(selectedStatus: number) {
+  if (draftSaving.value) return
+  if (!draftDriverId.value || !draftCompany.value) {
+    toast.error('Select a driver and company before setting a status')
+    return
+  }
+  draftStatus.value = selectedStatus
   draftSaving.value = true
   try {
-    await operations.createAssistantTask({ driverId: draftDriverId.value, companyId: draftCompany.value.id, status: Number(draftStatus.value), notes: draftNotes.value })
+    await operations.createAssistantTask({ driverId: draftDriverId.value, companyId: draftCompany.value.id, status: selectedStatus, notes: draftNotes.value })
     draftDriverId.value = ''
     draftCompanyId.value = ''
-    draftStatus.value = '3'
+    draftStatus.value = null
     draftNotes.value = ''
     queueRefresh()
   } catch {
     toast.error('Could not add assistant task')
+    draftStatus.value = null
   } finally {
     draftSaving.value = false
   }
@@ -275,6 +282,10 @@ async function updateAssistantRow(task: ReportRouteTask, changes: { status?: num
   } finally {
     if (savingStatus) statusSavingIds.value = statusSavingIds.value.filter((id) => id !== task.id)
   }
+}
+function saveAssistantNotes(task: ReportRouteTask, value: string) {
+  task.notes = value
+  void updateAssistantRow(task, { notes: value })
 }
 function isAssistantLocked(status: number): boolean {
   return status === 5

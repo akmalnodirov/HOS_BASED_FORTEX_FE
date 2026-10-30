@@ -26,7 +26,7 @@
     <!-- Main Content -->
     <main
       class="pt-[65px] transition-all duration-300"
-      :class="[isSidebarOpen ? 'lg:pl-[248px]' : 'lg:pl-0']"
+      :class="[isSidebarOpen ? 'lg:pl-[248px]' : 'lg:pl-0', isBoardPage && 'h-dvh overflow-hidden']"
     >
       <div>
         <router-view />
@@ -36,13 +36,14 @@
 </template>
 <!-- src/Layouts/MainLayout.vue -->
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/layouts/Default/components/AppSidebar.vue'
 import AppHeader from '@/layouts/Default/components/AppHeader.vue'
 import CToggle from '@/layouts/Default/components/CToggle.vue'
 
 const route = useRoute()
+const isBoardPage = computed(() => ['/report/tasks', '/report/activity', '/report/checker', '/report/assistant'].includes(route.path))
 const isSidebarOpen = ref(true)
 const isMobile = ref(false)
 
