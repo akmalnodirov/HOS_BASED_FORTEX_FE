@@ -100,12 +100,12 @@
                 </td>
               </tr>
               <tr
-                v-for="(entry, index) in rows"
+                v-for="(entry, index) in visibleRows"
                 v-else
                 :key="`${entry.routeTask.id}-${index}`"
                 class="border-b border-border/60 hover:bg-muted/30"
               >
-                <td class="px-4 py-3 text-muted-foreground">{{ index + 1 }}</td>
+                <td class="px-4 py-3 text-muted-foreground">{{ pageSizeSelection === 'all' ? index + 1 : (tablePage - 1) * Number(pageSizeSelection) + index + 1 }}</td>
                 <td class="px-4 py-3 font-medium">
                   <CReportSearchSelect v-if="canEdit && !isAssistantLocked(entry.routeTask.status)" :model-value="taskDriverId(entry.routeTask)" :options="driversForCompany(taskCompanyId(entry.routeTask))" size="sm" placeholder="Select driver" @update:model-value="value => updateAssistantRow(entry.routeTask, { driverId: value })" />
                   <template v-else>{{ entry.routeTask.driver?.name ?? '—' }}</template>
@@ -163,8 +163,16 @@
             </tbody>
           </table>
         </div>
-        <div class="shrink-0 px-4 py-3 text-sm text-muted-foreground border-t border-border">
-          {{ uniqueTasks.length }} assistant tasks
+        <div class="shrink-0 flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground border-t border-border">
+          <span>{{ uniqueTasks.length }} assistant tasks</span>
+          <div class="flex items-center gap-2">
+            <CReportPageSize v-model="pageSizeSelection" />
+            <template v-if="pageSizeSelection !== 'all'">
+              <Button size="sm" variant="outline" :disabled="tablePage <= 1" @click="tablePage--">Previous</Button>
+              <span class="text-xs">{{ tablePage }} / {{ tablePageCount }}</span>
+              <Button size="sm" variant="outline" :disabled="tablePage >= tablePageCount" @click="tablePage++">Next</Button>
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -191,6 +199,8 @@ import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
 import CReportNotePicker from '@/modules/Report/components/CReportNotePicker.vue'
 import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
+import CReportPageSize from '@/modules/Report/components/CReportPageSize.vue'
+import { useReportTablePage } from '@/modules/Report/composables/useReportTablePage'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -215,14 +225,15 @@ import {
 
 const operations = useReportOperations()
 const authStore = useAuthStore()
-const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.assistant.create') || hasPermission(authStore.getTokens(), 'report.manage'))
-const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.assistant.edit') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.assistant.create'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.assistant.edit'))
 const canManage = computed(() => canCreate.value || canEdit.value)
 const { assistantVersion } = useReportSocket()
 const editorOpen = ref(false)
 const editingTask = ref<ReportTaskState['routeTask'] | null>(null)
 function editTask(task: ReportTaskState['routeTask'] | null) { editingTask.value = task; editorOpen.value = true }
 const rows = ref<ReportTaskState[]>([])
+const { pageSizeSelection, tablePage, tablePageCount, visibleRows } = useReportTablePage(rows)
 const draftDriverId = ref('')
 const draftCompanyId = ref('')
 const draftStatus = ref<number | null>(null)
@@ -413,6 +424,7 @@ watch(companyId, () => {
 watch([driverId, companyId, assistantId, logBookerId, status], queueRefresh)
 
 watch(assistantVersion, queueRefresh)
+watch(tablePage, async () => { await nextTick(); tableScroll.value?.scrollTo({ top: 0 }) })
 
 onMounted(async () => {
   const lookups = await operations.getLookups()

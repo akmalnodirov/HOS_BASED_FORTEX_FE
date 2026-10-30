@@ -95,12 +95,12 @@
                 </td>
               </tr>
               <tr
-                v-for="(row, index) in rows"
+                v-for="(row, index) in visibleRows"
                 v-else
                 :key="row.id"
                 class="border-b border-border/60 hover:bg-muted/30"
               >
-                <td class="px-4 py-3 text-muted-foreground">{{ index + 1 }}</td>
+                <td class="px-4 py-3 text-muted-foreground">{{ pageSizeSelection === 'all' ? index + 1 : (tablePage - 1) * Number(pageSizeSelection) + index + 1 }}</td>
                 <td class="px-4 py-3 font-medium">{{ targetLabel(row.logBooker) }}</td>
                 <td class="px-4 py-3">{{ operationUserName(row.checker) }}</td>
                 <td class="px-4 py-3">
@@ -166,8 +166,16 @@
             </tbody>
           </table>
         </div>
-        <div class="shrink-0 px-4 py-3 text-sm text-muted-foreground border-t border-border">
-          {{ rows.length }} checker tasks · {{ uploadCount }} files
+        <div class="shrink-0 flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground border-t border-border">
+          <span>{{ rows.length }} checker tasks · {{ uploadCount }} files</span>
+          <div class="flex items-center gap-2">
+            <CReportPageSize v-model="pageSizeSelection" />
+            <template v-if="pageSizeSelection !== 'all'">
+              <Button size="sm" variant="outline" :disabled="tablePage <= 1" @click="tablePage--">Previous</Button>
+              <span class="text-xs">{{ tablePage }} / {{ tablePageCount }}</span>
+              <Button size="sm" variant="outline" :disabled="tablePage >= tablePageCount" @click="tablePage++">Next</Button>
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -196,6 +204,8 @@ import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
 import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
+import CReportPageSize from '@/modules/Report/components/CReportPageSize.vue'
+import { useReportTablePage } from '@/modules/Report/composables/useReportTablePage'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -219,9 +229,9 @@ import {
 
 const operations = useReportOperations()
 const authStore = useAuthStore()
-const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.checker.create') || hasPermission(authStore.getTokens(), 'report.manage'))
-const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.checker.edit') || hasPermission(authStore.getTokens(), 'report.manage'))
-const canDelete = computed(() => hasPermission(authStore.getTokens(), 'report.checker.delete') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.checker.create'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.checker.edit'))
+const canDelete = computed(() => hasPermission(authStore.getTokens(), 'report.checker.delete'))
 const canManage = computed(() => canCreate.value || canEdit.value || canDelete.value)
 const { checkerVersion } = useReportSocket()
 const editorOpen = ref(false)
@@ -243,6 +253,7 @@ async function confirmDelete() {
   }
 }
 const rows = ref<ReportCheckerTask[]>([])
+const { pageSizeSelection, tablePage, tablePageCount, visibleRows } = useReportTablePage(rows)
 const draftEmployeeId = ref('')
 const draftDriverId = ref('none')
 const draftCompanyId = ref('')
@@ -406,6 +417,7 @@ async function refresh() {
 watch([targetId, checkerId, companyId, status], queueRefresh)
 
 watch(checkerVersion, queueRefresh)
+watch(tablePage, async () => { await nextTick(); tableScroll.value?.scrollTo({ top: 0 }) })
 
 onMounted(async () => {
   const lookups = await operations.getLookups()

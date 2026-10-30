@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { createGlobalState } from '@vueuse/core'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
+import { toast } from 'vue-sonner'
 
 const separator = '\x1e'
 
@@ -66,13 +67,24 @@ const useGlobalReportSocket = createGlobalState(() => {
       return
     }
     if (event.type !== 1) return
-    if (event.target === 'NewTaskQueued' || event.target === 'TaskUpdated' || event.target === 'TaskDeleted' ||
-        event.target === 'NewTaskAssistant' || event.target === 'TaskAssistantUpdate') {
+    if (event.target === 'NewTaskQueued' || event.target === 'TaskUpdated' || event.target === 'TaskDeleted') {
+      if (!hasPermission(token.value, 'report.tasks.view')) return
       taskVersion.value += 1
-      assistantVersion.value += 1
+      toast.info(event.target === 'NewTaskQueued' ? 'Report task created' : event.target === 'TaskDeleted' ? 'Report task deleted' : 'Report task updated')
     }
-    if (event.target?.startsWith('CheckerTask')) checkerVersion.value += 1
-    if (event.target?.startsWith('DriverActivity')) activityVersion.value += 1
+    if (event.target === 'NewTaskAssistant' || event.target === 'TaskAssistantUpdate') {
+      if (!hasPermission(token.value, 'report.assistant.view')) return
+      assistantVersion.value += 1
+      toast.info(event.target === 'NewTaskAssistant' ? 'Assistant task created' : 'Assistant task updated')
+    }
+    if (event.target?.startsWith('CheckerTask')) {
+      if (!hasPermission(token.value, 'report.checker.view')) return
+      checkerVersion.value += 1
+      toast.info(event.target === 'CheckerTaskCreated' ? 'Checker task created' : event.target === 'CheckerTaskDeleted' ? 'Checker task deleted' : 'Checker task updated')
+    }
+    if (event.target?.startsWith('DriverActivity') && hasPermission(token.value, 'report.activity.view')) {
+      activityVersion.value += 1
+    }
   }
 
   function connect() {

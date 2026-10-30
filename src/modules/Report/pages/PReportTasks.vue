@@ -85,7 +85,7 @@
                 </td>
               </tr>
               <template
-                v-for="(entry, index) in rows"
+                v-for="(entry, index) in visibleRows"
                 v-else
                 :key="`${entry.routeTask.id}-${index}`"
               >
@@ -96,7 +96,7 @@
                   @keydown.enter.self="openTaskHistory(entry.routeTask.id)"
                   @keydown.space.self.prevent="openTaskHistory(entry.routeTask.id)"
                 >
-                  <td class="px-4 py-3 text-muted-foreground">{{ index + 1 }}</td>
+                  <td class="px-4 py-3 text-muted-foreground">{{ pageSizeSelection === 'all' ? index + 1 : (tablePage - 1) * Number(pageSizeSelection) + index + 1 }}</td>
                   <td class="px-4 py-3 font-medium" @click.stop>
                     <CReportSearchSelect v-if="canEdit && !isTaskLocked(entry.routeTask.status)" :model-value="taskDriverId(entry.routeTask)" :options="driversForCompany(taskCompanyId(entry.routeTask))" size="sm" placeholder="Select driver" @update:model-value="value => updateTaskRow(entry.routeTask, { driverId: value })" />
                     <template v-else>{{ entry.routeTask.driver?.name ?? '—' }}</template>
@@ -173,8 +173,16 @@
             </tbody>
           </table>
         </div>
-        <div class="shrink-0 px-4 py-3 text-sm text-muted-foreground border-t border-border">
-          {{ uniqueTasks.length }} tasks
+        <div class="shrink-0 flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground border-t border-border">
+          <span>{{ uniqueTasks.length }} tasks</span>
+          <div class="flex items-center gap-2">
+            <CReportPageSize v-model="pageSizeSelection" />
+            <template v-if="pageSizeSelection !== 'all'">
+              <Button size="sm" variant="outline" :disabled="tablePage <= 1" @click="tablePage--">Previous</Button>
+              <span class="text-xs">{{ tablePage }} / {{ tablePageCount }}</span>
+              <Button size="sm" variant="outline" :disabled="tablePage >= tablePageCount" @click="tablePage++">Next</Button>
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -221,6 +229,8 @@ import CReportNotePicker from '@/modules/Report/components/CReportNotePicker.vue
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
+import CReportPageSize from '@/modules/Report/components/CReportPageSize.vue'
+import { useReportTablePage } from '@/modules/Report/composables/useReportTablePage'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -246,15 +256,16 @@ import {
 
 const operations = useReportOperations()
 const authStore = useAuthStore()
-const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.create') || hasPermission(authStore.getTokens(), 'report.manage'))
-const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.edit') || hasPermission(authStore.getTokens(), 'report.manage'))
-const canDelete = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.delete') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.create'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.edit'))
+const canDelete = computed(() => hasPermission(authStore.getTokens(), 'report.tasks.delete'))
 const canManage = computed(() => canCreate.value || canEdit.value || canDelete.value)
 const { taskVersion } = useReportSocket()
 const editorOpen = ref(false)
 const editingTask = ref<ReportTaskState['routeTask'] | null>(null)
 function editTask(task: ReportTaskState['routeTask'] | null) { editingTask.value = task; editorOpen.value = true }
 const rows = ref<ReportTaskState[]>([])
+const { pageSizeSelection, tablePage, tablePageCount, visibleRows } = useReportTablePage(rows)
 const taskToDelete = ref<ReportRouteTask | null>(null)
 const deleting = ref(false)
 const taskStatistics = ref<ReportTaskStatistics>()
@@ -524,6 +535,7 @@ watch(companyId, () => {
 watch([driverId, companyId, logBookerId, status], queueRefresh)
 
 watch(taskVersion, queueRefresh)
+watch(tablePage, async () => { await nextTick(); tableScroll.value?.scrollTo({ top: 0 }) })
 
 onMounted(async () => {
   const lookups = await operations.getLookups()
