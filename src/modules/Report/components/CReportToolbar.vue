@@ -94,6 +94,7 @@ import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight } from
 import { CalendarDate } from '@internationalized/date'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
+import { reportToday } from '@/modules/Report/utils/operations'
 
 type PeriodKey = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
 
@@ -110,11 +111,12 @@ const props = withDefaults(
     showFilters?: boolean
     hideDaily?: boolean
     fullPeriods?: boolean
+    rollingWeek?: boolean
     defaultPeriod?: PeriodKey
     monthPicker?: boolean
     monthValue?: string
   }>(),
-  { showFilters: true, hideDaily: false, fullPeriods: false, defaultPeriod: 'day', monthPicker: false }
+  { showFilters: true, hideDaily: false, fullPeriods: false, rollingWeek: false, defaultPeriod: 'day', monthPicker: false }
 )
 
 const emit = defineEmits<{
@@ -132,6 +134,7 @@ const allPeriods: { key: PeriodKey; label: string }[] = [
 const periods = computed(() => {
   if (props.monthPicker) return []
   return allPeriods.filter((p) => !(props.hideDaily && p.key === 'day'))
+    .map((p) => p.key === 'week' && props.rollingWeek ? { ...p, label: 'Weekly' } : p)
 })
 
 function currentMonthValue(): string {
@@ -176,6 +179,13 @@ function calFrom(d: Date): CalendarDate {
 function periodToRange(period: PeriodKey): { start: CalendarDate; end: CalendarDate } {
   const now = new Date()
   const end = today()
+  if (period === 'week' && props.rollingWeek) {
+    const [year, month, day] = reportToday().split('-').map(Number)
+    const current = new Date(year, month - 1, day)
+    const start = new Date(current)
+    start.setDate(start.getDate() - 6)
+    return { start: calFrom(start), end: calFrom(current) }
+  }
   if (period === 'week') {
     const monday = new Date(now)
     const offset = (now.getDay() + 6) % 7

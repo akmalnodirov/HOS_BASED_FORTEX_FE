@@ -4,6 +4,7 @@
       title="Activity"
       subtitle="Driver activity status by day"
       default-period="week"
+      rolling-week
       full-periods
       @change="onRange"
     >
@@ -30,7 +31,8 @@
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto overscroll-contain" @scroll="onTableScroll">
+        <div class="relative flex-1 min-h-0">
+          <div ref="tableScroll" class="h-full overflow-auto overscroll-contain" @scroll="onTableScroll">
           <table
             class="w-full text-sm"
             :style="{ minWidth: `${Math.max(760, 312 + columns.length * 104)}px` }"
@@ -81,10 +83,12 @@
                   class="h-14 bg-slate-900 text-white dark:bg-slate-700 border-y border-slate-700"
                 >
                   <td
-                    class="sticky top-20 left-0 z-20 w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
+                    class="sticky left-0 z-[25] w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
+                    :class="virtualized ? '' : 'top-20'"
                   ></td>
                   <td
-                    class="sticky top-20 left-14 z-20 w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
+                    class="sticky left-14 z-[25] w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
+                    :class="virtualized ? '' : 'top-20'"
                   >
                     <span
                       class="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide mr-2"
@@ -95,7 +99,8 @@
                   </td>
                   <td
                     :colspan="columns.length"
-                    class="sticky top-20 z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
+                    class="z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
+                    :class="virtualized ? '' : 'sticky top-20'"
                   ></td>
                 </tr>
                 <tr v-else class="group h-14 border-b border-border/60 hover:bg-muted/30">
@@ -181,6 +186,14 @@
               </tr>
             </tbody>
           </table>
+          </div>
+          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 top-20 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700">
+            <span class="w-14 min-w-14 max-w-14"></span>
+            <span class="flex h-full w-64 min-w-64 max-w-64 items-center border-r border-slate-700 px-4 font-semibold">
+              <span class="mr-2 rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide">Company</span>
+              <span class="truncate">{{ pinnedVirtualCompany }}</span>
+            </span>
+          </div>
         </div>
         <div
           class="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-t border-border text-sm text-muted-foreground"
@@ -317,10 +330,11 @@ const driverId = ref('all')
 const page = ref(1)
 const pageSizeSelection = ref('all')
 const virtualStart = ref(0)
+const currentScrollIndex = ref(0)
 const virtualViewportHeight = ref(600)
 const range = ref<DateRange>({
-  startTime: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
-  endTime: dayjs().format('YYYY-MM-DD'),
+  startTime: dayjs(reportToday()).subtract(6, 'day').format('YYYY-MM-DD'),
+  endTime: reportToday(),
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let dayTimer: ReturnType<typeof setInterval> | undefined
@@ -367,12 +381,27 @@ const visibleEnd = computed(() => virtualized.value ? Math.min(allDisplayRows.va
 const displayRows = computed(() => allDisplayRows.value.slice(visibleStart.value, visibleEnd.value))
 const virtualTop = computed(() => virtualized.value ? visibleStart.value * virtualRowHeight : 0)
 const virtualBottom = computed(() => virtualized.value ? Math.max(0, allDisplayRows.value.length - visibleEnd.value) * virtualRowHeight : 0)
+const currentVirtualCompany = computed(() => {
+  for (let index = Math.min(currentScrollIndex.value, allDisplayRows.value.length - 1); index >= 0; index--) {
+    const row = allDisplayRows.value[index]
+    if (row?.isCompany) return { name: row.companyName, index }
+  }
+  return null
+})
+const pinnedVirtualCompany = computed(() =>
+  virtualized.value && currentVirtualCompany.value && currentScrollIndex.value > currentVirtualCompany.value.index
+    ? currentVirtualCompany.value.name
+    : null
+)
 
 function onTableScroll() {
   const element = tableScroll.value
   if (!element) return
   virtualViewportHeight.value = element.clientHeight
-  if (virtualized.value) virtualStart.value = Math.max(0, Math.floor(element.scrollTop / virtualRowHeight) - 8)
+  if (virtualized.value) {
+    currentScrollIndex.value = Math.max(0, Math.floor(element.scrollTop / virtualRowHeight))
+    virtualStart.value = Math.max(0, currentScrollIndex.value - 8)
+  }
 }
 const filteredDrivers = computed(() =>
   companyId.value === 'all'
@@ -526,7 +555,7 @@ onMounted(async () => {
   })
   await initialRefresh
   await nextTick()
-  tableScroll.value?.scrollTo({ top: tableScroll.value.scrollHeight })
+  if (tableScroll.value) tableScroll.value.scrollLeft = tableScroll.value.scrollWidth - tableScroll.value.clientWidth
 })
 
 onBeforeUnmount(() => {
