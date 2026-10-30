@@ -1,5 +1,6 @@
 .env
 .env-fds
+.env-cc
 git-auto.sh
 
 # [Id]
