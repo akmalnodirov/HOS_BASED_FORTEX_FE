@@ -63,22 +63,14 @@
         </div>
         <div class="flex flex-col gap-1.5">
           <span class="text-xs text-muted-foreground">Company</span>
-          <Select v-model="companyId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All companies" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All companies</SelectItem>
-              <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
-                {{ company.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" />
         </div>
       </div>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
           <table class="w-full min-w-[1480px] text-sm">
             <thead class="sticky top-0 z-20 bg-muted text-muted-foreground shadow-sm">
               <tr class="border-b border-border text-left">
@@ -112,10 +104,13 @@
                 <td class="px-4 py-3 font-medium">{{ targetLabel(row.logBooker) }}</td>
                 <td class="px-4 py-3">{{ operationUserName(row.checker) }}</td>
                 <td class="px-4 py-3">
-                  <Select v-if="canManage && !isCheckerLocked(row.status)" :model-value="String(row.status)" @update:model-value="value => updateCheckerRow(row, { status: Number(value) })">
-                    <SelectTrigger class="h-8 min-w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem v-for="item in checkerStatuses" :key="item.value" :value="String(item.value)">{{ item.label }}</SelectItem></SelectContent>
-                  </Select>
+                  <CReportStatusMenu
+                    v-if="canEdit && !isCheckerLocked(row.status)"
+                    :model-value="row.status"
+                    :options="checkerStatuses"
+                    :loading="statusSavingIds.includes(row.id)"
+                    @update:model-value="value => updateCheckerRow(row, { status: value })"
+                  />
                   <span v-else
                     class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
                     :class="operationStatusClass(row.status)"
@@ -126,22 +121,16 @@
                 <td class="px-4 py-3 whitespace-nowrap">{{ operationDate(row.startTime) }}</td>
                 <td class="px-4 py-3 whitespace-nowrap">{{ operationDate(row.endTime) }}</td>
                 <td class="px-4 py-3">
-                  <Select v-if="canManage && !isCheckerLocked(row.status)" :model-value="row.driver?.id ?? 'none'" @update:model-value="value => updateCheckerRow(row, { driverId: String(value) })">
-                    <SelectTrigger class="h-8 min-w-40"><SelectValue placeholder="Select driver" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No driver</SelectItem>
-                      <SelectItem v-for="driver in drivers" :key="driver.id" :value="driver.id">{{ driver.name }}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CReportSearchSelect v-if="canEdit && !isCheckerLocked(row.status)" :model-value="row.driver?.id ?? 'none'" :options="driversForCompany(row.company?.id)" empty-label="No driver" empty-value="none" size="sm" @update:model-value="value => updateCheckerRow(row, { driverId: value })" />
                   <template v-else>{{ row.driver?.name ?? '—' }}</template>
                 </td>
-                <td class="px-4 py-3">{{ row.company?.name ?? '—' }}</td>
+                <td class="px-4 py-3"><CReportSearchSelect v-if="canEdit && !isCheckerLocked(row.status)" :model-value="row.company?.id" :options="companies" size="sm" placeholder="Select company" @update:model-value="value => updateCheckerRow(row, { companyId: value })" /><template v-else>{{ row.company?.name ?? '—' }}</template></td>
                 <td class="px-4 py-3 max-w-xs whitespace-normal">
-                  <input v-if="canManage && !isCheckerLocked(row.status)" :value="row.note ?? ''" class="w-full min-w-40 bg-transparent border-b border-transparent focus:border-primary outline-none" placeholder="Action / note" @change="event => updateCheckerRow(row, { note: (event.target as HTMLInputElement).value })" />
+                  <input v-if="canEdit && !isCheckerLocked(row.status)" :value="row.note ?? ''" class="w-full min-w-40 bg-transparent border-b border-transparent focus:border-primary outline-none" placeholder="Action / note" @change="event => updateCheckerRow(row, { note: (event.target as HTMLInputElement).value })" />
                   <template v-else>{{ row.note || '—' }}</template>
                 </td>
                 <td class="px-4 py-3">
-                  <CReportCheckerUploads :task-id="row.id" :uploads="row.uploads ?? []" :can-manage="canManage && !isCheckerLocked(row.status)" @updated="refresh" />
+                  <CReportCheckerUploads :task-id="row.id" :uploads="row.uploads ?? []" :can-manage="canEdit && !isCheckerLocked(row.status)" @updated="refresh" />
                 </td>
                 <td class="px-4 py-3 max-w-xs whitespace-normal">
                   <template v-if="row.relatedRouteTask">
@@ -155,16 +144,16 @@
                   </template>
                   <span v-else>—</span>
                 </td>
-                <td v-if="canManage" class="px-4 py-3"><Button v-if="!isCheckerLocked(row.status)" size="icon-sm" variant="ghost" title="Edit checker task" aria-label="Edit checker task" @click="editTask(row)"><Pencil class="h-4 w-4 text-muted-foreground" /></Button></td>
+                <td v-if="canManage" class="px-4 py-3"><div class="flex gap-1"><Button v-if="canEdit && !isCheckerLocked(row.status)" size="icon-sm" variant="ghost" title="Edit checker task" aria-label="Edit checker task" @click="editTask(row)"><Pencil class="h-4 w-4 text-muted-foreground" /></Button><Button v-if="canDelete" size="icon-sm" variant="ghost" title="Delete checker task" aria-label="Delete checker task" @click="taskToDelete = row"><Trash2 class="h-4 w-4 text-destructive" /></Button></div></td>
               </tr>
-              <tr v-if="canManage" class="border-b border-border bg-primary/5">
+              <tr v-if="canCreate" class="border-b border-border bg-primary/5">
                 <td class="px-4 py-3 text-muted-foreground">+</td>
                 <td class="px-4 py-3"><Select v-model="draftEmployeeId"><SelectTrigger class="h-8 min-w-36"><SelectValue placeholder="Select employee" /></SelectTrigger><SelectContent><SelectItem v-for="user in users" :key="user.id" :value="user.id">{{ operationUserName(user) }}</SelectItem></SelectContent></Select></td>
-                <td class="px-4 py-3 text-muted-foreground">—</td>
-                <td class="px-4 py-3"><Select v-model="draftStatus"><SelectTrigger class="h-8 min-w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem v-for="item in checkerStatuses" :key="item.value" :value="String(item.value)">{{ item.label }}</SelectItem></SelectContent></Select></td>
+                <td class="px-4 py-3">{{ currentCheckerName }}</td>
+                <td class="px-4 py-3"><CReportStatusMenu :model-value="Number(draftStatus)" :options="checkerStatuses" @update:model-value="value => draftStatus = String(value)" /></td>
                 <td colspan="2" class="px-4 py-3 text-muted-foreground">Assigned when saved</td>
-                <td class="px-4 py-3"><Select v-model="draftDriverId"><SelectTrigger class="h-8 min-w-40"><SelectValue placeholder="Select driver" /></SelectTrigger><SelectContent><SelectItem value="none">No driver</SelectItem><SelectItem v-for="driver in drivers" :key="driver.id" :value="driver.id">{{ driver.name }}</SelectItem></SelectContent></Select></td>
-                <td class="px-4 py-3"><span v-if="draftCompanyFromDriver">{{ draftCompanyFromDriver.name }}</span><Select v-else v-model="draftCompanyId"><SelectTrigger class="h-8 min-w-40"><SelectValue placeholder="Select company" /></SelectTrigger><SelectContent><SelectItem v-for="company in companies" :key="company.id" :value="company.id">{{ company.name }}</SelectItem></SelectContent></Select></td>
+                <td class="px-4 py-3"><CReportSearchSelect :model-value="draftDriverId" :options="driversForCompany(draftCompanyId)" empty-label="No driver" empty-value="none" size="sm" @update:model-value="selectDraftDriver" /></td>
+                <td class="px-4 py-3"><CReportSearchSelect :model-value="draftCompanyId" :options="companies" size="sm" placeholder="Select company" @update:model-value="selectDraftCompany" /></td>
                 <td class="px-4 py-3"><input v-model="draftNote" class="w-full min-w-40 bg-transparent border-b border-border outline-none" placeholder="Action / note" /></td>
                 <td colspan="2" class="px-4 py-3"></td>
                 <td class="px-4 py-3"><Button size="icon-sm" title="Add row" aria-label="Add row" :disabled="!draftEmployeeId || !draftCompany || draftSaving" @click="saveDraft"><Plus class="h-4 w-4" /></Button></td>
@@ -182,16 +171,18 @@
         </div>
       </div>
     </div>
-    <CReportEditor v-model:open="editorOpen" kind="checker" :record="editingTask" :companies="companies" :drivers="drivers" :users="users" @saved="refresh" />
+    <CReportEditor v-model:open="editorOpen" kind="checker" :record="editingTask" :can-delete="canDelete" :companies="companies" :drivers="drivers" :users="users" @saved="refresh" />
+    <Dialog :open="!!taskToDelete" @update:open="value => { if (!value) taskToDelete = null }"><DialogContent class="max-w-sm"><DialogHeader><DialogTitle>Delete checker task?</DialogTitle></DialogHeader><DialogFooter><Button variant="outline" @click="taskToDelete = null">Cancel</Button><Button variant="destructive" :disabled="deleting" @click="confirmDelete">Delete</Button></DialogFooter></DialogContent></Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
-import { Loader2, Pencil, Plus, RefreshCw } from 'lucide-vue-next'
+import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -203,6 +194,8 @@ import CReportCheckerUploads from '@/modules/Report/components/CReportCheckerUpl
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
+import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportStatusMenu from '@/modules/Report/components/CReportStatusMenu.vue'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -226,11 +219,29 @@ import {
 
 const operations = useReportOperations()
 const authStore = useAuthStore()
-const canManage = computed(() => hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.checker.create') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.checker.edit') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canDelete = computed(() => hasPermission(authStore.getTokens(), 'report.checker.delete') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canManage = computed(() => canCreate.value || canEdit.value || canDelete.value)
 const { checkerVersion } = useReportSocket()
 const editorOpen = ref(false)
 const editingTask = ref<ReportCheckerTask | null>(null)
+const taskToDelete = ref<ReportCheckerTask | null>(null)
+const deleting = ref(false)
 function editTask(task: ReportCheckerTask | null) { editingTask.value = task; editorOpen.value = true }
+async function confirmDelete() {
+  if (!taskToDelete.value) return
+  deleting.value = true
+  try {
+    await operations.deleteCheckerTask(taskToDelete.value.id)
+    taskToDelete.value = null
+    queueRefresh()
+  } catch {
+    toast.error('Could not delete checker task')
+  } finally {
+    deleting.value = false
+  }
+}
 const rows = ref<ReportCheckerTask[]>([])
 const draftEmployeeId = ref('')
 const draftDriverId = ref('none')
@@ -238,8 +249,21 @@ const draftCompanyId = ref('')
 const draftStatus = ref('0')
 const draftNote = ref('')
 const draftSaving = ref(false)
-const draftCompanyFromDriver = computed(() => drivers.value.find((driver) => driver.id === draftDriverId.value)?.company)
-const draftCompany = computed(() => draftCompanyFromDriver.value ?? companies.value.find((company) => company.id === draftCompanyId.value))
+const draftCompany = computed(() => companies.value.find((company) => company.id === draftCompanyId.value))
+function driversForCompany(selectedCompanyId?: string) {
+  return selectedCompanyId
+    ? drivers.value.filter((driver) => driver.company?.id === selectedCompanyId)
+    : drivers.value
+}
+function selectDraftDriver(value: string) {
+  draftDriverId.value = value
+  const driver = drivers.value.find((item) => item.id === value)
+  if (driver?.company?.id) draftCompanyId.value = driver.company.id
+}
+function selectDraftCompany(value: string) {
+  draftCompanyId.value = value
+  if (!driversForCompany(value).some((driver) => driver.id === draftDriverId.value)) draftDriverId.value = 'none'
+}
 async function saveDraft() {
   if (!draftCompany.value || !draftEmployeeId.value) return
   draftSaving.value = true
@@ -257,16 +281,21 @@ async function saveDraft() {
     draftSaving.value = false
   }
 }
-async function updateCheckerRow(row: ReportCheckerTask, changes: { status?: number; note?: string; driverId?: string }) {
+async function updateCheckerRow(row: ReportCheckerTask, changes: { status?: number; note?: string; driverId?: string; companyId?: string }) {
+  if (changes.status !== undefined && statusSavingIds.value.includes(row.id)) return
   if (isCheckerLocked(row.status)) return
-  const driver = changes.driverId === 'none' ? undefined : changes.driverId
+  let driver = changes.driverId === 'none' ? undefined : changes.driverId
     ? drivers.value.find((item) => item.id === changes.driverId) : row.driver
-  const company = driver?.company ?? row.company
+  const company = changes.companyId
+    ? companies.value.find((item) => item.id === changes.companyId)
+    : driver?.company ?? row.company
+  if (changes.companyId && driver?.company?.id !== changes.companyId) driver = undefined
   if (!company?.id) return
+  const savingStatus = changes.status !== undefined
+  if (savingStatus) statusSavingIds.value = [...statusSavingIds.value, row.id]
   try {
     await operations.updateCheckerTask(row.id, {
       logBookerId: row.logBooker?.id,
-      checkerId: row.checker?.id ?? null,
       companyId: company.id,
       driverId: driver?.id ?? null,
       status: changes.status ?? row.status,
@@ -277,6 +306,8 @@ async function updateCheckerRow(row: ReportCheckerTask, changes: { status?: numb
   } catch {
     toast.error('Could not update checker task')
     queueRefresh()
+  } finally {
+    if (savingStatus) statusSavingIds.value = statusSavingIds.value.filter((id) => id !== row.id)
   }
 }
 function isCheckerLocked(status: number): boolean {
@@ -292,6 +323,8 @@ const targetId = ref('all')
 const checkerId = ref('all')
 const companyId = ref('all')
 const status = ref('all')
+const statusSavingIds = ref<string[]>([])
+const tableScroll = ref<HTMLElement | null>(null)
 const range = ref<DateRange>({
   startTime: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
   endTime: dayjs().format('YYYY-MM-DD'),
@@ -301,6 +334,10 @@ let requestVersion = 0
 
 const targetUsers = computed(() => users.value)
 const checkers = computed(() => users.value)
+const currentCheckerName = computed(() => {
+  const user = authStore.user
+  return user ? `${user.firstName} ${user.lastName}`.trim() || user.userName : 'Current user'
+})
 const uploadCount = computed(() =>
   rows.value.reduce((total, row) => total + (row.uploads?.length ?? 0), 0)
 )
@@ -371,6 +408,8 @@ onMounted(async () => {
   users.value = lookups.users
   ready.value = true
   await refresh()
+  await nextTick()
+  tableScroll.value?.scrollTo({ top: tableScroll.value.scrollHeight })
 })
 
 onBeforeUnmount(() => {

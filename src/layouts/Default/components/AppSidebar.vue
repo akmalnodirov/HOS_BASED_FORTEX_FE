@@ -75,21 +75,31 @@
                     class="absolute -left-3 top-0 bottom-0 w-[1px] bg-[#dbdbdb] dark:bg-sidebar-border"
                   ></div>
 
-                  <button
-                    v-for="subItem in item.children"
-                    :key="subItem.id"
-                    @click="navigateTo(subItem.path)"
-                    class="cursor-pointer relative"
-                    :class="[
-                      'w-full flex items-center gap-3 px-3 ml-1 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive(subItem.path, subItem.relatedPaths)
-                        ? 'bg-[#e6e6e6] dark:bg-sidebar-accent text-gray-900 dark:text-sidebar-accent-foreground'
-                        : 'text-gray-700 dark:text-sidebar-foreground/80 hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
-                      item.uppercase && 'uppercase',
-                    ]"
-                  >
-                    {{ subItem.label }}
-                  </button>
+                  <div v-for="subItem in item.children" :key="subItem.id">
+                    <button
+                      @click="subItem.children ? toggleMenu(subItem.id) : navigateTo(subItem.path)"
+                      class="cursor-pointer relative w-full flex items-center gap-3 px-3 ml-1 py-2 rounded-lg text-sm font-medium transition-colors"
+                      :class="[
+                        isActive(subItem.path, subItem.relatedPaths) || hasActiveChild(subItem)
+                          ? 'bg-[#e6e6e6] dark:bg-sidebar-accent text-gray-900 dark:text-sidebar-accent-foreground'
+                          : 'text-gray-700 dark:text-sidebar-foreground/80 hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
+                        item.uppercase && 'uppercase',
+                      ]"
+                    >
+                      <img v-if="typeof subItem.icon === 'string'" :src="subItem.icon" alt="" class="h-4 w-4 shrink-0 sidebar-icon" />
+                      <span class="flex-1 text-left">{{ subItem.label }}</span>
+                      <ChevronDown v-if="subItem.children" class="h-4 w-4 shrink-0 transition-transform" :class="isMenuExpanded(subItem.id) && 'rotate-180'" />
+                    </button>
+                    <div v-if="subItem.children" v-show="isMenuExpanded(subItem.id)" class="ml-4 border-l border-[#dbdbdb] pl-2 dark:border-sidebar-border">
+                      <button
+                        v-for="nestedItem in subItem.children"
+                        :key="nestedItem.id"
+                        class="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+                        :class="isActive(nestedItem.path) ? 'bg-[#e6e6e6] text-gray-900 dark:bg-sidebar-accent dark:text-sidebar-accent-foreground' : 'text-gray-700 hover:bg-[#e6e6e6] dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent/50'"
+                        @click="navigateTo(nestedItem.path)"
+                      >{{ nestedItem.label }}</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -314,8 +324,9 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/menu.svg',
         uppercase: true,
         children: [
-          { id: 'users', label: 'Users', icon: '/icons/user.svg', path: '/users' },
+          { id: 'users', label: 'Users', icon: null, path: '/users' },
           { id: 'users-roles', label: 'Roles', icon: null, path: '/users/roles' },
+          { id: 'report-levels', label: 'Levels', icon: null, path: '/report/levels' },
           { id: 'users-permissions', label: 'Permissions', icon: null, path: '/users/permissions' },
         ],
       },
@@ -328,6 +339,20 @@ const allMenuItems: MenuItem[] = [
           { id: 'report-activity', label: 'Activity', icon: null, path: '/report/activity' },
           { id: 'report-checker', label: 'Checker', icon: null, path: '/report/checker' },
           { id: 'report-assistant', label: 'Assistant', icon: null, path: '/report/assistant' },
+          {
+            id: 'report-inspection', label: 'Inspection', icon: '/icons/menu.svg',
+            children: [
+              { id: 'report-violation', label: 'Violation', icon: null, path: '/report/inspection/violation' },
+              { id: 'report-no-violation', label: 'No Violation', icon: null, path: '/report/inspection/no-violation' },
+            ],
+          },
+          {
+            id: 'report-manage', label: 'Manage', icon: '/icons/menu.svg',
+            children: [
+              { id: 'report-drivers', label: 'Drivers', icon: null, path: '/report/manage/drivers' },
+              { id: 'report-companies', label: 'Companies', icon: null, path: '/report/manage/companies' },
+            ],
+          },
         ],
       },
     ],
@@ -367,6 +392,18 @@ const hasActiveChild = (item: MenuItem): boolean => {
     (child) => isActive(child.path, child.relatedPaths) || hasActiveChild(child)
   )
 }
+
+watch(() => route.path, () => {
+  const expandActive = (items: MenuItem[]) => {
+    for (const item of items) {
+      if (item.children && hasActiveChild(item)) {
+        if (!expandedMenus.value.includes(item.id)) expandedMenus.value.push(item.id)
+        expandActive(item.children)
+      }
+    }
+  }
+  expandActive(allMenuItems)
+}, { immediate: true })
 
 const navigateTo = (path?: string) => {
   if (path) {

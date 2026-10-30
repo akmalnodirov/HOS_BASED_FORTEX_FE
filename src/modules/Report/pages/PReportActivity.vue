@@ -19,38 +19,18 @@
     <div class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-4 overflow-hidden">
       <CReportMetricCards :items="summaryCards" />
       <div
-        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2"
+        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3"
       >
         <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Company</span>
-          <Select v-model="companyId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All companies" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All companies</SelectItem>
-              <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
-                {{ company.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="flex flex-col gap-1.5">
           <span class="text-xs text-muted-foreground">Driver</span>
-          <Select v-model="driverId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All drivers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All drivers</SelectItem>
-              <SelectItem v-for="driver in filteredDrivers" :key="driver.id" :value="driver.id">
-                {{ driver.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
         </div>
       </div>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div class="flex-1 min-h-0 overflow-auto">
+        <div ref="tableScroll" class="flex-1 min-h-0 overflow-auto">
           <table
             class="w-full text-sm"
             :style="{ minWidth: `${Math.max(760, 312 + columns.length * 125)}px` }"
@@ -65,11 +45,12 @@
                 <th
                   class="sticky left-14 z-40 w-64 min-w-64 max-w-64 border-r border-border bg-muted px-4 py-3 font-medium shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]"
                 >
-                  Company / Driver
+                  <span class="block mb-1">Company / Driver</span>
+                  <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" size="sm" @click.stop />
                 </th>
                 <th
                   v-for="column in columns"
-                  :key="column.date"
+                  :key="`${column.date}-${column.colNumber}`"
                   class="px-3 py-3 font-medium text-center min-w-28"
                 >
                   {{ formatActivityDay(column.date) }}
@@ -91,10 +72,10 @@
                   class="bg-slate-900 text-white dark:bg-slate-700 border-y border-slate-700"
                 >
                   <td
-                    class="sticky top-11 left-0 z-20 w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
+                    class="sticky top-20 left-0 z-20 w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
                   ></td>
                   <td
-                    class="sticky top-11 left-14 z-20 w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
+                    class="sticky top-20 left-14 z-20 w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
                   >
                     <span
                       class="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide mr-2"
@@ -105,7 +86,7 @@
                   </td>
                   <td
                     :colspan="columns.length"
-                    class="sticky top-11 z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
+                    class="sticky top-20 z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
                   ></td>
                 </tr>
                 <tr v-else class="group border-b border-border/60 hover:bg-muted/30">
@@ -124,27 +105,52 @@
                   </td>
                   <td
                     v-for="column in columns"
-                    :key="column.date"
+                    :key="`${column.date}-${column.colNumber}`"
                     class="px-2 py-3 text-center"
-                    :class="canManage ? 'cursor-pointer hover:bg-primary/10' : ''"
-                    @click="canManage && (editingCell = cellKey(row, column.date))"
                   >
-                    <Select
-                      v-if="canManage && editingCell === cellKey(row, column.date)"
+                    <Popover
+                      v-if="canChangeCell(row, column) && editingCell === cellKey(row, column)"
                       :open="true"
-                      :model-value="String(activityFor(row, column.date)?.status ?? 9)"
                       @update:open="open => { if (!open) editingCell = null }"
-                      @update:model-value="value => upsertActivityCell(row, column, Number(value))"
                     >
-                      <SelectTrigger class="h-8 min-w-28" @click.stop><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem v-for="(label, value) in activityStatuses" :key="value" :value="String(value)">{{ label }}</SelectItem></SelectContent>
-                    </Select>
-                    <span v-else-if="hasKnownActivity(row, column.date)"
+                      <PopoverTrigger as-child>
+                        <button
+                          type="button"
+                          class="inline-flex min-h-8 min-w-20 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
+                          :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'text-muted-foreground hover:bg-primary/10'"
+                          :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
+                          :disabled="savingCell === cellKey(row, column)"
+                        >{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : '+' }}</button>
+                      </PopoverTrigger>
+                      <PopoverContent class="w-44 p-1" align="start">
+                        <button
+                          v-for="(label, value) in activityStatuses"
+                          :key="value"
+                          type="button"
+                          class="mb-1 flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs font-semibold last:mb-0 hover:opacity-80"
+                          :class="operationStatusClass(Number(value), true)"
+                          @click="upsertActivityCell(row, column, Number(value))"
+                        >{{ label }}</button>
+                      </PopoverContent>
+                    </Popover>
+                    <button
+                      v-else-if="canChangeCell(row, column)"
+                      type="button"
+                      class="inline-flex min-h-8 min-w-20 items-center justify-center rounded-md px-2 py-1 text-xs font-semibold hover:ring-2 hover:ring-primary/30"
+                      :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'text-muted-foreground hover:bg-primary/10'"
+                      :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
+                      :disabled="savingCell === cellKey(row, column)"
+                      @click="editingCell = cellKey(row, column)"
+                    >
+                      <Loader2 v-if="savingCell === cellKey(row, column)" class="h-4 w-4 animate-spin" />
+                      <template v-else>{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : '+' }}</template>
+                    </button>
+                    <span v-else-if="hasKnownActivity(row, column)"
                       class="inline-flex min-w-20 justify-center rounded-full px-2 py-1 text-xs font-semibold"
-                      :class="operationStatusClass(activityFor(row, column.date)?.status)"
-                      :title="operationUserName(activityFor(row, column.date)?.logBooker)"
+                      :class="operationStatusClass(activityFor(row, column)?.status, true)"
+                      :title="operationUserName(activityFor(row, column)?.logBooker)"
                     >
-                      {{ activityLabel(activityFor(row, column.date)?.status) }}
+                      {{ activityLabel(activityFor(row, column)?.status) }}
                     </span>
                     <span v-else class="text-muted-foreground">—</span>
                   </td>
@@ -195,20 +201,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
 import { Loader2, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
+import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -226,18 +227,21 @@ import {
   operationRangeStart,
   operationStatusClass,
   operationUserName,
+  reportToday,
 } from '@/modules/Report/utils/operations'
 
 type ActivityRow = ReportDriverActivityTable['rows'][number]
 
 const operations = useReportOperations()
 async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number], status: number) {
-  if (!row.driverId) return
+  if (!row.driverId || savingCell.value || activityDateKey(column.date) > reportToday()) return
+  const key = cellKey(row, column)
   editingCell.value = null
-  const existing = activityFor(row, column.date)
+  savingCell.value = key
+  const existing = activityFor(row, column)
   const body = {
     driverId: row.driverId,
-    date: `${column.date}T00:00:00Z`,
+    date: operationRangeStart(column.date),
     status,
     colNumber: existing?.colNumber ?? column.colNumber,
   }
@@ -250,12 +254,18 @@ async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivity
     await refresh(page.value)
   } catch {
     toast.error('Could not update activity')
+  } finally {
+    savingCell.value = null
   }
 }
 const authStore = useAuthStore()
-const canManage = computed(() => hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.activity.create') || hasPermission(authStore.getTokens(), 'report.manage'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.activity.edit') || hasPermission(authStore.getTokens(), 'report.manage'))
 const { activityVersion } = useReportSocket()
 const editingCell = ref<string | null>(null)
+const savingCell = ref<string | null>(null)
+const tableScroll = ref<HTMLElement | null>(null)
+const currentReportDay = ref(reportToday())
 const result = shallowRef<ReportDriverActivityTable>()
 const companies = shallowRef<ReportOperationCompany[]>([])
 const drivers = shallowRef<ReportOperationDriver[]>([])
@@ -271,17 +281,20 @@ const range = ref<DateRange>({
   endTime: dayjs().format('YYYY-MM-DD'),
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let dayTimer: ReturnType<typeof setInterval> | undefined
 let requestVersion = 0
-const activityCache = new WeakMap<ActivityRow, Map<string, ReportDriverActivity>>()
-
 const columns = computed<ReportDriverActivityTable['columns']>(() => {
+  if (result.value?.columns?.length) return result.value.columns.map(column => ({
+    date: activityDateKey(column.date),
+    colNumber: column.colNumber,
+  }))
   const start = dayjs(range.value.startTime).startOf('day')
   const end = dayjs(range.value.endTime).startOf('day')
   if (!start.isValid() || !end.isValid() || end.isBefore(start)) return []
 
   return Array.from({ length: end.diff(start, 'day') + 1 }, (_, index) => ({
     date: start.add(index, 'day').format('YYYY-MM-DD'),
-    colNumber: index + 1,
+    colNumber: 0,
   }))
 })
 const pageSize = computed(() =>
@@ -360,29 +373,27 @@ function formatActivityDay(value: string): string {
   return dayjs(value).format('MM/DD/YYYY')
 }
 
-function cellKey(row: ActivityRow, date: string): string {
-  return `${row.driverId}-${activityDateKey(date)}`
+function cellKey(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): string {
+  return `${row.driverId}-${activityDateKey(column.date)}-${column.colNumber}`
 }
 
-function activityFor(row: ActivityRow, date: string): ReportDriverActivity | undefined {
-  let activities = activityCache.get(row)
-  if (!activities) {
-    activities = new Map<string, ReportDriverActivity>()
-    for (const activity of Object.values(row.dateStatuses ?? {})) {
-      const key = activityDateKey(activity.date)
-      if (!activities.has(key)) activities.set(key, activity)
-    }
-    activityCache.set(row, activities)
-  }
-  return activities.get(activityDateKey(date))
+function activityFor(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): ReportDriverActivity | undefined {
+  return row.dateStatuses?.[`${activityDateKey(column.date)}#${column.colNumber}`]
+}
+
+function canChangeCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): boolean {
+  if (activityDateKey(column.date) > currentReportDay.value) return false
+  if (savingCell.value && savingCell.value !== cellKey(row, column)) return false
+  const id = activityFor(row, column)?.id
+  return id && id !== '00000000-0000-0000-0000-000000000000' ? canEdit.value : canCreate.value
 }
 
 function activityLabel(status?: number): string {
   return status == null ? '—' : (activityStatuses[status] ?? 'Unknown')
 }
 
-function hasKnownActivity(row: ActivityRow, date: string): boolean {
-  const status = activityFor(row, date)?.status
+function hasKnownActivity(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): boolean {
+  const status = activityFor(row, column)?.status
   return status != null && status !== 9
 }
 
@@ -415,19 +426,24 @@ watch([companyId, driverId], queueRefresh)
 
 watch(activityVersion, queueRefresh)
 
-onMounted(() => {
+onMounted(async () => {
   ready.value = true
-  void refresh(1)
+  dayTimer = setInterval(() => { currentReportDay.value = reportToday() }, 60_000)
+  const initialRefresh = refresh(1)
   void operations.getLookups().then((lookups) => {
     companies.value = lookups.companies
     drivers.value = lookups.drivers
   }).catch(() => {
     loadError.value = 'Could not load activity filters. Please try again.'
   })
+  await initialRefresh
+  await nextTick()
+  tableScroll.value?.scrollTo({ top: tableScroll.value.scrollHeight })
 })
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearTimeout(refreshTimer)
+  if (dayTimer) clearInterval(dayTimer)
   requestVersion += 1
 })
 </script>

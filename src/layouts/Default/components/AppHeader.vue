@@ -123,7 +123,6 @@
             class="w-105 p-0 overflow-hidden rounded border-none shadow-xl"
             :side-offset="8"
           >
-            <!-- Search Section -->
             <div class="p-4 flex items-center gap-2 bg-[#F0F0F0] dark:bg-muted">
               <div class="relative flex-1">
                 <Search
@@ -150,7 +149,6 @@
               <button type="button" class="mb-3 w-full rounded border border-border px-3 py-2 text-left text-sm font-medium hover:bg-muted" @click="isDropdownOpen = false; router.push('/initial/companies')">
                 All Companies
               </button>
-              <!-- Companies List -->
               <div class="max-h-[320px] overflow-y-auto pr-1 flex flex-col gap-3">
                 <div
                   v-if="isLoading"
@@ -214,7 +212,6 @@
               </div>
             </div>
 
-            <!-- User Profile Footer -->
             <div
               class="p-4 border-t border-border bg-background dark:bg-card flex items-center gap-2"
             >
@@ -323,7 +320,6 @@ const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
 watch(() => authStore.loggedIn, (loggedIn) => { if (loggedIn) void refreshNotifications() }, { immediate: true })
 
-// Company dropdown state
 const {
   companies,
   selectedCompanyId,
@@ -395,6 +391,11 @@ const pageTitle = computed(() => {
     '/report/activity': 'Report / Activity',
     '/report/checker': 'Report / Checker',
     '/report/assistant': 'Report / Assistant',
+    '/report/inspection/violation': 'Report / Inspection / Violation',
+    '/report/inspection/no-violation': 'Report / Inspection / No Violation',
+    '/report/manage/drivers': 'Report / Manage / Drivers',
+    '/report/manage/companies': 'Report / Manage / Companies',
+    '/report/levels': 'Report / Levels',
 
     '/tools/activity': 'Tools / Activity',
     '/tools/monitoring': 'Tools / Monitoring',

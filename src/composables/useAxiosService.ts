@@ -94,6 +94,9 @@ class ApiService {
     // Request Interceptor
     this.axiosInstance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
+        if (config.data instanceof FormData) {
+          config.headers.delete('Content-Type')
+        }
         const token = this.getAuthStore().getTokens()
 
         if (token && config.headers) {

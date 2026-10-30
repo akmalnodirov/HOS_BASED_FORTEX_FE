@@ -15,6 +15,7 @@ export interface Role {
   id: string
   name: string
   permissions: DispatcherPermission[]
+  clientName?: string | null
 }
 
 export interface RouteEldDispatcherApiResponse {

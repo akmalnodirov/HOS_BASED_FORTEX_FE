@@ -8,27 +8,12 @@
       <form class="grid gap-4" @submit.prevent="save">
         <label class="grid gap-1.5 text-sm">
           Driver
-          <Select v-model="form.driverId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="Select driver" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem v-if="kind === 'checker'" value="none">No driver</SelectItem>
-              <SelectItem v-for="driver in drivers" :key="driver.id" :value="driver.id">
-                {{ driver.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <CReportSearchSelect v-model="form.driverId" :options="drivers" placeholder="Select driver" :empty-label="kind === 'checker' ? 'No driver' : undefined" empty-value="none" />
         </label>
         <label v-if="kind !== 'activity'" class="grid gap-1.5 text-sm">
           Company
           <Input v-if="selectedCompany" :model-value="selectedCompany.name" readonly class="h-10" />
-          <Select v-else v-model="form.companyId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="Select company" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
-                {{ company.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <CReportSearchSelect v-else v-model="form.companyId" :options="companies" placeholder="Select company" />
         </label>
         <label v-if="kind === 'checker'" class="grid gap-1.5 text-sm">
           Employee
@@ -72,12 +57,15 @@
           <Textarea v-model="form.note" rows="3" />
         </label>
         <div class="flex justify-end gap-2">
-          <Button v-if="record?.id" type="button" variant="destructive" class="mr-auto" :disabled="saving" @click="remove">Delete</Button>
+          <Button v-if="record?.id && canDelete" type="button" variant="destructive" class="mr-auto" :disabled="saving" @click="deleteOpen = true">Delete</Button>
           <Button type="button" variant="outline" @click="emit('update:open', false)">Cancel</Button>
           <Button type="submit" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</Button>
         </div>
       </form>
     </DialogContent>
+  </Dialog>
+  <Dialog v-model:open="deleteOpen">
+    <DialogContent class="max-w-sm"><DialogHeader><DialogTitle>Delete this {{ title }}?</DialogTitle></DialogHeader><div class="flex justify-end gap-2"><Button variant="outline" @click="deleteOpen = false">Cancel</Button><Button variant="destructive" :disabled="saving" @click="remove">Delete</Button></div></DialogContent>
   </Dialog>
 </template>
 
@@ -93,6 +81,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarDate } from '@internationalized/date'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
 import { useReportOperations } from '@/modules/Report/composables/useReportOperations'
 import { activityStatuses, checkerStatuses, routeTaskStatuses } from '@/modules/Report/utils/operations'
 import type { ReportOperationCompany, ReportOperationDriver, ReportOperationUser } from '@/modules/Report/types'
@@ -118,10 +107,12 @@ const props = defineProps<{
   companies: ReportOperationCompany[]
   drivers: ReportOperationDriver[]
   users: ReportOperationUser[]
+  canDelete?: boolean
 }>()
 const emit = defineEmits<{ (event: 'update:open', value: boolean): void; (event: 'saved'): void }>()
 const operations = useReportOperations()
 const saving = ref(false)
+const deleteOpen = ref(false)
 const calendarOpen = ref(false)
 const form = reactive({
   driverId: '',
@@ -245,7 +236,7 @@ async function save() {
 
 async function remove() {
   if (isRecordLocked.value) return
-  if (!props.record?.id || !window.confirm(`Delete this ${title.value}?`)) return
+  if (!props.record?.id || !props.canDelete) return
   saving.value = true
   try {
     if (props.kind === 'checker') await operations.deleteCheckerTask(props.record.id)
@@ -253,6 +244,7 @@ async function remove() {
     else await operations.deleteTask(props.record.id)
     emit('saved')
     emit('update:open', false)
+    deleteOpen.value = false
   } finally {
     saving.value = false
   }

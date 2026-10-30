@@ -105,14 +105,18 @@ export function usePortalUsers() {
   async function fetchOptions() {
     isLoadingRoles.value = true
     try {
-      const [rolesResponse, companiesResponse] = await Promise.all([
+      const [rolesResponse, companiesResponse] = await Promise.allSettled([
         api.get<Role[] | ApiEnvelope<Role[]>>(ApiEndpoints.ROUTE_ELD_DISPATCHER_ROLES),
         api.get<DispatcherCompany[] | ApiEnvelope<DispatcherCompany[]>>(
           ApiEndpoints.ROUTE_ELD_DISPATCHER_COMPANIES
         ),
       ])
-      roles.value = unwrap(rolesResponse.data).filter((role) => role.permissions.length > 0)
-      companies.value = unwrap(companiesResponse.data)
+      if (rolesResponse.status === 'fulfilled')
+        roles.value = unwrap(rolesResponse.value.data).filter((role) => role.permissions.length > 0)
+      else toast.error(errorMessage(rolesResponse.reason, 'Failed to load roles'))
+      if (companiesResponse.status === 'fulfilled')
+        companies.value = unwrap(companiesResponse.value.data)
+      else companies.value = []
     } catch (error) {
       toast.error(errorMessage(error, 'Failed to load roles and companies'))
     } finally {

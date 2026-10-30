@@ -12,7 +12,7 @@ import {
 import SortIcon from '@/components/icons/SortIcon.vue'
 import PRouteEldAlerts from '@/modules/RouteEldAlerts/pages/PRouteEldAlerts.vue'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { hasPermission } from '@/router/permissions'
+import { canAccessPath, hasPermission } from '@/router/permissions'
 import { computed } from 'vue'
 import { useCompanies } from '@/layouts/Initial/composables/useCompanies'
 
@@ -43,12 +43,21 @@ const canViewAlerts = computed(() =>
     hasPermission(authStore.token, `route_eld.alerts.${type}`)
   )
 )
+const reportHomePath = computed(() =>
+  ['/report/tasks', '/report/activity', '/report/checker', '/report/assistant', '/report/inspection/violation', '/report/inspection/no-violation', '/report/manage/drivers', '/report/manage/companies', '/report/levels']
+    .find(path => canAccessPath(path, authStore.token))
+)
+const canViewReport = computed(() => Boolean(reportHomePath.value))
 </script>
 
 <template>
   <div
     class="flex min-h-[calc(100vh-124px)] flex-col bg-white p-[16px_24px] dark:bg-background"
   >
+    <div v-if="canViewReport" class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-4">
+      <div><h3 class="font-semibold text-foreground">Route Report board</h3><p class="text-sm text-muted-foreground">Open the board without selecting a Route ELD company.</p></div>
+      <RouterLink :to="reportHomePath || '/report/tasks'"><Button>Open Report board</Button></RouterLink>
+    </div>
     <div class="mb-5 flex items-center justify-between">
       <div>
         <h2 class="text-xl font-semibold text-foreground">Select company</h2>
