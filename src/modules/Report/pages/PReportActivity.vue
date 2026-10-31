@@ -17,16 +17,18 @@
       </template>
     </CReportToolbar>
 
-    <div class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-4 overflow-hidden">
-      <CReportMetricCards :items="summaryCards" />
-      <div
-        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3"
-      >
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Driver</span>
-          <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
+    <div class="flex-1 min-h-0 p-1 sm:p-1 flex flex-col gap-1 overflow-hidden">
+      <CReportOverviewCurtain>
+        <CReportMetricCards :items="summaryCards" />
+        <div
+          class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3"
+        >
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Driver</span>
+            <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
+          </div>
         </div>
-      </div>
+      </CReportOverviewCurtain>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
@@ -236,6 +238,7 @@ import { Button } from '@/components/ui/button'
 import { getApiErrorMessage } from '@/composables/useAxiosService'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
+import CReportOverviewCurtain from '@/modules/Report/components/CReportOverviewCurtain.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
 import CReportPageSize from '@/modules/Report/components/CReportPageSize.vue'

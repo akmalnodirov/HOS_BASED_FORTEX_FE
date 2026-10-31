@@ -16,60 +16,62 @@
       </template>
     </CReportToolbar>
 
-    <div class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-4 overflow-hidden">
-      <CReportMetricCards :items="summaryCards" />
-      <div
-        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
-      >
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Company</span>
-          <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" />
+    <div class="flex-1 min-h-0 p-1 sm:p-1 flex flex-col gap-1 overflow-hidden">
+      <CReportOverviewCurtain>
+        <CReportMetricCards :items="summaryCards" />
+        <div
+          class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+        >
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Company</span>
+            <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Driver</span>
+            <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Assistant</span>
+            <Select v-model="assistantId">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All assistants" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All assistants</SelectItem>
+                <SelectItem v-for="user in assistants" :key="user.id" :value="user.id">
+                  {{ operationUserName(user) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Status</span>
+            <Select v-model="status">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem
+                  v-for="item in assistantStatuses"
+                  :key="item.value"
+                  :value="String(item.value)"
+                >
+                  {{ item.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Logbooker</span>
+            <Select v-model="logBookerId">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All logbookers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All logbookers</SelectItem>
+                <SelectItem v-for="user in logBookers" :key="user.id" :value="user.id">
+                  {{ operationUserName(user) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Driver</span>
-          <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Assistant</span>
-          <Select v-model="assistantId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All assistants" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All assistants</SelectItem>
-              <SelectItem v-for="user in assistants" :key="user.id" :value="user.id">
-                {{ operationUserName(user) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Status</span>
-          <Select v-model="status">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem
-                v-for="item in assistantStatuses"
-                :key="item.value"
-                :value="String(item.value)"
-              >
-                {{ item.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Logbooker</span>
-          <Select v-model="logBookerId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All logbookers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All logbookers</SelectItem>
-              <SelectItem v-for="user in logBookers" :key="user.id" :value="user.id">
-                {{ operationUserName(user) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      </CReportOverviewCurtain>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
@@ -82,7 +84,7 @@
                 <th class="px-4 py-3 font-medium">Driver</th>
                 <th class="px-4 py-3 font-medium min-w-48">
                   <span class="block mb-1">Company</span>
-                  <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" size="sm" />
+                  <!-- <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" size="sm" /> -->
                 </th>
                 <th class="px-4 py-3 font-medium">Assistant</th>
                 <th class="px-4 py-3 font-medium">Status</th>
@@ -194,6 +196,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
+import CReportOverviewCurtain from '@/modules/Report/components/CReportOverviewCurtain.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'

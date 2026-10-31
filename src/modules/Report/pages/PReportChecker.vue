@@ -16,56 +16,58 @@
       </template>
     </CReportToolbar>
 
-    <div class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-4 overflow-hidden">
-      <CReportMetricCards :items="summaryCards" />
-      <div
-        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Employee</span>
-          <Select v-model="targetId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All employees" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All employees</SelectItem>
-              <SelectItem v-for="user in targetUsers" :key="user.id" :value="user.id">
-                {{ targetLabel(user) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+    <div class="flex-1 min-h-0 p-1 sm:p-1 flex flex-col gap-1 overflow-hidden">
+      <CReportOverviewCurtain>
+        <CReportMetricCards :items="summaryCards" />
+        <div
+          class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        >
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Employee</span>
+            <Select v-model="targetId">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All employees" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All employees</SelectItem>
+                <SelectItem v-for="user in targetUsers" :key="user.id" :value="user.id">
+                  {{ targetLabel(user) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Checker</span>
+            <Select v-model="checkerId">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All checkers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All checkers</SelectItem>
+                <SelectItem v-for="user in checkers" :key="user.id" :value="user.id">
+                  {{ operationUserName(user) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Status</span>
+            <Select v-model="status">
+              <SelectTrigger class="h-10"><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem
+                  v-for="item in checkerStatuses"
+                  :key="item.value"
+                  :value="String(item.value)"
+                >
+                  {{ item.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Company</span>
+            <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" />
+          </div>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Checker</span>
-          <Select v-model="checkerId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All checkers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All checkers</SelectItem>
-              <SelectItem v-for="user in checkers" :key="user.id" :value="user.id">
-                {{ operationUserName(user) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Status</span>
-          <Select v-model="status">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem
-                v-for="item in checkerStatuses"
-                :key="item.value"
-                :value="String(item.value)"
-              >
-                {{ item.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Company</span>
-          <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" />
-        </div>
-      </div>
+      </CReportOverviewCurtain>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
@@ -200,6 +202,7 @@ import {
 } from '@/components/ui/select'
 import CReportCheckerUploads from '@/modules/Report/components/CReportCheckerUploads.vue'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
+import CReportOverviewCurtain from '@/modules/Report/components/CReportOverviewCurtain.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportEditor from '@/modules/Report/components/CReportEditor.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
