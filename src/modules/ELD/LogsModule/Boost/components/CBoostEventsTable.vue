@@ -1017,7 +1017,6 @@ function draggableAttrs(column: DragColumnType, event: BoostUiEventRow) {
       : event.engineHours != null
   return {
     draggable: hasValue,
-    'data-event-id': event.eventId,
     'data-drag-field': column,
     'data-drop-enabled': event.actionState === 8 || props.mutationPending ? 'false' : 'true',
   }

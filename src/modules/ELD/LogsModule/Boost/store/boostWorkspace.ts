@@ -650,15 +650,18 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   }
 
   async function generateRepair(request: GenerateRouteEldRepairRequest) {
-    if (!session.value || !activeTabId.value) return null
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before generating repair options.')
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
     isMutating.value = true
     try {
       const response = await api.post<
         RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
       >(
-        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIRS(session.value.id, activeTabId.value),
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId),
         request
       )
       return unwrap(response.data)
@@ -668,9 +671,10 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   }
 
   async function applyRepair(repairId: string, optionId: string) {
-    if (!session.value || !activeTabId.value) return null
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before applying a repair option.')
     assertEditableSession()
-    if (isMutating.value) throw new Error('Wait for the current workspace change to finish.')
+    assertCanMutate()
     const sessionId = session.value.id
     const tabId = activeTabId.value
     isMutating.value = true
@@ -686,8 +690,14 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         ),
         null
       )
-      await synchronizeWorkspace(sessionId, tabId, true)
-      return unwrap(response.data)
+      const repair = unwrap(response.data)
+      let refreshError: unknown = null
+      try {
+        await synchronizeWorkspace(sessionId, tabId, true)
+      } catch (error) {
+        refreshError = error
+      }
+      return { repair, refreshError }
     } finally {
       isMutating.value = false
     }

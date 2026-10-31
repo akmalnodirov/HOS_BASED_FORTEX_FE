@@ -21,6 +21,21 @@
           <SummaryValue label="Date and time" :value="selectedEventTime" />
         </div>
 
+        <div
+          class="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
+          role="alert"
+        >
+          <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0" />
+          <div class="space-y-1">
+            <p class="text-sm font-semibold">Repair options modify the driver’s real log</p>
+            <p class="text-xs leading-relaxed">
+              Applying an option can move or delete events or change an event to Off Duty. Review
+              the preview against GPS, ELD and camera evidence before applying it. Use “Consider
+              ALPR warnings” when camera-confirmed events must remain unchanged.
+            </p>
+          </div>
+        </div>
+
         <div v-if="!result" class="mx-auto max-w-3xl space-y-5">
           <div class="space-y-2">
             <label class="text-xs font-medium text-muted-foreground">Repair method</label>
@@ -101,8 +116,8 @@
             <div>
               <p class="text-sm font-semibold">{{ repairKindLabel(result.kind) }}</p>
               <p class="text-xs text-muted-foreground">
-                {{ result.options.length }} complete repair
-                {{ result.options.length === 1 ? 'option' : 'options' }} found
+                {{ availableOptionCount }} available repair
+                {{ availableOptionCount === 1 ? 'option' : 'options' }} found
               </p>
             </div>
             <Button
@@ -115,6 +130,14 @@
             </Button>
           </div>
 
+          <p
+            v-if="displayError"
+            class="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+            role="alert"
+          >
+            {{ displayError }}
+          </p>
+
           <div
             v-if="!result.options.length"
             class="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground"
@@ -123,7 +146,7 @@
           </div>
 
           <article
-            v-for="option in result.options"
+            v-for="option in preparedOptions"
             :key="option.id"
             class="overflow-hidden rounded-xl border border-border bg-background"
           >
@@ -134,39 +157,51 @@
                     Option {{ option.rank }} — {{ option.title }}
                   </h3>
                   <span
-                    class="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700"
+                    class="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                    :class="optionBadgeClass(option)"
                   >
-                    Complete
+                    {{ optionBadgeLabel(option) }}
                   </span>
                 </div>
                 <p class="mt-1 text-xs text-muted-foreground">{{ option.explanation }}</p>
               </div>
-              <Button
-                size="sm"
-                :disabled="Boolean(applyingOptionId) || !option.preview"
-                @click="$emit('apply', option.id)"
-              >
-                <Loader2 v-if="applyingOptionId === option.id" class="mr-2 h-4 w-4 animate-spin" />
-                {{ applyingOptionId === option.id ? 'Applying...' : 'Apply this option' }}
-              </Button>
+              <div class="flex shrink-0 items-center gap-2">
+                <Button
+                  v-if="option.preview"
+                  variant="outline"
+                  size="sm"
+                  :disabled="Boolean(applyingOptionId)"
+                  @click="togglePreview(option.id)"
+                >
+                  {{ expandedOptionId === option.id ? 'Hide preview' : 'Review preview' }}
+                </Button>
+                <Button
+                  size="sm"
+                  :disabled="Boolean(applyingOptionId) || !canApply(option)"
+                  @click="requestApply(option)"
+                >
+                  <Loader2 v-if="applyingOptionId === option.id" class="mr-2 h-4 w-4 animate-spin" />
+                  {{ applyingOptionId === option.id ? 'Applying...' : 'Apply this option' }}
+                </Button>
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-px border-b bg-border sm:grid-cols-4 lg:grid-cols-6">
-              <Metric label="Requested" :value="formatDuration(option.requestedDurationMs)" />
-              <Metric label="Achieved" :value="formatDuration(option.achievedDurationMs)" />
+              <Metric label="Requested" :value="formatBoostDuration(option.requestedDurationMs)" />
+              <Metric label="Achieved" :value="formatBoostDuration(option.achievedDurationMs)" />
               <Metric label="Changed" :value="String(option.changedEventCount)" />
               <Metric label="Deleted" :value="String(option.deletedEventCount)" />
-              <Metric label="Moved time" :value="formatDuration(option.totalMovedMilliseconds)" />
+              <Metric label="Moved time" :value="formatBoostDuration(option.totalMovedMilliseconds)" />
               <Metric
                 label="Violation"
                 :value="option.targetViolationRemoved ? 'Removed' : 'Unchanged'"
               />
             </div>
 
-            <template v-if="option.preview">
+            <template v-if="option.preview && expandedOptionId === option.id">
               <div class="border-b p-4">
                 <CBoostGraph
-                  :events="graphEvents(option)"
+                  :events="option.graphEvents"
                   :from-date="fromDate"
                   :to-date="toDate"
                   :time-zone="timeZone"
@@ -230,7 +265,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="row in previewRows(option)"
+                      v-for="row in option.previewRows"
                       :key="row.event.id"
                       class="border-b last:border-b-0"
                       :class="{
@@ -242,7 +277,7 @@
                         {{ formatEventTime(row.event) }}
                       </td>
                       <td class="whitespace-nowrap px-3 py-2 font-mono">
-                        {{ row.durationMs == null ? '—' : formatDuration(row.durationMs) }}
+                        {{ row.durationMs == null ? '—' : formatBoostDuration(row.durationMs) }}
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center gap-1.5">
@@ -281,17 +316,11 @@
               </div>
             </template>
 
-            <p v-else class="p-6 text-center text-sm text-muted-foreground">
+            <p v-else-if="!option.preview" class="p-6 text-center text-sm text-muted-foreground">
               This preview is no longer available because the underlying event timeline changed.
             </p>
           </article>
 
-          <p
-            v-if="displayError"
-            class="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700"
-          >
-            {{ displayError }}
-          </p>
         </div>
       </div>
 
@@ -310,11 +339,57 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
+
+  <Dialog :open="Boolean(pendingApplyOption)" @update:open="handleConfirmOpenChange">
+    <DialogContent class="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Confirm log repair</DialogTitle>
+        <DialogDescription>
+          This action changes the driver’s working log and cannot be treated as an automatic HOS
+          correction without supporting evidence.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div v-if="pendingApplyOption" class="space-y-4">
+        <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <p class="font-semibold">{{ pendingApplyOption.title }}</p>
+          <p class="mt-1 text-xs">
+            {{ pendingApplyOption.changedEventCount }} changed,
+            {{ pendingApplyOption.deletedEventCount }} deleted; moved time
+            {{ formatBoostDuration(pendingApplyOption.totalMovedMilliseconds) }}.
+          </p>
+        </div>
+        <label class="flex items-start gap-3 rounded-md border p-3 text-sm">
+          <Checkbox
+            :model-value="applyConfirmed"
+            @update:model-value="applyConfirmed = Boolean($event)"
+          />
+          <span>
+            I reviewed this option against the available ELD, location and camera evidence and
+            intend to apply these event changes.
+          </span>
+        </label>
+      </div>
+
+      <DialogFooter class="gap-2">
+        <Button variant="outline" :disabled="Boolean(applyingOptionId)" @click="cancelApply">
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          :disabled="!applyConfirmed || Boolean(applyingOptionId)"
+          @click="confirmApply"
+        >
+          Confirm and apply
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch } from 'vue'
-import { Camera, Loader2 } from 'lucide-vue-next'
+import { Camera, Loader2, TriangleAlert } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -342,9 +417,13 @@ import type {
   RouteEldRepairPreviewEvent,
   RouteEldRepairRequestKind,
   RouteEldRepairRequestResponse,
-  RouteEldScheduleCalculations,
 } from '../../types/boost'
-import { resolveRouteEldScheduleTimeZone } from '../../composables/useScheduleBoost'
+import { formatRouteEldEventTime } from '@/utils/routeEldTimeZone'
+import {
+  areBoostDurationPartsValid,
+  boostDurationPartsToSeconds,
+  formatBoostDuration,
+} from '../../utils/formatters'
 
 const props = withDefaults(
   defineProps<{
@@ -352,7 +431,7 @@ const props = withDefaults(
     loading?: boolean
     applyingOptionId?: string
     selectedEvent?: RouteEldHosEvent | null
-    violations?: RouteEldScheduleCalculations['violations']
+    selectionError?: string
     result?: RouteEldRepairRequestResponse | null
     error?: string
     fromDate: string
@@ -364,7 +443,7 @@ const props = withDefaults(
     loading: false,
     applyingOptionId: '',
     selectedEvent: null,
-    violations: () => [],
+    selectionError: '',
     result: null,
     error: '',
     timeZone: 'CT',
@@ -442,11 +521,20 @@ const hours = ref(0)
 const minutes = ref(0)
 const seconds = ref(0)
 const considerAlpr = ref(false)
+const expandedOptionId = ref('')
+const pendingApplyOption = ref<RouteEldRepairOption | null>(null)
+const applyConfirmed = ref(false)
 const requiresDuration = computed(() => Boolean(kind.value && durationKinds.has(kind.value)))
 const allowsAutomaticDuration = computed(() =>
   Boolean(kind.value && automaticDurationKinds.has(kind.value))
 )
-const durationSeconds = computed(() => hours.value * 3600 + minutes.value * 60 + seconds.value)
+const durationSeconds = computed(() =>
+  boostDurationPartsToSeconds({
+    hours: hours.value,
+    minutes: minutes.value,
+    seconds: seconds.value,
+  })
+)
 const selectedKindDescription = computed(
   () => repairKinds.find((item) => item.value === kind.value)?.description ?? ''
 )
@@ -455,17 +543,22 @@ const selectedEventTime = computed(() =>
 )
 
 const validationError = computed(() => {
+  if (props.selectionError) return props.selectionError
   if (!props.selectedEvent) return 'Select an event from the graph or events table first.'
   if (!kind.value) return 'Select a repair method.'
+  if (
+    kind.value &&
+    ['AddEventDuration', 'ReduceEventDuration'].includes(kind.value) &&
+    !['OFF', 'SB', 'D', 'ON'].includes(props.selectedEvent.eventCategory.toUpperCase())
+  ) {
+    return 'An event-duration repair requires an active duty-status event.'
+  }
   if (requiresDuration.value) {
-    if (
-      ![hours.value, minutes.value, seconds.value].every(Number.isInteger) ||
-      hours.value < 0 ||
-      minutes.value < 0 ||
-      minutes.value > 59 ||
-      seconds.value < 0 ||
-      seconds.value > 59
-    ) {
+    if (!areBoostDurationPartsValid({
+      hours: hours.value,
+      minutes: minutes.value,
+      seconds: seconds.value,
+    })) {
       return 'Enter whole hours, with minutes and seconds between 0 and 59.'
     }
     if (!allowsAutomaticDuration.value && durationSeconds.value < 1)
@@ -494,6 +587,8 @@ watch(
     minutes.value = 0
     seconds.value = 0
     considerAlpr.value = false
+    pendingApplyOption.value = null
+    applyConfirmed.value = false
   }
 )
 
@@ -523,28 +618,11 @@ const handleOpenChange = (value: boolean) => {
 }
 const repairKindLabel = (value: RouteEldRepairRequestKind) =>
   repairKinds.find((item) => item.value === value)?.label ?? value
-const formatDuration = (milliseconds: number) => {
-  const totalSeconds = Math.max(0, Math.round(milliseconds / 1_000))
-  const hoursPart = Math.floor(totalSeconds / 3600)
-  const minutesPart = Math.floor((totalSeconds % 3600) / 60)
-  const secondsPart = totalSeconds % 60
-  return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`
-}
 function formatEventTime(event: RouteEldHosEvent) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: resolveRouteEldScheduleTimeZone(event.timeZone ?? props.timeZone),
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(event.timestamp))
+  return formatRouteEldEventTime(event.timestamp, event.timeZone ?? props.timeZone)
 }
-const graphEvents = (option: RouteEldRepairOption) =>
-  option.preview?.events.filter((row) => !row.isDeleted).map((row) => row.event) ?? []
 type PreviewRow = RouteEldRepairPreviewEvent & { durationMs: number | null }
-function previewRows(option: RouteEldRepairOption): PreviewRow[] {
+function buildPreviewRows(option: RouteEldRepairOption): PreviewRow[] {
   if (!option.preview) return []
   const rows = [...option.preview.events].sort(
     (left, right) =>
@@ -554,7 +632,7 @@ function previewRows(option: RouteEldRepairOption): PreviewRow[] {
     (row) =>
       !row.isDeleted &&
       ['ACTIVE', 'UNKNOWN'].includes(row.event.recordStatus.toUpperCase()) &&
-      ['OFF', 'SB', 'D', 'ON'].includes(row.event.eventCategory.toUpperCase())
+      ['OFF', 'SB', 'D', 'ON', 'PC', 'YM'].includes(row.event.eventCategory.toUpperCase())
   )
   const durationById = new Map<string, number>()
   for (let index = 0; index + 1 < duties.length; index++) {
@@ -564,6 +642,60 @@ function previewRows(option: RouteEldRepairOption): PreviewRow[] {
     )
   }
   return rows.map((row) => ({ ...row, durationMs: durationById.get(row.event.id) ?? null }))
+}
+type PreparedRepairOption = RouteEldRepairOption & {
+  graphEvents: RouteEldHosEvent[]
+  previewRows: PreviewRow[]
+}
+const preparedOptions = computed<PreparedRepairOption[]>(() =>
+  (props.result?.options ?? []).map((option) => ({
+    ...option,
+    graphEvents:
+      option.preview?.events.filter((row) => !row.isDeleted).map((row) => row.event) ?? [],
+    previewRows: buildPreviewRows(option),
+  }))
+)
+const availableOptionCount = computed(
+  () => preparedOptions.value.filter((option) => canApply(option)).length
+)
+watch(
+  () => props.result,
+  (result) => {
+    expandedOptionId.value = result?.options.find((option) => option.preview)?.id ?? ''
+  }
+)
+const canApply = (option: RouteEldRepairOption) =>
+  option.status === 'Available' && option.fullySatisfies && Boolean(option.preview)
+const optionBadgeLabel = (option: RouteEldRepairOption) => {
+  if (option.status !== 'Available') return option.status
+  return option.fullySatisfies ? 'Complete' : 'Incomplete'
+}
+const optionBadgeClass = (option: RouteEldRepairOption) =>
+  option.status === 'Available' && option.fullySatisfies
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-muted text-muted-foreground'
+const togglePreview = (optionId: string) => {
+  expandedOptionId.value = expandedOptionId.value === optionId ? '' : optionId
+}
+const requestApply = (option: RouteEldRepairOption) => {
+  if (!canApply(option)) return
+  pendingApplyOption.value = option
+  applyConfirmed.value = false
+}
+const cancelApply = () => {
+  if (props.applyingOptionId) return
+  pendingApplyOption.value = null
+  applyConfirmed.value = false
+}
+const handleConfirmOpenChange = (open: boolean) => {
+  if (!open) cancelApply()
+}
+const confirmApply = () => {
+  if (!applyConfirmed.value || !pendingApplyOption.value || props.applyingOptionId) return
+  const optionId = pendingApplyOption.value.id
+  pendingApplyOption.value = null
+  applyConfirmed.value = false
+  emit('apply', optionId)
 }
 const changeClass = (status: string) => {
   if (status === 'CHANGED') return 'bg-amber-100 text-amber-700'

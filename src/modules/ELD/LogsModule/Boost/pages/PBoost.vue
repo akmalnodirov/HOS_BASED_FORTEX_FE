@@ -230,11 +230,9 @@
         selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
       "
       :duration-title="durationSelectionError"
-      :repair-disabled="!selectedRepairEvent || !canEditSession"
+      :repair-disabled="Boolean(repairSelectionError) || !canEditSession"
       :repair-title="
-        selectedRepairEvent
-          ? 'Generate repair options for the selected event'
-          : 'Select an event from the graph or table first'
+        repairSelectionError || 'Generate repair options for the selected event'
       "
       :reassign-disabled="!selectedRowIds.length || !canEditSession"
       :normalize-disabled="!canEditSession"
@@ -411,7 +409,7 @@
       :loading="repairGenerating"
       :applying-option-id="applyingRepairOptionId"
       :selected-event="selectedRepairEvent"
-      :violations="workspace?.calculations.violations ?? []"
+      :selection-error="repairSelectionError"
       :result="repairResult"
       :error="repairFailureReason"
       :from-date="session?.fromDate ?? ''"
@@ -835,6 +833,20 @@ const graphEvents = computed(() =>
 const selectedRepairEvent = computed(
   () => graphEvents.value.find((event) => event.id === selectedEventId.value) ?? null
 )
+const repairSelectionError = computed(() => {
+  const currentSession = session.value
+  const selected = selectedRepairEvent.value
+  if (!currentSession || !selected)
+    return 'Select an event from the graph or events table first.'
+  if (activeDriverId.value !== currentSession.driverId)
+    return 'Repair is available only while viewing the session driver.'
+  if (!isRouteEldEventWithinSession(selected, currentSession))
+    return 'Events outside the session period cannot be repaired.'
+  if (selected.isFrozen) return 'DOT-inspected events cannot be repaired.'
+  if (selected.recordStatus.toUpperCase() !== 'ACTIVE')
+    return 'Only active events can be used to generate repair options.'
+  return ''
+})
 type CameraSource = { eventId: string; signature: string }
 const cameraSources = computed<CameraSource[]>(() => {
   if (!session.value || workspace.value?.session.id !== session.value.id ||
@@ -1713,8 +1725,8 @@ const openDurationModal = () => {
 }
 const openRepairModal = () => {
   if (!canEditSession.value) return
-  if (!selectedRepairEvent.value) {
-    toast.error('Select an event from the graph or events table first.')
+  if (repairSelectionError.value) {
+    toast.error(repairSelectionError.value)
     return
   }
   repairResult.value = null
@@ -1743,10 +1755,16 @@ const applyRepairOption = async (optionId: string) => {
   applyingRepairOptionId.value = optionId
   repairFailureReason.value = ''
   try {
-    await store.applyRepair(repairId, optionId)
+    const outcome = await store.applyRepair(repairId, optionId)
     repairOpen.value = false
     repairResult.value = null
-    toast.success('Repair option applied to the active working tab.')
+    if (outcome.refreshError) {
+      toast.warning(
+        'The repair was applied, but the workspace could not be refreshed. Reload the tab to see the updated events.'
+      )
+    } else {
+      toast.success('Repair option applied to the active working tab.')
+    }
   } catch (error) {
     repairFailureReason.value = getApiErrorMessage(error, 'The repair option could not be applied.')
   } finally {

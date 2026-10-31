@@ -19,8 +19,6 @@ export function useDragDrop(
   const isDragging = ref(false)
   let activeDrag: ActiveDrag | null = null
   let sourceCell: HTMLElement | null = null
-  let currentTargetCell: HTMLElement | null = null
-  let currentTargetCanDrop = false
   let suppressClickUntil = 0
 
   function getCell(event: DragEvent): HTMLElement | null {
@@ -30,7 +28,7 @@ export function useDragDrop(
   }
 
   function getEventId(cell: HTMLElement) {
-    return cell.dataset.eventId ?? null
+    return cell.closest<HTMLElement>('[data-event-id]')?.dataset.eventId ?? null
   }
 
   function canDrop(cell: HTMLElement) {
@@ -40,25 +38,10 @@ export function useDragDrop(
       getEventId(cell) !== activeDrag.sourceEventId
   }
 
-  function canDropOnTarget(cell: HTMLElement) {
-    if (cell !== currentTargetCell) {
-      currentTargetCell = cell
-      currentTargetCanDrop = canDrop(cell)
-    }
-    return currentTargetCanDrop
-  }
-
-  function clearTargetCell(cell?: HTMLElement) {
-    if (cell && currentTargetCell !== cell) return
-    currentTargetCell = null
-    currentTargetCanDrop = false
-  }
-
   function clearDrag() {
     if (activeDrag) suppressClickUntil = Date.now() + 350
     sourceCell?.classList.remove('dd-dragging')
     sourceCell = null
-    clearTargetCell()
     document.querySelectorAll('.dd-over, .dd-not-allowed').forEach((element) => {
       element.classList.remove('dd-over', 'dd-not-allowed')
     })
@@ -82,14 +65,14 @@ export function useDragDrop(
 
   function handleDragOver(event: DragEvent) {
     const cell = getCell(event)
-    if (!cell || !canDropOnTarget(cell)) return
+    if (!cell || !canDrop(cell)) return
     event.preventDefault()
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
   }
 
   function handleDragEnter(event: DragEvent) {
     const cell = getCell(event)
-    if (!cell || !activeDrag || !canDropOnTarget(cell)) return
+    if (!cell || !activeDrag || !canDrop(cell)) return
     event.preventDefault()
     cell.classList.add('dd-over')
   }
@@ -99,13 +82,12 @@ export function useDragDrop(
     if (!cell) return
     if (!(event.relatedTarget instanceof Node) || !cell.contains(event.relatedTarget)) {
       cell.classList.remove('dd-over')
-      clearTargetCell(cell)
     }
   }
 
   function handleDrop(event: DragEvent) {
     const cell = getCell(event)
-    if (!cell || !canDropOnTarget(cell) || !activeDrag) return
+    if (!cell || !canDrop(cell) || !activeDrag) return
     const targetEventId = getEventId(cell)
     if (!targetEventId) return
     event.preventDefault()
