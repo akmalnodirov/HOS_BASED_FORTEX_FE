@@ -418,7 +418,12 @@ import type {
   RouteEldRepairRequestKind,
   RouteEldRepairRequestResponse,
 } from '../../types/boost'
+import dayjs from 'dayjs'
 import { formatRouteEldEventTime } from '@/utils/routeEldTimeZone'
+import {
+  routeEldSessionTimelineCutoff,
+  timestampFromRouteEldZonedLocal,
+} from '../../composables/useScheduleBoost'
 import {
   areBoostDurationPartsValid,
   boostDurationPartsToSeconds,
@@ -621,6 +626,22 @@ const repairKindLabel = (value: RouteEldRepairRequestKind) =>
 function formatEventTime(event: RouteEldHosEvent) {
   return formatRouteEldEventTime(event.timestamp, event.timeZone ?? props.timeZone)
 }
+// Mirrors normalizedStatus in useScheduleBoost: an absent status means ACTIVE.
+function normalizedRecordStatus(value?: string | null) {
+  return String(value || 'ACTIVE')
+    .trim()
+    .toUpperCase()
+}
+// Same cutoff the preview CBoostGraph derives from these very props (graphEndTimestamp).
+const previewCutoffMs = computed(() => {
+  const periodEnd = props.toDate
+    ? timestampFromRouteEldZonedLocal(
+        `${dayjs(props.toDate).add(1, 'day').format('YYYY-MM-DD')}T00:00:00`,
+        props.timeZone
+      )
+    : Number.POSITIVE_INFINITY
+  return Math.min(routeEldSessionTimelineCutoff(props.sessionCreatedAt), periodEnd)
+})
 type PreviewRow = RouteEldRepairPreviewEvent & { durationMs: number | null }
 function buildPreviewRows(option: RouteEldRepairOption): PreviewRow[] {
   if (!option.preview) return []
@@ -628,19 +649,22 @@ function buildPreviewRows(option: RouteEldRepairOption): PreviewRow[] {
     (left, right) =>
       left.event.timestamp - right.event.timestamp || left.event.id.localeCompare(right.event.id)
   )
+  // Must agree with graphEventDurationById in useScheduleBoost and with the CBoostGraph drawn
+  // directly above this table: only normalized-ACTIVE events bound a duty (a missing status
+  // defaults to ACTIVE, UNKNOWN does not qualify). Accepting UNKNOWN here split one graph
+  // segment into two rows, so the graph and the duration column described different timelines.
   const duties = rows.filter(
     (row) =>
       !row.isDeleted &&
-      ['ACTIVE', 'UNKNOWN'].includes(row.event.recordStatus.toUpperCase()) &&
+      normalizedRecordStatus(row.event.recordStatus) === 'ACTIVE' &&
       ['OFF', 'SB', 'D', 'ON', 'PC', 'YM'].includes(row.event.eventCategory.toUpperCase())
   )
   const durationById = new Map<string, number>()
-  for (let index = 0; index + 1 < duties.length; index++) {
-    durationById.set(
-      duties[index]!.event.id,
-      Math.max(0, duties[index + 1]!.event.timestamp - duties[index]!.event.timestamp)
-    )
-  }
+  // The trailing duty runs to the timeline cutoff, as on the graph, instead of rendering "—".
+  duties.forEach((row, index) => {
+    const nextTimestamp = duties[index + 1]?.event.timestamp ?? previewCutoffMs.value
+    durationById.set(row.event.id, Math.max(0, nextTimestamp - row.event.timestamp))
+  })
   return rows.map((row) => ({ ...row, durationMs: durationById.get(row.event.id) ?? null }))
 }
 type PreparedRepairOption = RouteEldRepairOption & {

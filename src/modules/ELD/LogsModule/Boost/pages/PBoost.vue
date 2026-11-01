@@ -1469,7 +1469,14 @@ const selectInitialTab = () => {
   if (initial) selectTab(initial)
 }
 const onSelectedRowIdsUpdate = (ids: string[]) => {
+  // The repair anchor (selectedEventId) is sticky so it can also be set straight from the
+  // graph, where no row is checked. That makes it go stale when a checked row is cleared:
+  // Repair stays enabled on an event the user can no longer see as selected. Drop the anchor
+  // whenever its own row leaves the table selection (row toggled off, shift-range, clear-all).
+  const anchorId = selectedEventId.value
+  const anchorWasSelected = Boolean(anchorId) && selectedRowIds.value.includes(anchorId)
   selectedRowIds.value = ids
+  if (anchorWasSelected && !ids.includes(anchorId)) selectedEventId.value = ''
 }
 const highlightEventRow = (eventId: string) => {
   highlightedEventId.value = eventId
