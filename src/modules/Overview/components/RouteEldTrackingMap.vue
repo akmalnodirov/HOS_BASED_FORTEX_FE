@@ -97,7 +97,10 @@
           title="Current vehicle position"
           @click="selectedPoint = latestPoint"
         >
-          <Navigation class="h-5 w-5" :style="{ transform: `rotate(${bearing}deg)` }" />
+          <Navigation
+            class="h-5 w-5 transition-transform duration-100"
+            :style="{ transform: `rotate(${markerRotation(bearing)}deg)` }"
+          />
         </button>
       </CustomMarker>
     </GoogleMap>
@@ -178,16 +181,12 @@
       </button>
       <div class="pr-6 font-semibold">{{ selectedPoint.location || 'Tracking point' }}</div>
       <div class="mt-2 grid grid-cols-[76px_1fr] gap-x-2 gap-y-1">
-        <span class="text-muted-foreground">Time</span
-        ><span>{{ formatTime(selectedPoint.timestamp) }}</span>
-        <span class="text-muted-foreground">Speed</span
-        ><span>{{ speedLabel(selectedPoint.speed) }}</span>
-        <span class="text-muted-foreground">Odometer</span
-        ><span>{{ numberLabel(selectedPoint.odometer, ' mi') }}</span>
+        <span class="text-muted-foreground">Time</span><span>{{ formatTime(selectedPoint.timestamp) }}</span>
+        <span class="text-muted-foreground">Speed</span><span>{{ speedLabel(selectedPoint.speed) }}</span>
+        <span class="text-muted-foreground">Duty status</span><span>{{ dutyStatusLabel(selectedPoint) }}</span>
+        <span class="text-muted-foreground">Odometer</span><span>{{ numberLabel(selectedPoint.odometer, ' mi') }}</span>
         <span class="text-muted-foreground">Position</span>
-        <span
-          >{{ selectedPoint.latitude.toFixed(5) }}, {{ selectedPoint.longitude.toFixed(5) }}</span
-        >
+        <span>{{ selectedPoint.latitude.toFixed(5) }}, {{ selectedPoint.longitude.toFixed(5) }}</span>
       </div>
     </div>
   </div>
@@ -351,6 +350,7 @@ async function consumePoints(points: RouteEldLiveTrackingPoint[]) {
     routeRevision += 1
     commitAnimationProgress()
     stopAnimation()
+    bearing.value = pointBearing(points, points.indexOf(targetPoint)) ?? bearing.value
     animatedPosition.value = position(targetPoint)
     visiblePointTimestamp.value = targetPoint.timestamp
     maybePanToVehicle(animatedPosition.value)
@@ -384,6 +384,7 @@ function resetRoute(points: RouteEldLiveTrackingPoint[]) {
   committedPath.value = []
   const liveLeg = initialLiveLeg(points)
   animatedPosition.value = liveLeg?.start ?? (points.length ? position(points.at(-1)!) : null)
+  bearing.value = points.length ? (pointBearing(points, points.length - 1) ?? 0) : 0
   visiblePointTimestamp.value =
     liveLeg?.startTimestamp ?? points.at(-1)?.timestamp ?? Number.POSITIVE_INFINITY
   lastPanPosition = animatedPosition.value
@@ -394,6 +395,7 @@ async function rebuildRoadPath(points: RouteEldLiveTrackingPoint[]) {
   const revision = ++routeRevision
   if (points.length < 2) {
     committedPath.value = points.map(position)
+    bearing.value = points.length ? (normalizeBearing(points[0].bearing) ?? bearing.value) : 0
     isMatchingRoute.value = false
     await nextTick(fitRoute)
     return
@@ -423,6 +425,7 @@ async function rebuildRoadPath(points: RouteEldLiveTrackingPoint[]) {
   if (revision !== routeRevision) return
   committedPath.value = roadPath
   animatedPosition.value = position(points.at(-1)!)
+  bearing.value = pathBearing(roadPath) ?? pointBearing(points, points.length - 1) ?? bearing.value
   isMatchingRoute.value = false
   await nextTick(fitRoute)
 }
@@ -694,16 +697,38 @@ function handleFullscreenChange() {
 }
 
 function statusForPoint(point: RouteEldLiveTrackingPoint): Exclude<StatusFilter, 'all'> {
-  if (point.motionStatus === 'MOVING') return 'driving'
-  const rawStatus =
-    point.id === validPoints.value.at(-1)?.id
-      ? props.currentStatus || point.engineEventCode || ''
-      : point.engineEventCode || ''
-  const status = rawStatus.replace(/[\s_-]/g, '').toUpperCase()
-  if (status.includes('SLEEP') || status === 'SB') return 'sleeper'
-  if (status.includes('DRIV') || status === 'D') return 'driving'
-  if (status.includes('ONDUTY') || status === 'ON') return 'onDuty'
+  const status = dutyStatusForPoint(point)
+  if (status === 'sleeper') return 'sleeper'
+  if (status === 'driving') return 'driving'
+  if (status === 'onDuty' || status === 'yardMove') return 'onDuty'
   return 'offDuty'
+}
+
+function dutyStatusForPoint(point: RouteEldLiveTrackingPoint) {
+  const rawStatus =
+    point.dutyStatus ||
+    (point.id === validPoints.value.at(-1)?.id ? props.currentStatus : null) ||
+    point.engineEventCode ||
+    ''
+  const status = rawStatus.replace(/[\s_-]/g, '').toUpperCase()
+  if (status.includes('PERSONAL') || status === 'PC' || status.includes('DRINDPC'))
+    return 'personalUse'
+  if (status.includes('YARD') || status === 'YM' || status.includes('DRINDYM')) return 'yardMove'
+  if (status.includes('SLEEP') || status === 'SB' || status.includes('DSSB')) return 'sleeper'
+  if (status.includes('DRIV') || status === 'D' || status.includes('DSD')) return 'driving'
+  if (status.includes('ONDUTY') || status === 'ON' || status.includes('DSON')) return 'onDuty'
+  if (status.includes('OFF') || status.includes('DSOFF')) return 'offDuty'
+  return point.motionStatus === 'MOVING' ? 'driving' : 'offDuty'
+}
+
+function dutyStatusLabel(point: RouteEldLiveTrackingPoint) {
+  const status = dutyStatusForPoint(point)
+  if (status === 'personalUse') return 'Personal Use'
+  if (status === 'yardMove') return 'Yard Move'
+  if (status === 'sleeper') return 'Sleeper Berth'
+  if (status === 'driving') return 'Driving'
+  if (status === 'onDuty') return 'On Duty'
+  return 'Off Duty'
 }
 
 function markerClass(point: RouteEldLiveTrackingPoint) {
@@ -781,6 +806,35 @@ function distanceMeters(start: LatLng, end: LatLng) {
     Math.sin(latitudeDelta / 2) ** 2 +
     Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+}
+
+function markerRotation(value: number) {
+  return value - 45
+}
+
+function normalizeBearing(value: number | null | undefined) {
+  return value != null && Number.isFinite(value) ? ((value % 360) + 360) % 360 : null
+}
+
+function pointBearing(points: RouteEldLiveTrackingPoint[], index: number) {
+  if (!points[index]) return null
+  for (let previous = index - 1; previous >= 0; previous -= 1) {
+    if (!samePosition(position(points[previous]), position(points[index])))
+      return calculateBearing(position(points[previous]), position(points[index]))
+  }
+  for (let next = index + 1; next < points.length; next += 1) {
+    if (!samePosition(position(points[index]), position(points[next])))
+      return calculateBearing(position(points[index]), position(points[next]))
+  }
+  return normalizeBearing(points[index].bearing)
+}
+
+function pathBearing(path: LatLng[]) {
+  for (let index = path.length - 1; index > 0; index -= 1) {
+    if (!samePosition(path[index - 1], path[index]))
+      return calculateBearing(path[index - 1], path[index])
+  }
+  return null
 }
 
 function calculateBearing(from: LatLng, to: LatLng) {

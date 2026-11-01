@@ -33,7 +33,7 @@ export function useRouteEldOverviewDrivers() {
         params: { companyId },
       })
       .then((response) => {
-        drivers.value = response.data
+        drivers.value = preserveLiveBearings(response.data, drivers.value)
       })
       .catch((exception: any) => {
         error.value =
@@ -153,6 +153,43 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
   })
 
   return { tracking, isLoading, isRefreshing, isToday, error, load }
+}
+
+function preserveLiveBearings(next: RouteEldLiveDriver[], previous: RouteEldLiveDriver[]) {
+  const previousById = new Map(previous.map((driver) => [driver.driverId, driver]))
+  return next.map((driver) => {
+    const point = driver.latestPoint
+    if (!point) return driver
+    const previousPoint = previousById.get(driver.driverId)?.latestPoint
+    const providerBearing = normalizeBearing(point.bearing)
+    const movementBearing = previousPoint ? bearingBetween(previousPoint, point) : null
+    const bearing = movementBearing ?? providerBearing ?? normalizeBearing(previousPoint?.bearing)
+    return bearing == null ? driver : { ...driver, latestPoint: { ...point, bearing } }
+  })
+}
+
+function bearingBetween(
+  from: RouteEldLiveDriver['latestPoint'],
+  to: RouteEldLiveDriver['latestPoint']
+) {
+  if (!from || !to) return null
+  if (
+    Math.abs(from.latitude - to.latitude) < 0.0000001 &&
+    Math.abs(from.longitude - to.longitude) < 0.0000001
+  )
+    return null
+  const fromLatitude = (from.latitude * Math.PI) / 180
+  const toLatitude = (to.latitude * Math.PI) / 180
+  const longitudeDelta = ((to.longitude - from.longitude) * Math.PI) / 180
+  const y = Math.sin(longitudeDelta) * Math.cos(toLatitude)
+  const x =
+    Math.cos(fromLatitude) * Math.sin(toLatitude) -
+    Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta)
+  return normalizeBearing((Math.atan2(y, x) * 180) / Math.PI)
+}
+
+function normalizeBearing(value: number | null | undefined) {
+  return value != null && Number.isFinite(value) ? ((value % 360) + 360) % 360 : null
 }
 
 function deduplicateTrackingPoints(points: RouteEldDriverTracking['points']) {
