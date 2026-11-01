@@ -17,6 +17,8 @@ import type {
   RouteEldSessionOperation,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
+  GenerateRouteEldRepairRequest,
+  RouteEldRepairRequestResponse,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -647,6 +649,60 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     return unwrap(response.data)
   }
 
+  async function generateRepair(request: GenerateRouteEldRepairRequest) {
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before generating repair options.')
+    assertEditableSession()
+    assertCanMutate()
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId),
+        request
+      )
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function applyRepair(repairId: string, optionId: string) {
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before applying a repair option.')
+    assertEditableSession()
+    assertCanMutate()
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY(
+          sessionId,
+          tabId,
+          repairId,
+          optionId
+        ),
+        null
+      )
+      const repair = unwrap(response.data)
+      let refreshError: unknown = null
+      try {
+        await synchronizeWorkspace(sessionId, tabId, true)
+      } catch (error) {
+        refreshError = error
+      }
+      return { repair, refreshError }
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function normalize(normalizeList: RouteEldNormalizeType[], applyCertificationFix: boolean) {
     if (!session.value || !activeTabId.value) return null
     if (!canEditWorkingSession.value) {
@@ -855,6 +911,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     fetchDriverOptions,
     fetchReassignTargets,
     analyzeAiAdvice,
+    generateRepair,
+    applyRepair,
     normalize,
     submitOrRollback,
     activeOperation,

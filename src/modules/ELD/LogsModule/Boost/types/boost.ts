@@ -631,6 +631,84 @@ export interface RouteEldWorkspace {
   freezePeriods: Array<Record<string, unknown>>
 }
 
+export type RouteEldRepairRequestKind =
+  | 'ReduceShiftDriving'
+  | 'ReduceShiftElapsed'
+  | 'RepairShiftViolation'
+  | 'RepairCycleViolation'
+  | 'RepairBreakViolation'
+  | 'AddEventDuration'
+  | 'ReduceEventDuration'
+
+export interface GenerateRouteEldRepairRequest {
+  kind: RouteEldRepairRequestKind
+  targetViolationType?: string | null
+  targetEventId: string
+  targetTimestamp: number
+  requestedDurationSeconds: number
+  considerAlpr: boolean
+}
+
+export interface RouteEldRepairOperation {
+  order: number
+  type: 'ShiftTimestamp' | 'DeleteEvent' | 'ChangeToOffDuty'
+  eventId: string
+  beforeTimestamp?: number | null
+  afterTimestamp?: number | null
+}
+
+export interface RouteEldRepairPreviewEvent {
+  event: RouteEldHosEvent
+  isDeleted: boolean
+  changeStatus: 'UNCHANGED' | 'CHANGED' | 'DELETED'
+  hasAlprCamera: boolean
+}
+
+export interface RouteEldRepairPreviewProfileForm {
+  logDate: string
+  trailers: string[]
+  shippingDocuments: string[]
+}
+
+export interface RouteEldRepairOptionPreview {
+  events: RouteEldRepairPreviewEvent[]
+  calculations: RouteEldScheduleCalculations
+  profileForms: RouteEldRepairPreviewProfileForm[]
+}
+
+export interface RouteEldRepairOption {
+  id: string
+  strategyCode: string
+  title: string
+  explanation: string
+  rank: number
+  status: 'Available' | 'Applied' | 'Superseded' | 'Stale'
+  requestedDurationMs: number
+  achievedDurationMs: number
+  fullySatisfies: boolean
+  targetViolationRemoved: boolean
+  changedEventCount: number
+  deletedEventCount: number
+  totalMovedMilliseconds: number
+  operations: RouteEldRepairOperation[]
+  preview?: RouteEldRepairOptionPreview | null
+}
+
+export interface RouteEldRepairRequestResponse {
+  id: string
+  sessionId: string
+  tabId: string
+  kind: RouteEldRepairRequestKind
+  status: 'Ready' | 'NoSolution' | 'Applied' | 'Stale' | 'Failed'
+  targetViolationType?: string | null
+  targetEventId?: string | null
+  targetTimestamp?: number | null
+  requestedDurationMs: number
+  selectedOptionId?: string | null
+  createdAt: string
+  options: RouteEldRepairOption[]
+}
+
 export interface RouteEldAlprOrigin {
   eventId: string
   sequenceId: string | null
