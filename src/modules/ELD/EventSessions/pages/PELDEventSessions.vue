@@ -20,6 +20,20 @@
           />
         </div>
 
+        <Select v-if="companyFilterEnabled" v-model="selectedCompanyId">
+          <SelectTrigger class="h-10 w-full sm:w-52" :disabled="companyOptionsLoading">
+            <SelectValue
+              :placeholder="companyOptionsLoading ? 'Loading companies...' : 'All companies'"
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All companies</SelectItem>
+            <SelectItem v-for="company in companyOptions" :key="company.id" :value="company.id">
+              {{ company.name }}{{ company.isActive ? '' : ' (inactive)' }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
         <Popover v-model:open="periodOpen">
           <PopoverTrigger as-child>
             <Button
@@ -400,11 +414,15 @@ import {
 } from '@/components/ui/table'
 import { useDebounceSearch } from '@/composables/useDebounceSearch'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
-import { getCompanyId } from '@/utils/company'
 import { useEventSessions } from '../composables/useEventSessions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
-import type { EventSessionFilters, EventSessionListItem, EventSessionStatus } from '../types'
+import type {
+  EventSessionCompanyOption,
+  EventSessionFilters,
+  EventSessionListItem,
+  EventSessionStatus,
+} from '../types'
 
 const authStore = useAuthStore()
 const canRollback = computed(() => hasPermission(authStore.token, 'route_eld.log_details.rollback'))
@@ -428,13 +446,16 @@ const {
   rollingBackId,
   error,
   fetchSessions,
-  fetchSelectedCompanyExternalId,
+  fetchFilterOptions,
   rollbackSession,
 } = useEventSessions()
 
 const today = localDate(new Date())
 const defaultCreatedFrom = localDate(new Date(Date.now() - 8 * 86_400_000))
-const selectedCompanyExternalId = ref<string | null>(null)
+const selectedCompanyId = ref('ALL')
+const companyOptions = ref<EventSessionCompanyOption[]>([])
+const companyFilterEnabled = ref(false)
+const companyOptionsLoading = ref(false)
 const companyContextReady = ref(false)
 const companyContextError = ref<string | null>(null)
 const statusFilter = ref<'ALL' | EventSessionStatus>('ALL')
@@ -459,7 +480,7 @@ const rollbackTarget = ref<EventSessionListItem | null>(null)
 
 const filters = computed<EventSessionFilters>(() => ({
   search: debouncedSearch.value.trim() || undefined,
-  companyId: selectedCompanyExternalId.value ?? undefined,
+  companyId: selectedCompanyId.value === 'ALL' ? undefined : selectedCompanyId.value,
   status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
   createdFrom: appliedRange.value.from,
   createdTo: appliedRange.value.to,
@@ -476,7 +497,9 @@ const submittedCount = computed(() => page.value.submittedCount)
 const rolledBackCount = computed(() => page.value.rolledBackCount)
 const sessionCount = computed(() => draftCount.value + submittedCount.value + rolledBackCount.value)
 const totalPages = computed(() => Math.max(1, page.value.pagination.totalPages))
-const pageError = computed(() => companyContextError.value ?? error.value)
+// Session errors come first: they are current and actionable, whereas companyContextError
+// describes a one-off filter-options failure that would otherwise hide every later one.
+const pageError = computed(() => error.value ?? companyContextError.value)
 const validDateRange = computed(() => {
   return pendingRange.value.from <= pendingRange.value.to && pendingRange.value.to <= today
 })
@@ -500,7 +523,7 @@ const pageNumbers = computed<(number | string)[]>(() => {
 })
 
 watch(
-  [debouncedSearch, statusFilter, pageSize],
+  [debouncedSearch, selectedCompanyId, statusFilter, pageSize],
   () => {
     pageNumber.value = 1
   },
@@ -517,7 +540,7 @@ watch(totalPages, (value) => {
   if (pageNumber.value > value) pageNumber.value = value
 })
 
-onMounted(loadSelectedCompany)
+onMounted(loadFilterOptions)
 onUnmounted(cleanup)
 
 function summaryCardClass(active: boolean) {
@@ -592,26 +615,31 @@ async function confirmRollback() {
 }
 
 function refresh() {
-  if (companyContextReady.value) void fetchSessions(filters.value, true)
-}
-
-async function loadSelectedCompany() {
-  const companyId = getCompanyId()
-  if (!companyId) {
-    companyContextError.value = 'Select a company before opening event sessions.'
+  if (!companyContextReady.value) return
+  // loadFilterOptions is the only place companyContextError is cleared, and it otherwise runs
+  // just once from onMounted — so retry it here, or a single filter-options failure would keep
+  // the banner up for the rest of the session with no way to recover.
+  if (companyContextError.value) {
+    void loadFilterOptions()
     return
   }
+  void fetchSessions(filters.value, true)
+}
+
+async function loadFilterOptions() {
+  companyOptionsLoading.value = true
+  companyContextError.value = null
   try {
-    selectedCompanyExternalId.value = await fetchSelectedCompanyExternalId(companyId)
-    if (!selectedCompanyExternalId.value) {
-      companyContextError.value = 'The selected company could not be resolved.'
-      return
-    }
-    companyContextReady.value = true
-    await fetchSessions(filters.value)
+    const options = await fetchFilterOptions()
+    companyFilterEnabled.value = options.companyFilterEnabled
+    companyOptions.value = options.companies
   } catch (exception) {
     companyContextError.value =
-      exception instanceof Error ? exception.message : 'The selected company could not be loaded.'
+      exception instanceof Error ? exception.message : 'Company filters could not be loaded.'
+  } finally {
+    companyOptionsLoading.value = false
+    companyContextReady.value = true
+    await fetchSessions(filters.value)
   }
 }
 

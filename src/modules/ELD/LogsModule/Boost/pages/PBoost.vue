@@ -343,7 +343,6 @@
       v-model:open="showEditEventModal"
       :form="editEventForm"
       :edit-options="store.eventEditOptions"
-      :users="responsibleUsers"
       :disable-sleeper-berth="Boolean(activeDriverId === session?.driverId
         ? session?.disableSleeperBerth : session?.coDriverDisableSleeperBerth)"
       :from-date="session?.fromDate"
@@ -642,7 +641,6 @@ const {
   session,
   workspace,
   profileForms,
-  responsibleUsers,
   workspaceTimeZone,
   driverId,
   headerDate,
@@ -1369,7 +1367,7 @@ watch(activeDriverId, () => {
   normalizeResult.value = null
   if (activeDriverId.value) {
     void store.fetchEventEditOptions(activeDriverId.value).catch(() => {})
-    void store.fetchDriverOptions(activeDriverId.value).catch(() => {})
+    void store.fetchCoDrivers(activeDriverId.value).catch(() => {})
   }
 })
 const changeStatusLabel = (value?: string) => {

@@ -395,7 +395,7 @@
                         {{
                           event.eventType === 7 && event.eventName
                             ? event.eventName
-                            : findEventByTypeAndCode(event.eventType, event.eventCode)!.label
+                            : getEventLabel(event.eventType, event.eventCode, event.dateToCertify)
                         }}
                       </span>
                     </template>
@@ -732,7 +732,7 @@ import type {
   BoostEventTableColumn,
   BoostEventTableColumnVisibility,
 } from '../composables/useBoostEventTableColumns'
-import { findEventByTypeAndCode } from '@/utils/events.ts'
+import { findEventByTypeAndCode, getEventLabel } from '@/utils/events.ts'
 import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
 import { copyCoordinates } from '../utils/coordinateClipboard'
 

@@ -1,8 +1,12 @@
 import { ref } from 'vue'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
-import type { RouteEldCompaniesResponse } from '@/types/company'
-import type { EventSessionFilters, EventSessionOperation, EventSessionPage } from '../types'
+import type {
+  EventSessionFilterOptions,
+  EventSessionFilters,
+  EventSessionOperation,
+  EventSessionPage,
+} from '../types'
 
 interface ApiEnvelope<T> {
   successResult: T
@@ -74,13 +78,11 @@ export function useEventSessions() {
     }
   }
 
-  async function fetchSelectedCompanyExternalId(companyId: string) {
-    const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
-    return (
-      response.data.successResult.find(
-        (company) => company.id.toLowerCase() === companyId.toLowerCase()
-      )?.externalCompanyId ?? null
-    )
+  async function fetchFilterOptions() {
+    const response = await api.get<
+      EventSessionFilterOptions | ApiEnvelope<EventSessionFilterOptions>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_FILTER_OPTIONS)
+    return unwrap(response.data)
   }
 
   async function rollbackSession(sessionId: string) {
@@ -128,7 +130,7 @@ export function useEventSessions() {
     rollingBackId,
     error,
     fetchSessions,
-    fetchSelectedCompanyExternalId,
+    fetchFilterOptions,
     rollbackSession,
   }
 }

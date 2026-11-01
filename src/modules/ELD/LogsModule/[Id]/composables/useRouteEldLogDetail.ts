@@ -589,6 +589,7 @@ function mapEvent(
     eventId: event.id,
     sequenceId: event.sequenceId,
     dateTime: timestampInZone(event.timestamp, event.timeZone || zone),
+    dateToCertify: event?.dateToCertify ?? '',
     eventType: definition?.type ?? 0,
     eventCode: definition?.code ?? 0,
     eventName: event.eventName,
