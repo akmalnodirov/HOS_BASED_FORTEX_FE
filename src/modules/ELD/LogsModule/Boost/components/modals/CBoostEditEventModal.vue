@@ -495,6 +495,11 @@ function coordinateValue(value: number | string | null): number | null {
 function fieldText(value: number | string | null) {
   return value === null || value === '' ? '' : String(value)
 }
+function displayText(field: DecimalField) {
+  const value = props.form[field]
+  if (field !== 'odometer' || value === null || value === '') return fieldText(value)
+  return String(Math.round(Number(value)))
+}
 
 const latitudeText = ref('')
 const longitudeText = ref('')
@@ -530,7 +535,7 @@ function isFieldInvalid(field: DecimalField) {
 function syncFieldText(field: DecimalField) {
   const { text, parse } = decimalFields[field]
   if (parse(text.value) !== coordinateValue(props.form[field]))
-    text.value = fieldText(props.form[field])
+    text.value = displayText(field)
 }
 
 const latitudeInvalid = computed(() => isFieldInvalid('latitude'))
@@ -607,7 +612,7 @@ watch(() => props.open, (open) => {
     return
   }
   for (const field of decimalFieldNames)
-    decimalFields[field].text.value = fieldText(props.form[field])
+    decimalFields[field].text.value = displayText(field)
 })
 onBeforeUnmount(cancelReverseGeocode)
 
@@ -837,7 +842,8 @@ function onMeasurementInput(field: MeasurementField, e: Event) {
   const { text, parse } = decimalFields[field]
   text.value = (e.target as HTMLInputElement).value
   if (isFieldBlocked(field)) return
-  const value = text.value.trim() === '' ? null : parse(text.value)
+  const parsed = text.value.trim() === '' ? null : parse(text.value)
+  const value = field === 'odometer' && parsed !== null ? Math.round(parsed) : parsed
   if (value !== coordinateValue(props.form[field]))
     patch({ [field]: value } as Partial<BoostEventStatusForm>)
 }

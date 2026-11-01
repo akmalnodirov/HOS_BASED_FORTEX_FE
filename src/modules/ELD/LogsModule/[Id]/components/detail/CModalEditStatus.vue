@@ -122,9 +122,10 @@
             <div class="space-y-2">
               <Label>Odometer</Label>
               <Input
-                v-model="statusForm.totalVehicleMiles"
+                :model-value="statusForm.totalVehicleMiles != null ? Math.round(Number(statusForm.totalVehicleMiles)) : ''"
+                @update:model-value="onOdometerInput"
                 type="number"
-                step="any"
+                step="1"
                 placeholder="Enter Odometer"
               />
             </div>
@@ -276,6 +277,10 @@ const statusForm = reactive({
   totalEngineHours: undefined as number | undefined,
   vehicleId: '',
 })
+
+function onOdometerInput(value: string | number) {
+  statusForm.totalVehicleMiles = value === '' || value == null ? undefined : Math.round(Number(value))
+}
 
 const startTimeString = computed({
   get: () => timeObjectToString(eventState.editEventStart),

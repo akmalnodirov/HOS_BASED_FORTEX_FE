@@ -382,7 +382,7 @@ export function useELDLogDetail() {
         calculatedLocation: formData.calculatedLocation || null,
         manualLocation: formData.manualLocation || null,
         annotation: formData.annotation || null,
-        totalVehicleMiles: Math.round(formData.totalVehicleMiles ?? 0),
+        totalVehicleMiles: formData.totalVehicleMiles ?? 0,
         totalEngineHours: formData.totalEngineHours ?? 0,
         trailer: formData.trailer ?? null,
         doc: formData.doc ?? null,
