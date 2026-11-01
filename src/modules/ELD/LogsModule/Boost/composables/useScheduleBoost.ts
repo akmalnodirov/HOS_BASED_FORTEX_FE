@@ -386,6 +386,7 @@ export function useScheduleBoost() {
     workspace,
     profileForms,
     schedule,
+    responsibleUsers,
     coDrivers,
     activeTabId,
     isLoading,
@@ -900,6 +901,7 @@ export function useScheduleBoost() {
   const isBoostEventsSubmitted = computed(() => session.value?.status === 'SUBMITTED')
 
   const defaultEditForm = (): BoostEventStatusForm => ({
+    responsibleUserId: '',
     id: 0,
     eventId: '',
     sequenceId: null,
@@ -937,6 +939,7 @@ export function useScheduleBoost() {
   }
 
   async function prepareInsertEvent(sourceId?: string) {
+    if (!responsibleUsers.value.length) await store.fetchDriverOptions(driverId.value)
     const source = sourceId ? sourceEvent(sourceId) : null
     const sourceEventValue = source?.event
     if (
@@ -964,6 +967,10 @@ export function useScheduleBoost() {
     }, 0)
     editEventForm.value = {
       ...defaultEditForm(),
+      responsibleUserId:
+        responsibleUsers.value.find((user) => user.active)?.id ??
+        responsibleUsers.value[0]?.id ??
+        '',
       sequenceId: String(maxSequence + 1),
       event: { eventType, eventCode },
       eventCodeId: initialEventCode,
@@ -1133,8 +1140,10 @@ export function useScheduleBoost() {
       if (source) {
         await store.updateEvent(form.eventId, eventPayload(form, source))
       } else {
+        if (!form.responsibleUserId) throw new Error('Select a responsible user')
         await store.insertEvent({
           driverId: activeDriverId.value,
+          responsibleUserId: form.responsibleUserId,
           event: eventPayload(form),
         })
       }
@@ -1201,7 +1210,7 @@ export function useScheduleBoost() {
     showEditDailyFormModal.value = true
     if (!coDrivers.value.length) {
       try {
-        await store.fetchCoDrivers(driverId.value)
+        await store.fetchDriverOptions(driverId.value)
         editDailyForm.coDrivers = coDrivers.value.map((driver) => {
           const parts = driver.name.split(' ')
           return {
@@ -1581,9 +1590,9 @@ export function useScheduleBoost() {
     async () => {
       if (session.value) {
         headerDate.value = [dayjs(session.value.fromDate), dayjs(session.value.toDate)]
-        if (!coDrivers.value.length) {
+        if (!responsibleUsers.value.length || !coDrivers.value.length) {
           try {
-            await store.fetchCoDrivers(driverId.value)
+            await store.fetchDriverOptions(driverId.value)
           } catch (error) {
             void error
           }
@@ -1611,6 +1620,7 @@ export function useScheduleBoost() {
     workspace,
     profileForms,
     schedule,
+    responsibleUsers,
     coDrivers,
     workspaceTimeZone,
     driverId,

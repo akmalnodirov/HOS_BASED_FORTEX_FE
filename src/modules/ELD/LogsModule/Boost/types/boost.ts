@@ -202,6 +202,7 @@ export interface BoostViolationRequest {
 }
 
 export interface BoostEventStatusForm {
+  responsibleUserId?: string
   id: number
   eventId: string
   sequenceId: string | null
@@ -799,7 +800,7 @@ export interface RouteEldProfileForm {
   isRolledBack: boolean
 }
 
-export interface RouteEldCoDriverOption {
+export interface RouteEldResponsibleUser {
   id: string
   name: string
   active: boolean

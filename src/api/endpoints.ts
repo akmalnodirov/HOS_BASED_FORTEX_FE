@@ -340,6 +340,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
   static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
+  static readonly ROUTE_ELD_DRIVER_RESPONSIBLE_USERS = (driverId: string) =>
+    `${this.ROUTE_ELD_DRIVERS}/${driverId}/responsible-users`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVERS = (driverId: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${driverId}/co-drivers`
   static readonly ROUTE_ELD_NORMALIZE = `${this.BASE_URL}/route-eld/normalize`

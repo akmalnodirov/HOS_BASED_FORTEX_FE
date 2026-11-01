@@ -11,7 +11,7 @@ import type {
   RouteEldProfileForm,
   RouteEldSchedule,
   RouteEldEventEditOptions,
-  RouteEldCoDriverOption,
+  RouteEldResponsibleUser,
   RouteEldWorkspace,
   RouteEldWorkspaceEvent,
   RouteEldSessionOperation,
@@ -63,7 +63,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const profileForms = ref<RouteEldProfileForm[]>([])
   const schedule = ref<RouteEldSchedule | null>(null)
   const eventEditOptions = ref<RouteEldEventEditOptions>({ vehicles: [], elds: [] })
-  const coDrivers = ref<RouteEldCoDriverOption[]>([])
+  const responsibleUsers = ref<RouteEldResponsibleUser[]>([])
+  const coDrivers = ref<RouteEldResponsibleUser[]>([])
   const reassignTargets = ref<RouteEldDriverOption[]>([])
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
@@ -614,11 +615,17 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
   }
 
-  async function fetchCoDrivers(driverId: string) {
-    const coDriversResponse = await api.get<
-      RouteEldCoDriverOption[] | ApiEnvelope<RouteEldCoDriverOption[]>
-    >(ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId))
+  async function fetchDriverOptions(driverId: string) {
+    const [usersResponse, coDriversResponse] = await Promise.all([
+      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_RESPONSIBLE_USERS(driverId)
+      ),
+      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
+        ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId)
+      ),
+    ])
     if ((selectedDriverId.value || session.value?.driverId) === driverId) {
+      responsibleUsers.value = unwrap(usersResponse.data) ?? []
       coDrivers.value = unwrap(coDriversResponse.data) ?? []
     }
   }
@@ -854,6 +861,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     profileForms.value = []
     schedule.value = null
     eventEditOptions.value = { vehicles: [], elds: [] }
+    responsibleUsers.value = []
     coDrivers.value = []
     reassignTargets.value = []
     profileFormEditRequest.value = null
@@ -872,6 +880,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     profileForms,
     schedule,
     eventEditOptions,
+    responsibleUsers,
     coDrivers,
     reassignTargets,
     profileFormEditRequest,
@@ -899,7 +908,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     boostEventDuration,
     reassignEvents,
     updateProfileForm,
-    fetchCoDrivers,
+    fetchDriverOptions,
     fetchReassignTargets,
     analyzeAiAdvice,
     generateRepair,

@@ -3,6 +3,7 @@ export interface InsertInfoLogRequest {
   timeZone: string
   eventCode: string
   recordOrigin: 'ELD' | 'DRIVER' | 'OTHER_USER'
+  responsibleUserId: string
   vehicleId: string | null
   latitude: number | null
   longitude: number | null
