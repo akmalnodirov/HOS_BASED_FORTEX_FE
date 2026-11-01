@@ -134,7 +134,9 @@ export const useBoost = () => {
         sequenceId: ev.sequenceId,
         driverFullName: driverInfo.value?.name ?? '',
         startTime: ev.dateTime,
-        dateToCertify: ev.certifiedDate,
+        // certifiedDate is a full datetime here (see acceptAsTimeZone below); dateToCertify is
+        // consumed as a plain YYYY/MM/DD date by getEventLabel.
+        dateToCertify: ev.certifiedDate ? dayjs(ev.certifiedDate).format('YYYY/MM/DD') : null,
         duration: ev.durationInSeconds,
         eventType: ev.eventType,
         eventCode: ev.eventCode,

@@ -497,7 +497,9 @@ const submittedCount = computed(() => page.value.submittedCount)
 const rolledBackCount = computed(() => page.value.rolledBackCount)
 const sessionCount = computed(() => draftCount.value + submittedCount.value + rolledBackCount.value)
 const totalPages = computed(() => Math.max(1, page.value.pagination.totalPages))
-const pageError = computed(() => companyContextError.value ?? error.value)
+// Session errors come first: they are current and actionable, whereas companyContextError
+// describes a one-off filter-options failure that would otherwise hide every later one.
+const pageError = computed(() => error.value ?? companyContextError.value)
 const validDateRange = computed(() => {
   return pendingRange.value.from <= pendingRange.value.to && pendingRange.value.to <= today
 })
@@ -613,7 +615,15 @@ async function confirmRollback() {
 }
 
 function refresh() {
-  if (companyContextReady.value) void fetchSessions(filters.value, true)
+  if (!companyContextReady.value) return
+  // loadFilterOptions is the only place companyContextError is cleared, and it otherwise runs
+  // just once from onMounted — so retry it here, or a single filter-options failure would keep
+  // the banner up for the rest of the session with no way to recover.
+  if (companyContextError.value) {
+    void loadFilterOptions()
+    return
+  }
+  void fetchSessions(filters.value, true)
 }
 
 async function loadFilterOptions() {
