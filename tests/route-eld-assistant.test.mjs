@@ -94,6 +94,7 @@ async function loadConfirmation() {
     data: { id: 'conversation-1', items: [], openTurn: waitingTurn() },
   })
   await store.load('session-1')
+  store.setContext('session-1', 'tab-1')
 }
 
 test('confirmation remains actionable and blocks a new send without showing Thinking', async () => {
@@ -105,24 +106,28 @@ test('confirmation remains actionable and blocks a new send without showing Thin
   assert.equal(await store.send('session-1', 'tab-1', 'another request'), false)
 })
 
-test('explicit dispatcher approval uses the exact decision contract and waits for driver acceptance', async () => {
+test('attested dispatcher approval uses the exact decision contract and recognizes applied draft', async () => {
   await loadConfirmation()
   const calls = []
   globalThis.assistantTestApi.post = async (...args) => {
     calls.push(args)
     return {
-      data: turn({ status: 'COMPLETED', items: [proposalItem('awaitingDriverAcceptance')] }),
+      data: turn({ status: 'COMPLETED', items: [proposalItem('applied')] }),
     }
   }
-  assert.equal(await store.decide('session-1', true), true)
+  assert.equal(await store.decide('session-1', 'tab-1', true, true), true)
   assert.equal(
     calls[0][0],
     '/api/route-eld/event-sessions/session-1/assistant/turns/turn-1/decision'
   )
-  assert.deepEqual(calls[0][1], { confirmationId: 'confirmation-1', approve: true })
+  assert.deepEqual(calls[0][1], {
+    confirmationId: 'confirmation-1',
+    approve: true,
+    factualAttestation: true,
+  })
   assert.equal(store.confirmation, null)
-  assert.equal(store.appliedCorrections.length, 0)
-  assert.equal(store.items[0].action.correction.status, 'awaitingDriverAcceptance')
+  assert.equal(store.appliedCorrections.length, 1)
+  assert.equal(store.items[0].action.correction.status, 'applied')
 })
 
 test('rejection sends approve false and never exposes an applied correction', async () => {
@@ -132,8 +137,12 @@ test('rejection sends approve false and never exposes an applied correction', as
     body = value
     return { data: turn({ status: 'CANCELLED' }) }
   }
-  assert.equal(await store.decide('session-1', false), true)
-  assert.deepEqual(body, { confirmationId: 'confirmation-1', approve: false })
+  assert.equal(await store.decide('session-1', 'tab-1', false), true)
+  assert.deepEqual(body, {
+    confirmationId: 'confirmation-1',
+    approve: false,
+    factualAttestation: false,
+  })
   assert.equal(store.appliedCorrections.length, 0)
 })
 
@@ -144,9 +153,9 @@ test('decision disables duplicate submission and preserves preview after a netwo
     new Promise((_resolve, reject) => {
       fail = reject
     })
-  const pending = store.decide('session-1', true)
+  const pending = store.decide('session-1', 'tab-1', true, true)
   assert.equal(store.isDeciding, true)
-  assert.equal(await store.decide('session-1', true), false)
+  assert.equal(await store.decide('session-1', 'tab-1', true, true), false)
   fail({ isAxiosError: true })
   assert.equal(await pending, false)
   assert.equal(store.isDeciding, false)
@@ -162,7 +171,7 @@ test('stale decision retains the preview until retry reload resolves the expired
       response: { status: 409, data: { message: 'The proposal is stale.' } },
     }
   }
-  assert.equal(await store.decide('session-1', true), false)
+  assert.equal(await store.decide('session-1', 'tab-1', true, true), false)
   assert.equal(store.error, 'The proposal is stale.')
   assert.deepEqual(store.confirmation, confirmation)
   globalThis.assistantTestApi.get = async () => ({
@@ -195,7 +204,7 @@ test('a late decision response cannot contaminate a different session', async ()
     new Promise((resolve) => {
       finish = resolve
     })
-  const decision = store.decide('session-1', true)
+  const decision = store.decide('session-1', 'tab-1', true, true)
   globalThis.assistantTestApi.get = async () => ({ data: null })
   await store.load('session-2')
   finish({ data: turn({ status: 'COMPLETED', items: [proposalItem('applied')] }) })
@@ -232,4 +241,71 @@ test('polling stops at confirmation and retains updated action items by id', asy
   context.mock.timers.tick(5000)
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(polls, 1)
+})
+
+for (const [data, status, expected] of [
+  ['The timeline changed.', 409, 'The timeline changed.'],
+  [
+    {
+      code: 'Assistant.Correction.Conflict',
+      message: 'A different decision was recorded.',
+      traceId: 'trace-1',
+    },
+    409,
+    'A different decision was recorded.',
+  ],
+  [undefined, 401, 'Your session expired. Sign in again.'],
+]) {
+  test(`decision error uses ${status} response message without losing the pending preview: ${expected}`, async () => {
+    await loadConfirmation()
+    globalThis.assistantTestApi.post = async () => {
+      throw { isAxiosError: true, response: { status, data } }
+    }
+    assert.equal(await store.decide('session-1', 'tab-1', true, true), false)
+    assert.equal(store.error, expected)
+    assert.deepEqual(store.confirmation, confirmation)
+  })
+}
+
+test('approval cannot reach the decision endpoint without an explicit factual attestation', async () => {
+  await loadConfirmation()
+  let calls = 0
+  globalThis.assistantTestApi.post = async () => {
+    calls += 1
+    return { data: turn() }
+  }
+  assert.equal(await store.decide('session-1', 'tab-1', true, false), false)
+  assert.equal(calls, 0)
+  assert.deepEqual(store.confirmation, confirmation)
+})
+
+test('approval cannot reach the decision endpoint for a different selected tab', async () => {
+  await loadConfirmation()
+  let calls = 0
+  globalThis.assistantTestApi.post = async () => {
+    calls += 1
+    return { data: turn() }
+  }
+  assert.equal(await store.decide('session-1', 'tab-other', true, true), false)
+  assert.equal(calls, 0)
+})
+
+test('structured forbidden errors explain the missing apply permission and retain the confirmation', async () => {
+  await loadConfirmation()
+  globalThis.assistantTestApi.post = async () => {
+    throw {
+      isAxiosError: true,
+      response: {
+        status: 403,
+        data: {
+          code: 'Assistant.Correction.Forbidden',
+          message: 'Boost permission is required to apply corrections.',
+          traceId: 'trace-1',
+        },
+      },
+    }
+  }
+  assert.equal(await store.decide('session-1', 'tab-1', true, true), false)
+  assert.equal(store.error, 'Boost permission is required to apply corrections.')
+  assert.deepEqual(store.confirmation, confirmation)
 })

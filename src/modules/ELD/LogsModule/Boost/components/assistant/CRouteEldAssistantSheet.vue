@@ -42,10 +42,28 @@
 
         <CRouteEldAssistantConfirmation
           v-if="assistant.confirmation"
+          :key="`${assistant.confirmation.id}:${sessionId}:${tabId}`"
           :confirmation="assistant.confirmation"
+          :can-apply="canApply && confirmationMatchesContext"
           :busy="assistant.isDeciding || assistant.isLoading || clearing"
           @decide="decide"
         />
+        <p
+          v-if="assistant.confirmation && !confirmationMatchesContext"
+          role="status"
+          class="text-xs text-amber-600"
+        >
+          This correction belongs to tab
+          {{ assistant.confirmation.correction?.tabId ?? 'unknown' }}. Return to that tab to apply
+          it, or reject the correction here.
+        </p>
+        <p
+          v-else-if="assistant.confirmation && !canApply"
+          role="status"
+          class="text-xs text-amber-600"
+        >
+          Applying corrections requires Boost permission. You can still reject this correction.
+        </p>
         <Button
           v-if="hasPendingDriverAcceptance"
           variant="outline"
@@ -53,7 +71,7 @@
           :disabled="assistant.isLoading || assistant.isDeciding || assistant.isSending || clearing"
           @click="reload"
         >
-          Check driver acceptance status
+          Check correction status
         </Button>
 
         <div v-if="isThinking" class="flex justify-start">
@@ -132,13 +150,17 @@ import CRouteEldAssistantConfirmation from './CRouteEldAssistantConfirmation.vue
 
 const MAX_LENGTH = 2000
 
-const props = defineProps<{
-  open: boolean
-  sessionId: string
-  tabId: string
-  driverName?: string
-  otherDriverSelected?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    sessionId: string
+    tabId: string
+    driverName?: string
+    otherDriverSelected?: boolean
+    canApply?: boolean
+  }>(),
+  { canApply: true }
+)
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -164,6 +186,10 @@ const isThinking = computed(() => assistant.isProcessing)
 const hasPendingDriverAcceptance = computed(() =>
   assistant.items.some((item) => item.action?.correction?.status === 'awaitingDriverAcceptance')
 )
+const confirmationMatchesContext = computed(() => {
+  const preview = assistant.confirmation?.correction
+  return Boolean(preview && preview.sessionId === props.sessionId && preview.tabId === props.tabId)
+})
 const refreshedProposals = new Set<string>()
 const canSend = computed(
   () => Boolean(props.sessionId && props.tabId) && !assistant.isBusy && !clearing.value
@@ -176,16 +202,17 @@ const canClear = computed(
     (visibleItems.value.length > 0 || assistant.conversationId !== null || assistant.error !== null)
 )
 
-function stopIfHidden(sessionId: string) {
-  if (assistant.sessionId !== sessionId) return
+function stopIfHidden(sessionId: string, tabId: string) {
+  if (assistant.sessionId !== sessionId || assistant.contextTabId !== tabId) return
   if (!props.open || !isActive.value || props.sessionId !== sessionId) assistant.stopPolling()
 }
 
 async function reload() {
   const sessionId = props.sessionId
   if (!sessionId) return
+  const tabId = props.tabId
   await assistant.load(sessionId)
-  stopIfHidden(sessionId)
+  stopIfHidden(sessionId, tabId)
 }
 
 async function submit(text: string) {
@@ -193,7 +220,7 @@ async function submit(text: string) {
   const tabId = props.tabId
   if (!sessionId || !tabId || !canSend.value || !text.trim()) return false
   const accepted = await assistant.send(sessionId, tabId, text)
-  stopIfHidden(sessionId)
+  stopIfHidden(sessionId, tabId)
   return accepted
 }
 
@@ -213,10 +240,16 @@ async function retry() {
   if (accepted && draft.value.trim() === text.trim()) draft.value = ''
 }
 
-async function decide(approve: boolean) {
+async function decide(approve: boolean, factualAttestation: boolean) {
   const sessionId = props.sessionId
-  await assistant.decide(sessionId, approve)
-  stopIfHidden(sessionId)
+  const tabId = props.tabId
+  if (
+    approve &&
+    (!props.open || !isActive.value || !props.canApply || !confirmationMatchesContext.value)
+  )
+    return
+  await assistant.decide(sessionId, tabId, approve, factualAttestation)
+  stopIfHidden(sessionId, tabId)
 }
 
 async function clearChat() {
@@ -243,21 +276,30 @@ function scrollToBottom() {
 }
 
 watch(
-  [() => props.open, () => props.sessionId],
-  ([open, sessionId], previous) => {
-    if (previous && previous[1] !== sessionId) {
-      refreshedProposals.clear()
+  [() => props.open, () => props.sessionId, () => props.tabId],
+  ([open, sessionId, tabId], previous) => {
+    assistant.setContext(sessionId, tabId)
+    if (previous && previous[1] !== sessionId) refreshedProposals.clear()
+    if (previous && (previous[1] !== sessionId || previous[2] !== tabId)) {
       draft.value = ''
     }
     if (open && sessionId) void reload()
     else assistant.stopPolling()
   },
-  { immediate: true }
+  { immediate: true, flush: 'sync' }
 )
 
 watch(
-  () => [assistant.appliedCorrections, props.sessionId, props.tabId] as const,
-  ([proposals]) => {
+  () =>
+    [
+      assistant.appliedCorrections,
+      props.sessionId,
+      props.tabId,
+      props.open,
+      isActive.value,
+    ] as const,
+  ([proposals, , , open, active]) => {
+    if (!open || !active) return
     for (const proposal of proposals) {
       if (refreshedProposals.has(proposal.id)) continue
       const preview = proposal.preview

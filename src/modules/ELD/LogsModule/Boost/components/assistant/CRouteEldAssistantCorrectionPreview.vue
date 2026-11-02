@@ -35,12 +35,15 @@
       </li>
     </ol>
     <p class="break-all text-muted-foreground">
+      Session: {{ preview.sessionId }} · Tab: {{ preview.tabId }}
+      <br />
       Repair: {{ preview.repairId }} · Option: {{ preview.optionId }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
 import type { RouteEldAssistantCorrectionPreview } from '../../types/assistant'
 
 defineProps<{ preview: RouteEldAssistantCorrectionPreview }>()
@@ -49,18 +52,18 @@ function timestamp(value: number | null, timeZone?: string | null) {
   if (value === null) return 'None'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
-  let local = ''
-  if (timeZone) {
-    try {
-      local = `${new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        dateStyle: 'medium',
-        timeStyle: 'long',
-      }).format(date)} · `
-    } catch {
-      // Keep the exact UTC and epoch values visible if a provider time zone is unknown.
-    }
+  const sourceZone = timeZone?.trim() || 'UTC'
+  let zone = resolveRouteEldScheduleTimeZone(sourceZone, sourceZone)
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone })
+  } catch {
+    zone = 'UTC'
   }
-  return `${local}${date.toISOString()} (${value} ms)`
+  const local = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    dateStyle: 'medium',
+    timeStyle: 'long',
+  }).format(date)
+  return `${local} · ${date.toISOString()} (${value} ms)`
 }
 </script>

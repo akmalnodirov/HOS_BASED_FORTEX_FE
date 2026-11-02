@@ -99,4 +99,5 @@ export interface RouteEldAssistantCorrectionProposal {
 export interface RouteEldAssistantDecisionRequest {
   confirmationId: string
   approve: boolean
+  factualAttestation: boolean
 }

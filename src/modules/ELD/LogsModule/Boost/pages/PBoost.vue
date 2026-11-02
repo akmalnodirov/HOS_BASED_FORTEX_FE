@@ -381,6 +381,7 @@
       :tab-id="store.activeTabId ?? ''"
       :driver-name="session?.driverName ?? ''"
       :other-driver-selected="assistantOtherDriverSelected"
+      :can-apply="allowed('route_eld.log_details.boost')"
       @applied="refreshAfterAssistantApplied"
     />
     <CBoostNormalizeModal
@@ -607,6 +608,7 @@ import CBoostEditDailyFormModal from '../components/modals/CBoostEditDailyFormMo
 import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.vue'
 import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
 import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
+import { useAssistantWorkspaceRefresh } from '../composables/useAssistantWorkspaceRefresh'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
@@ -722,17 +724,7 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
-async function refreshAfterAssistantApplied(applied: { sessionId: string; tabId: string }) {
-  if (store.session?.id !== applied.sessionId || store.activeTabId !== applied.tabId) return
-  try {
-    await store.refreshWorkspace()
-  } catch {
-    toast.error(
-      'The correction was applied to the draft, but the workspace could not be refreshed. Reload the tab to see the updated events.'
-    )
-  }
-}
-
+const refreshAfterAssistantApplied = useAssistantWorkspaceRefresh()
 const assistantOpen = ref(false)
 const assistantOtherDriverSelected = computed(() =>
   Boolean(

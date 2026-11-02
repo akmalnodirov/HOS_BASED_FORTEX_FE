@@ -12,6 +12,13 @@ const apiMockUrl = 'assistant-test:api'
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === '@/components/ui/checkbox')
+      return { url: 'assistant-test:checkbox', shortCircuit: true }
+    if (specifier === '@/components/ui/sheet')
+      return { url: 'assistant-test:sheet', shortCircuit: true }
+    if (specifier === '@/components/ui/textarea')
+      return { url: 'assistant-test:textarea', shortCircuit: true }
+    if (specifier === 'vue-sonner') return { url: 'assistant-test:toast', shortCircuit: true }
     if (specifier === '@/composables/useAxiosService') {
       return { url: apiMockUrl, shortCircuit: true }
     }
@@ -25,14 +32,67 @@ registerHooks({
         }
       }
     }
-    return nextResolve(specifier, context)
+    return nextResolve(
+      specifier,
+      context.parentURL?.startsWith('assistant-test:')
+        ? { ...context, parentURL: import.meta.url }
+        : context
+    )
   },
   load(url, context, nextLoad) {
+    if (url === 'assistant-test:checkbox')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      import { defineComponent, h } from 'vue';
+      export const Checkbox = defineComponent({ props: ['modelValue','disabled'], emits: ['update:modelValue'], setup: (props, { emit }) => () => h('button', { role: 'checkbox', disabled: props.disabled, 'aria-checked': props.modelValue, onClick: () => { if (!props.disabled) emit('update:modelValue', !props.modelValue) } }) });`,
+      }
+    if (url === 'assistant-test:sheet')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      import { defineComponent, h } from 'vue';
+      const part = defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) });
+      export const Sheet = defineComponent({ props: ['open'], setup: (props, { slots }) => () => props.open ? h('div', slots.default?.()) : null });
+      export const SheetContent=part, SheetDescription=part, SheetHeader=part, SheetTitle=part;`,
+      }
+    if (url === 'assistant-test:textarea')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      import { defineComponent, h } from 'vue';
+      export const Textarea = defineComponent({ props: ['modelValue'], setup: (props) => () => h('textarea', { value: props.modelValue }) });`,
+      }
+    if (url === 'assistant-test:toast')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      export const toast = { error: (message) => globalThis.assistantTestToasts.push(message) };`,
+      }
     if (url === apiMockUrl) {
       return {
         format: 'module',
-        source: `export const useApi = () => globalThis.assistantTestApi;
-          export const getApiErrorMessage = (error, fallback) => error.response?.data?.message || fallback;`,
+        source: ts.transpileModule(
+          ts
+            .createSourceFile(
+              'useAxiosService.ts',
+              readFileSync(resolve(root, 'src/composables/useAxiosService.ts'), 'utf8'),
+              ts.ScriptTarget.Latest,
+              true
+            )
+            .statements.filter(
+              (node) =>
+                ts.isFunctionDeclaration(node) &&
+                ['extractErrorMessage', 'getApiErrorMessage'].includes(node.name?.text)
+            )
+            .map((node) => node.getText())
+            .join('\n') + '\nexport const useApi = () => globalThis.assistantTestApi;',
+          { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }
+        ).outputText,
         shortCircuit: true,
       }
     }

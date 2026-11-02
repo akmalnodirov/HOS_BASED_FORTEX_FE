@@ -12,8 +12,12 @@ const routeEldTimeZones: Record<string, string> = {
   SK: 'America/Regina',
 }
 
-export function resolveRouteEldScheduleTimeZone(value?: string | null) {
-  return routeEldTimeZones[String(value || '').trim().toUpperCase()] ?? routeEldTimeZones.CT
+export function resolveRouteEldScheduleTimeZone(
+  value?: string | null,
+  fallback = routeEldTimeZones.CT
+) {
+  const code = String(value || '').trim().toUpperCase()
+  return routeEldTimeZones[code] ?? fallback
 }
 
 export function formatRouteEldEventTime(
