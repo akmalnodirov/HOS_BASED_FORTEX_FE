@@ -321,6 +321,11 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR = (
+    sessionId: string,
+    tabId: string,
+    repairId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
     sessionId: string,
     tabId: string,

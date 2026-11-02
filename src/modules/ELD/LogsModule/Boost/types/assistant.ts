@@ -2,6 +2,7 @@ export const RouteEldAssistantItemKind = {
   User: 1,
   Assistant: 2,
   Action: 3,
+  RepairOptions: 4,
 } as const
 
 export type RouteEldAssistantItemKindValue =
@@ -25,12 +26,31 @@ export interface RouteEldAssistantAction {
   correction?: RouteEldAssistantCorrectionProposal | null
 }
 
+export interface RouteEldAssistantRepairOptionSummary {
+  optionId: string
+  rank: number
+  title: string
+  explanation: string
+  fullySatisfies: boolean
+  targetViolationRemoved: boolean
+}
+
+/** Options the assistant generated for one draft tab (item kind 4, dispatcher conversations only). */
+export interface RouteEldAssistantRepairOptions {
+  repairId: string
+  sessionId: string
+  tabId: string
+  kind: string
+  options: RouteEldAssistantRepairOptionSummary[]
+}
+
 export interface RouteEldAssistantItem {
   id: string
   kind: number
   text: string | null
   createdAt: string
   action: RouteEldAssistantAction | null
+  repairOptions?: RouteEldAssistantRepairOptions | null
 }
 
 export interface RouteEldAssistantTurn {
