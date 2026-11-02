@@ -119,11 +119,17 @@ export interface RouteEldLiveDriver {
   latestPoint: RouteEldLiveTrackingPoint | null
 }
 
+export interface RouteEldSpeedChartPoint {
+  timestamp: number
+  speed: number
+}
+
 export interface RouteEldDriverTracking {
   driver: RouteEldLiveDriver
   fromTimestamp: number
   toTimestamp: number
   points: RouteEldLiveTrackingPoint[]
+  speedChart?: RouteEldSpeedChartPoint[] | null
 }
 
 export interface RouteEldLiveShareResponse {

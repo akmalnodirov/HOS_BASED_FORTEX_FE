@@ -61,7 +61,11 @@ export function useRouteEldOverviewDrivers() {
   return { drivers, isLoading, isRefreshing, error, load }
 }
 
-export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: Ref<string>) {
+export function useRouteEldDriverTracking(
+  driverId: Ref<string>,
+  selectedDate: Ref<string>,
+  includeSpeedChart: Ref<boolean>
+) {
   const api = useApi()
   const tracking = ref<RouteEldDriverTracking | null>(null)
   const isLoading = ref(false)
@@ -98,7 +102,9 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
             }
           : range.value
       const response = await api.get<RouteEldDriverTracking>(
-        ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS(driverId.value),
+        includeSpeedChart.value
+          ? ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS_WITH_SPEED_CHART(driverId.value)
+          : ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS(driverId.value),
         { params: { companyId, ...requestRange } }
       )
       if (sequence === requestSequence) {
@@ -106,6 +112,7 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
           tracking.value = {
             ...response.data,
             points: deduplicateTrackingPoints(response.data.points),
+            speedChart: deduplicateSpeedChartPoints(response.data.speedChart ?? []),
           }
         } else {
           tracking.value = {
@@ -113,6 +120,10 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
             driver: response.data.driver,
             toTimestamp: response.data.toTimestamp,
             points: deduplicateTrackingPoints([...tracking.value.points, ...response.data.points]),
+            speedChart: deduplicateSpeedChartPoints([
+              ...(tracking.value.speedChart ?? []),
+              ...(response.data.speedChart ?? []),
+            ]),
           }
         }
       }
@@ -138,7 +149,7 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
   }
 
   watch(
-    [driverId, selectedDate],
+    [driverId, selectedDate, includeSpeedChart],
     () => {
       tracking.value = null
       void load(true)
@@ -157,6 +168,12 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
 
 function deduplicateTrackingPoints(points: RouteEldDriverTracking['points']) {
   return [...new Map(points.map((point) => [point.id, point])).values()].sort(
+    (left, right) => left.timestamp - right.timestamp
+  )
+}
+
+function deduplicateSpeedChartPoints(points: NonNullable<RouteEldDriverTracking['speedChart']>) {
+  return [...new Map(points.map((point) => [point.timestamp, point])).values()].sort(
     (left, right) => left.timestamp - right.timestamp
   )
 }

@@ -378,6 +378,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS = (driverId: string) =>
     `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points`
+  static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS_WITH_SPEED_CHART = (driverId: string) =>
+    `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points-with-speed-chart`
   static readonly ROUTE_ELD_LIVE_SHARE = `${this.BASE_URL}/route-eld/live-share`
   static readonly ROUTE_ELD_LIVE_SHARE_TRACKING = (token: string) =>
     `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
