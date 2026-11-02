@@ -15,6 +15,9 @@
     </section>
 
     <div v-if="!session" class="bg-background p-10 text-center text-sm text-muted-foreground">
+      <p v-if="handedOff" role="status" class="mb-2 text-foreground">
+        Your request is saved. Open or create a draft to send it.
+      </p>
       Pick dates and create or open a draft to work with the AI.
     </div>
     <div v-else class="grid min-h-[560px] grid-cols-1 gap-2 xl:grid-cols-[7fr_3fr]">
@@ -51,7 +54,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -61,6 +65,8 @@ import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boo
 import CAiChatPanel from '../components/CAiChatPanel.vue'
 import CAiDraftTabs from '../components/CAiDraftTabs.vue'
 import CAiOptionsPanel from '../components/CAiOptionsPanel.vue'
+import { useAiHandoffStore } from '../store/aiHandoff'
+import { useRouteEldAssistantStore } from '@/modules/ELD/LogsModule/Boost/store/routeEldAssistant'
 
 const store = useBoostWorkspaceStore()
 const authStore = useAuthStore()
@@ -93,6 +99,29 @@ async function onApplied(applied: { sessionId: string; tabId: string }) {
   await refreshAfterApplied(applied)
   await optionsRef.value?.refresh()
 }
+
+// The launcher's request is sent once, after the draft and tab are open; it is forgotten only once sent.
+const route = useRoute()
+const handoff = useAiHandoffStore()
+const assistant = useRouteEldAssistantStore()
+const driverId = computed(() => String(route.params.id ?? ''))
+const handedOff = computed(() => handoff.peek(driverId.value))
+let handoffInFlight = false
+watch(
+  // isBusy is watched so a send refused while the chat loads is retried once it is free.
+  [() => session.value?.id, tabId, chatRef, handedOff, () => assistant.isBusy],
+  async ([sessionId, currentTab, chat, text, busy]) => {
+    if (!sessionId || !currentTab || !chat || !text || busy || handoffInFlight) return
+    if (session.value?.driverId?.toLowerCase() !== driverId.value.toLowerCase()) return
+    handoffInFlight = true
+    try {
+      if (await chat.send(text)) handoff.take(driverId.value)
+    } finally {
+      handoffInFlight = false
+    }
+  },
+  { flush: 'post' }
+)
 
 defineExpose({ chatRef })
 </script>
