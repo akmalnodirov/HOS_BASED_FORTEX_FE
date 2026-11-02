@@ -19,6 +19,13 @@ beforeEach(() => {
   }
 })
 
+const DISABLED = /\sdisabled(?:="[^"]*")?(?=[\s>])/
+const deleteButton = (html) => {
+  const tag = html.match(/<button[^>]*aria-label="Delete this draft tab"[^>]*>/)?.[0]
+  assert.ok(tag, 'the delete button is rendered')
+  return tag
+}
+
 const render = (component, props) => {
   const app = createSSRApp({ render: () => h(component, props) })
   app.use(pinia)
@@ -56,5 +63,7 @@ test('deleting a draft tab is disabled without tab management permission', async
   const html = await render(DraftTabs, { canManageTabs: false })
   assert.match(html, />\s*1\s*</)
   assert.match(html, />\s*2\s*</)
-  assert.match(html, /aria-label="Delete this draft tab"[^>]*disabled|disabled[^>]*aria-label="Delete this draft tab"/)
+  assert.match(deleteButton(html), DISABLED)
+  const allowed = await render(DraftTabs, { canManageTabs: true })
+  assert.doesNotMatch(deleteButton(allowed), DISABLED)
 })

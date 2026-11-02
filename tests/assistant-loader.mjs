@@ -19,6 +19,9 @@ registerHooks({
     if (specifier === '@/components/ui/textarea')
       return { url: 'assistant-test:textarea', shortCircuit: true }
     if (specifier === 'vue-sonner') return { url: 'assistant-test:toast', shortCircuit: true }
+    // The SVG log chart pulls dayjs plugins that Node cannot resolve; tests only need to know it renders.
+    if (specifier === '@/modules/ELD/LogsModule/Boost/components/CBoostGraph.vue')
+      return { url: 'assistant-test:graph', shortCircuit: true }
     if (specifier === '@/composables/useAxiosService') {
       return { url: apiMockUrl, shortCircuit: true }
     }
@@ -57,6 +60,14 @@ registerHooks({
       const part = defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) });
       export const Sheet = defineComponent({ props: ['open'], setup: (props, { slots }) => () => props.open ? h('div', slots.default?.()) : null });
       export const SheetContent=part, SheetDescription=part, SheetHeader=part, SheetTitle=part;`,
+      }
+    if (url === 'assistant-test:graph')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      import { defineComponent, h } from 'vue';
+      export default defineComponent({ props: ['events', 'compact'], setup: (props) => () => h('div', { 'data-graph': props.compact ? 'compact' : 'full' }) });`,
       }
     if (url === 'assistant-test:textarea')
       return {

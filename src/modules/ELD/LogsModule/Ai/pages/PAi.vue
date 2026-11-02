@@ -24,9 +24,17 @@
           <p v-if="!canBoost" role="status" class="p-6 text-center text-sm text-muted-foreground">
             Repair options need the Boost permission. You can still ask the AI about this log.
           </p>
-          <p v-else class="flex h-full min-h-60 items-center justify-center p-6 text-sm text-muted-foreground">
-            To get table variants, assign a task to the AI
-          </p>
+          <CAiOptionsPanel
+            v-else-if="tabId"
+            ref="optionsRef"
+            :session-id="session.id"
+            :tab-id="tabId"
+            :from-date="session.fromDate"
+            :to-date="session.toDate"
+            :time-zone="timeZone"
+            :session-created-at="session.createdAt"
+            @use="useOption"
+          />
         </div>
       </section>
       <CAiChatPanel
@@ -36,7 +44,7 @@
         :session-id="session.id"
         :tab-id="tabId"
         :can-apply="canBoost"
-        @applied="refreshAfterApplied"
+        @applied="onApplied"
       />
     </div>
   </div>
@@ -52,11 +60,13 @@ import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/com
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
 import CAiChatPanel from '../components/CAiChatPanel.vue'
 import CAiDraftTabs from '../components/CAiDraftTabs.vue'
+import CAiOptionsPanel from '../components/CAiOptionsPanel.vue'
 
 const store = useBoostWorkspaceStore()
 const authStore = useAuthStore()
 const { session, workspace, activeTabId } = storeToRefs(store)
 const chatRef = ref<InstanceType<typeof CAiChatPanel> | null>(null)
+const optionsRef = ref<InstanceType<typeof CAiOptionsPanel> | null>(null)
 
 const allowed = (code: string) => hasPermission(authStore.token, code)
 const canBoost = computed(() => allowed('route_eld.log_details.boost'))
@@ -73,6 +83,16 @@ const graphEvents = computed(() =>
 )
 const timeZone = computed(() => workspace.value?.events[0]?.event.timeZone ?? 'CT')
 const refreshAfterApplied = useAssistantWorkspaceRefresh()
+
+// A card never applies by itself: it asks the AI, which shows the usual attested confirmation.
+async function useOption(message: string) {
+  await chatRef.value?.send(message)
+}
+
+async function onApplied(applied: { sessionId: string; tabId: string }) {
+  await refreshAfterApplied(applied)
+  await optionsRef.value?.refresh()
+}
 
 defineExpose({ chatRef })
 </script>

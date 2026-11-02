@@ -1,6 +1,6 @@
 <template>
   <div class="rounded-md border border-border bg-white dark:bg-card">
-    <div class="grid grid-cols-[1fr_minmax(0,2fr)_1fr] items-center gap-3 border-b px-3 py-2">
+    <div v-if="!compact" class="grid grid-cols-[1fr_minmax(0,2fr)_1fr] items-center gap-3 border-b px-3 py-2">
       <div class="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
         <slot name="graph-actions" />
       </div>
@@ -465,6 +465,8 @@ const props = withDefaults(
     coDriverEvents?: RouteEldHosEvent[]
     coDriverName?: string | null
     isGraphLoading?: boolean
+    /** Read-only preview: hides the zoom and marker toolbar. */
+    compact?: boolean
   }>(),
   {
     events: () => [],
