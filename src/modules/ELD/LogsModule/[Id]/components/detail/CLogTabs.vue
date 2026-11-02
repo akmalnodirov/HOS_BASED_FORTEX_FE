@@ -153,7 +153,7 @@ import { CalendarDate } from '@internationalized/date'
 import { useBoostWorkspaceStore } from '../../../Boost/store/boostWorkspace'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
-import { reusableDrafts } from '@/modules/ELD/LogsModule/Ai/utils/aiSessions'
+import { reusableDrafts, workspaceSwitchQuery } from '@/modules/ELD/LogsModule/Ai/utils/aiSessions'
 import type { RouteEldEventSessionListItem } from '../../../Boost/types/boost'
 
 // Define props
@@ -256,7 +256,7 @@ watch(activeTab, (newTab, oldTab) => {
         router.push({
           name: 'ELDAi',
           params: { id: driverId },
-          query: dateParam ? { date: dateParam } : undefined,
+          query: workspaceSwitchQuery(route.name, route.query, dateParam),
         })
       }
       break
@@ -265,7 +265,7 @@ watch(activeTab, (newTab, oldTab) => {
         router.push({
           name: 'ELDBoost',
           params: { id: driverId },
-          query: dateParam ? { date: dateParam } : undefined,
+          query: workspaceSwitchQuery(route.name, route.query, dateParam),
         })
       }
       break

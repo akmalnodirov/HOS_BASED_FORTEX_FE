@@ -216,5 +216,5 @@ onDeactivated(() => {
 })
 onBeforeUnmount(() => assistant.stopPolling())
 
-defineExpose({ send })
+defineExpose({ send, fill })
 </script>

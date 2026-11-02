@@ -14,10 +14,10 @@
       />
     </section>
 
+    <p v-if="waitingRequest" role="status" class="bg-background px-4 py-2 text-sm">
+      Your request is saved. Open or create a draft for {{ waitingRequest.fromDate }} – {{ waitingRequest.toDate }} to send it.
+    </p>
     <div v-if="!session" class="bg-background p-10 text-center text-sm text-muted-foreground">
-      <p v-if="handedOff" role="status" class="mb-2 text-foreground">
-        Your request is saved. Open or create a draft to send it.
-      </p>
       Pick dates and create or open a draft to work with the AI.
     </div>
     <div v-else class="grid min-h-[560px] grid-cols-1 gap-2 xl:grid-cols-[7fr_3fr]">
@@ -65,7 +65,7 @@ import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boo
 import CAiChatPanel from '../components/CAiChatPanel.vue'
 import CAiDraftTabs from '../components/CAiDraftTabs.vue'
 import CAiOptionsPanel from '../components/CAiOptionsPanel.vue'
-import { useAiHandoffStore } from '../store/aiHandoff'
+import { deliverHandoff, handoffReady, useAiHandoffStore } from '../store/aiHandoff'
 import { useRouteEldAssistantStore } from '@/modules/ELD/LogsModule/Boost/store/routeEldAssistant'
 
 const store = useBoostWorkspaceStore()
@@ -105,19 +105,30 @@ const route = useRoute()
 const handoff = useAiHandoffStore()
 const assistant = useRouteEldAssistantStore()
 const driverId = computed(() => String(route.params.id ?? ''))
-const handedOff = computed(() => handoff.peek(driverId.value))
-let handoffInFlight = false
+const request = computed(() =>
+  handoff.pending?.driverId.toLowerCase() === driverId.value.toLowerCase() ? handoff.pending : null
+)
+const ready = computed(() =>
+  handoffReady({
+    request: request.value,
+    session: session.value,
+    querySessionId: String(route.query.sessionId ?? ''),
+    tabId: tabId.value,
+    busy: assistant.isBusy || store.isBusy,
+  })
+)
+// Shown while the request waits for its own draft (wrong dates, a submitted session, no permission).
+const waitingRequest = computed(() => (request.value && !store.isLoading && !ready.value ? request.value : null))
+let delivering = false
 watch(
-  // isBusy is watched so a send refused while the chat loads is retried once it is free.
-  [() => session.value?.id, tabId, chatRef, handedOff, () => assistant.isBusy],
-  async ([sessionId, currentTab, chat, text, busy]) => {
-    if (!sessionId || !currentTab || !chat || !text || busy || handoffInFlight) return
-    if (session.value?.driverId?.toLowerCase() !== driverId.value.toLowerCase()) return
-    handoffInFlight = true
+  [ready, chatRef],
+  async ([isReady, chat]) => {
+    if (!isReady || !chat || delivering) return
+    delivering = true
     try {
-      if (await chat.send(text)) handoff.take(driverId.value)
+      await deliverHandoff(handoff, driverId.value, chat)
     } finally {
-      handoffInFlight = false
+      delivering = false
     }
   },
   { flush: 'post' }

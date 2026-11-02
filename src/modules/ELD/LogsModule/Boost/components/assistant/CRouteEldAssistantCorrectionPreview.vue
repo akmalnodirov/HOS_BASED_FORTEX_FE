@@ -7,7 +7,7 @@
       </div>
       <div>
         <dt class="font-medium">Original request</dt>
-        <dd class="whitespace-pre-wrap break-words">{{ preview.originalRequest }}</dd>
+        <dd class="whitespace-pre-wrap break-words">{{ stripApplyMarker(preview.originalRequest) }}</dd>
       </div>
     </dl>
     <ol aria-label="Exact proposed operations" class="space-y-2">
@@ -43,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import { stripApplyMarker } from '@/modules/ELD/LogsModule/Ai/utils/aiOptions'
 import { resolveRouteEldScheduleTimeZone } from '@/utils/routeEldTimeZone'
 import type { RouteEldAssistantCorrectionPreview } from '../../types/assistant'
 

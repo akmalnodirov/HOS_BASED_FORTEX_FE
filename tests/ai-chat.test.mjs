@@ -67,3 +67,22 @@ test('deleting a draft tab is disabled without tab management permission', async
   const allowed = await render(DraftTabs, { canManageTabs: true })
   assert.doesNotMatch(deleteButton(allowed), DISABLED)
 })
+
+test('the confirmation card shows the request without its apply marker', async () => {
+  const { default: Preview } = await import(
+    '../src/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantCorrectionPreview.vue'
+  )
+  const html = await render(Preview, {
+    preview: {
+      repairId: 'r1',
+      optionId: 'o1',
+      sessionId: 's1',
+      tabId: 't1',
+      reason: 'Shorten driving: Moves the driving end.',
+      originalRequest: 'Apply option 1: Shorten driving [[apply repair=r1 option=o1]]',
+      operations: [],
+    },
+  })
+  assert.match(html, /Apply option 1: Shorten driving/)
+  assert.doesNotMatch(html, /\[\[apply/)
+})

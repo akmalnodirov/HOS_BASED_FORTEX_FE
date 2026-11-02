@@ -46,12 +46,17 @@ export function stripApplyMarker(text: string) {
   return text.replace(APPLY_MARKER, '')
 }
 
+/**
+ * The repair GET keeps a stale option "Available" but drops its preview once the log changed,
+ * so a loaded option without a preview is out of date. Null means the option is still loading.
+ */
 export function optionBadge(
-  status: RouteEldRepairOption['status'] | undefined,
+  option: Pick<RouteEldRepairOption, 'status' | 'preview'> | null | undefined,
   inProgress: boolean
 ): AiOptionBadge {
-  if (status === 'Applied') return 'Completed'
-  if (status === 'Stale' || status === 'Superseded') return 'Invalid'
+  if (option?.status === 'Applied') return 'Completed'
+  if (option?.status === 'Stale' || option?.status === 'Superseded') return 'Invalid'
+  if (option && !option.preview) return 'Invalid'
   return inProgress ? 'In Progress' : 'Pending'
 }
 

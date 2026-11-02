@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onActivated, ref, watch } from 'vue'
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
 import { useRouteEldAssistantStore } from '@/modules/ELD/LogsModule/Boost/store/routeEldAssistant'
 import type { RouteEldRepairOption } from '@/modules/ELD/LogsModule/Boost/types/boost'
@@ -101,6 +101,9 @@ watch(
     if (!assistant.isDeciding) usedOptionId.value = null
   }
 )
+
+// The page is kept alive; edits made on Boost meanwhile can make these options stale.
+onActivated(() => void refresh())
 
 defineExpose({ refresh })
 </script>

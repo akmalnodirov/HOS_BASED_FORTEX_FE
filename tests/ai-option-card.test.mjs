@@ -25,7 +25,7 @@ const option = (status, overrides = {}) => ({
     { order: 0, type: 'ShiftTimestamp', eventId: 'e1', beforeTimestamp: at, afterTimestamp: at + 1_800_000, beforeEventCode: 'DS_D', afterEventCode: 'DS_D' },
     { order: 1, type: 'ChangeToOffDuty', eventId: 'e2', beforeTimestamp: at, afterTimestamp: null, beforeEventCode: 'DS_ON', afterEventCode: 'DS_OFF' },
   ],
-  preview: null,
+  preview: { events: [], calculations: { freeTimes: [], violations: [], eventIssues: [] }, profileForms: [] },
   ...overrides,
 })
 const props = (overrides = {}) => ({
@@ -57,6 +57,12 @@ test('a collapsed card shows rank, title, result and its status', async () => {
 
 test('an out-of-date option is Invalid and cannot be used', async () => {
   const html = await render(props({ option: option('Stale'), expanded: true }))
+  assert.match(html, />\s*Invalid\s*</)
+  assert.match(useButton(html), DISABLED)
+})
+
+test('an option whose preview was dropped because the log changed is Invalid and cannot be used', async () => {
+  const html = await render(props({ option: option('Available', { preview: null }), expanded: true }))
   assert.match(html, />\s*Invalid\s*</)
   assert.match(useButton(html), DISABLED)
 })

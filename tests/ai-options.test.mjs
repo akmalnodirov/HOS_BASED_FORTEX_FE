@@ -36,13 +36,21 @@ test('the apply message carries a marker that the chat hides', () => {
   assert.equal(stripApplyMarker('Plain question [[not a marker]]'), 'Plain question [[not a marker]]')
 })
 
+const live = (status, preview = { events: [] }) => ({ status, preview })
+
 test('option states map to the four badges', () => {
-  assert.equal(optionBadge('Available', false), 'Pending')
-  assert.equal(optionBadge('Available', true), 'In Progress')
-  assert.equal(optionBadge('Applied', false), 'Completed')
-  assert.equal(optionBadge('Stale', false), 'Invalid')
-  assert.equal(optionBadge('Superseded', true), 'Invalid')
-  assert.equal(optionBadge(undefined, false), 'Pending')
+  assert.equal(optionBadge(live('Available'), false), 'Pending')
+  assert.equal(optionBadge(live('Available'), true), 'In Progress')
+  assert.equal(optionBadge(live('Applied'), false), 'Completed')
+  assert.equal(optionBadge(live('Stale'), false), 'Invalid')
+  assert.equal(optionBadge(live('Superseded'), true), 'Invalid')
+  assert.equal(optionBadge(null, false), 'Pending')
+})
+
+test('an available option without a preview is out of date, because the log changed', () => {
+  // The repair GET keeps status Available but drops the preview when the timeline moved on.
+  assert.equal(optionBadge(live('Available', null), false), 'Invalid')
+  assert.equal(optionBadge(live('Applied', null), false), 'Completed')
 })
 
 test('changes rows show the move in minutes, none for a deletion', () => {

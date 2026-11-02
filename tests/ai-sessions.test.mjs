@@ -30,3 +30,22 @@ test('only drafts with the exact dates are reused, newest first', () => {
   )
   assert.deepEqual(reusableDrafts(sessions, '2026-10-01', '2026-10-14'), [])
 })
+
+test('switching between Boost and AI keeps the open draft', async () => {
+  const { workspaceSwitchQuery } = await import('../src/modules/ELD/LogsModule/Ai/utils/aiSessions.ts')
+  const query = { sessionId: 's2', tabId: 't3', fromDate: '2026-10-20', toDate: '2026-11-02', date: '2026-11-01' }
+  assert.deepEqual(workspaceSwitchQuery('ELDBoost', query, '2026-11-01'), {
+    sessionId: 's2',
+    tabId: 't3',
+    fromDate: '2026-10-20',
+    toDate: '2026-11-02',
+  })
+  assert.deepEqual(workspaceSwitchQuery('ELDAi', query, '2026-11-01'), {
+    sessionId: 's2',
+    tabId: 't3',
+    fromDate: '2026-10-20',
+    toDate: '2026-11-02',
+  })
+  assert.deepEqual(workspaceSwitchQuery('ELDLogDetail', query, '2026-11-01'), { date: '2026-11-01' })
+  assert.deepEqual(workspaceSwitchQuery('ELDBoost', {}, undefined), undefined)
+})

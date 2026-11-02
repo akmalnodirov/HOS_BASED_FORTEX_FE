@@ -137,7 +137,7 @@ const emit = defineEmits<{ (e: 'use', message: string): void }>()
 const isOpen = ref(props.expanded)
 const currentView = ref<CardView>(props.view)
 
-const badge = computed(() => optionBadge(props.option?.status, props.inProgress))
+const badge = computed(() => optionBadge(props.option, props.inProgress))
 const rows = computed(() => (props.option ? changeRows(props.option, props.timeZone) : []))
 const graphEvents = computed(
   () => props.option?.preview?.events.filter((row) => !row.isDeleted).map((row) => row.event) ?? []

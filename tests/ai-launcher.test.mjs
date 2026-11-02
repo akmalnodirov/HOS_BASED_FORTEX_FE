@@ -4,7 +4,7 @@ import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { createPinia, setActivePinia } from 'pinia'
 import { matchDrivers } from '../src/modules/ELD/LogsModule/Ai/utils/aiDrivers.ts'
-import { useAiHandoffStore } from '../src/modules/ELD/LogsModule/Ai/store/aiHandoff.ts'
+import { deliverHandoff, handoffReady, useAiHandoffStore } from '../src/modules/ELD/LogsModule/Ai/store/aiHandoff.ts'
 import Launcher from '../src/modules/ELD/LogsModule/Ai/components/CLloraLauncher.vue'
 
 let pinia
@@ -47,4 +47,43 @@ test('the launcher greets the dispatcher by first name and has no voice input', 
   assert.match(html, /Hi Temur, how can I help you\?/)
   assert.match(html, /placeholder="Write your question"/)
   assert.doesNotMatch(html, /aria-label="Voice/i)
+})
+
+const request = { driverId: 'd1', fromDate: '2026-10-20', toDate: '2026-11-02', text: 'Fix the break' }
+const openDraft = { id: 's1', driverId: 'D1', status: 'DRAFT', fromDate: '2026-10-20', toDate: '2026-11-02' }
+const ready = (overrides = {}) =>
+  handoffReady({ request, session: openDraft, querySessionId: 's1', tabId: 't1', busy: false, ...overrides })
+
+test('a handed-off request goes only to the draft it was meant for', () => {
+  assert.equal(ready(), true)
+  assert.equal(ready({ session: { ...openDraft, fromDate: '2026-10-01' } }), false, 'leftover session with other dates')
+  assert.equal(ready({ session: { ...openDraft, status: 'SUBMITTED' } }), false, 'fallback to a submitted session')
+  assert.equal(ready({ querySessionId: 'other' }), false, 'a skipped draft still loaded in the store')
+  assert.equal(ready({ session: { ...openDraft, driverId: 'd9' } }), false, 'another driver')
+  assert.equal(ready({ busy: true }), false)
+  assert.equal(ready({ tabId: '' }), false)
+  assert.equal(ready({ request: null }), false)
+})
+
+test('a handed-off request is taken before sending, and a failed send puts it back in the input', async () => {
+  const handoff = useAiHandoffStore()
+  const filled = []
+  const chat = { sent: [], send: async (text) => (chat.sent.push(text), false), fill: (text) => filled.push(text) }
+  handoff.set(request)
+  await deliverHandoff(handoff, 'd1', chat)
+  assert.deepEqual(chat.sent, ['Fix the break'])
+  assert.deepEqual(filled, ['Fix the break'])
+  assert.equal(handoff.peek('d1'), null)
+  await deliverHandoff(handoff, 'd1', chat)
+  assert.equal(chat.sent.length, 1, 'never sent twice')
+})
+
+test('a delivered request is sent once and not put back', async () => {
+  const handoff = useAiHandoffStore()
+  const filled = []
+  const chat = { sent: [], send: async (text) => (chat.sent.push(text), true), fill: (text) => filled.push(text) }
+  handoff.set(request)
+  await deliverHandoff(handoff, 'd1', chat)
+  assert.deepEqual(chat.sent, ['Fix the break'])
+  assert.deepEqual(filled, [])
 })
