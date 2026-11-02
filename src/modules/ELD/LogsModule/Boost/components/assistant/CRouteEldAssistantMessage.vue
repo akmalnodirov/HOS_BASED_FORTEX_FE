@@ -3,7 +3,7 @@
     <div
       class="max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
     >
-      {{ item.text }}
+      {{ stripApplyMarker(item.text) }}
     </div>
   </div>
   <div
@@ -32,6 +32,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import CRouteEldAssistantCorrectionPreview from './CRouteEldAssistantCorrectionPreview.vue'
+import { stripApplyMarker } from '@/modules/ELD/LogsModule/Ai/utils/aiOptions'
 import { RouteEldAssistantItemKind, type RouteEldAssistantItem } from '../../types/assistant'
 
 const props = defineProps<{
