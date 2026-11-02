@@ -20,7 +20,7 @@ const preview = {
 const confirmation = {
   id: 'confirmation-1',
   summary: 'Review correction',
-  expiresAt: '2026-11-03T00:00:00Z',
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   details: [],
   correction: preview,
 }

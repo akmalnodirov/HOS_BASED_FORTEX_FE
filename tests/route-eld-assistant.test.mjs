@@ -74,7 +74,7 @@ const confirmation = {
   toolName: 'prepare_factual_correction',
   summary: 'Review correction',
   details: [],
-  expiresAt: '2026-11-03T00:00:00Z',
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   correction: preview,
 }
 const waitingTurn = () => turn({ status: 'AWAITING_CONFIRMATION', confirmation })
@@ -90,6 +90,7 @@ const proposalItem = (status) => ({
   },
 })
 async function loadConfirmation() {
+  confirmation.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   globalThis.assistantTestApi.get = async () => ({
     data: { id: 'conversation-1', items: [], openTurn: waitingTurn() },
   })
@@ -106,7 +107,8 @@ test('confirmation remains actionable and blocks a new send without showing Thin
   assert.equal(await store.send('session-1', 'tab-1', 'another request'), false)
 })
 
-test('attested dispatcher approval uses the exact decision contract and recognizes applied draft', async () => {
+test('attested dispatcher approval uses the exact decision contract and recognizes applied draft', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.parse('2027-01-15T12:00:00Z') })
   await loadConfirmation()
   const calls = []
   globalThis.assistantTestApi.post = async (...args) => {
