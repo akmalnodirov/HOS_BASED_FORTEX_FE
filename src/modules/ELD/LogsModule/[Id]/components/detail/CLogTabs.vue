@@ -153,6 +153,7 @@ import { CalendarDate } from '@internationalized/date'
 import { useBoostWorkspaceStore } from '../../../Boost/store/boostWorkspace'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
+import { reusableDrafts } from '@/modules/ELD/LogsModule/Ai/utils/aiSessions'
 import type { RouteEldEventSessionListItem } from '../../../Boost/types/boost'
 
 // Define props
@@ -183,6 +184,7 @@ const boostStore = useBoostWorkspaceStore()
 const authStore = useAuthStore()
 const canCreateSession = computed(() => hasPermission(authStore.token, 'route_eld.log_details.sessions.create'))
 const canInsertInfo = computed(() => hasPermission(authStore.token, 'route_eld.log_details.events.insert'))
+const canUseAssistant = computed(() => hasPermission(authStore.token, 'route_eld.log_details.assistant'))
 const { sessions, session: activeSession } = storeToRefs(boostStore)
 const activeSessionId = computed(() => activeSession.value?.id ?? '')
 
@@ -194,10 +196,17 @@ const tabs = [
   'INSERT INFO LOG',
   // 'HISTORY'
 ]
-const visibleTabs = computed(() => tabs.filter(tab => tab !== 'INSERT INFO LOG' || canInsertInfo.value))
+const visibleTabs = computed(() =>
+  tabs.filter(
+    (tab) =>
+      (tab !== 'INSERT INFO LOG' || canInsertInfo.value) && (tab !== 'AI' || canUseAssistant.value)
+  )
+)
 const activeTab = ref('ALL')
 
-const isBoostPage = computed(() => route.name === 'ELDBoost')
+// The AI tab works on the same draft session as Boost, with the same session controls.
+const isBoostPage = computed(() => route.name === 'ELDBoost' || route.name === 'ELDAi')
+const isAiPage = computed(() => route.name === 'ELDAi')
 
 const getActiveTabFromRoute = (): string => {
   if (route.query.tab === 'history') {
@@ -206,6 +215,8 @@ const getActiveTabFromRoute = (): string => {
   switch (route.name) {
     case 'ELDBoost':
       return 'BOOST'
+    case 'ELDAi':
+      return 'AI'
     case 'ELDTracking':
       return 'TRACKING'
     case 'ELDInsertInfoLog':
@@ -240,6 +251,15 @@ watch(activeTab, (newTab, oldTab) => {
   const dateParam = props.headerDate?.format('YYYY-MM-DD')
 
   switch (newTab) {
+    case 'AI':
+      if (driverId && route.name !== 'ELDAi') {
+        router.push({
+          name: 'ELDAi',
+          params: { id: driverId },
+          query: dateParam ? { date: dateParam } : undefined,
+        })
+      }
+      break
     case 'BOOST':
       if (driverId && route.name !== 'ELDBoost') {
         router.push({
@@ -461,6 +481,21 @@ watch(
       const attemptKey = `${normalizedDriverId}:${fromDate}:${toDate}`
       if (automaticSessionAttemptKey.value === attemptKey) return
       automaticSessionAttemptKey.value = attemptKey
+
+      // The AI tab reuses a draft with the same dates instead of creating one per visit.
+      if (isAiPage.value) {
+        for (const draft of reusableDrafts(items, fromDate, toDate)) {
+          try {
+            const workspace = await boostStore.loadSession(draft.id)
+            if (workspace) {
+              await applyBoostWorkspaceRoute(workspace)
+              return
+            }
+          } catch {
+            // A locked or forbidden draft is skipped; the next match or a new draft is used.
+          }
+        }
+      }
 
       if (!canCreateSession.value) {
         const fallback = items[0]
