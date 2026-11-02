@@ -305,6 +305,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
   static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>

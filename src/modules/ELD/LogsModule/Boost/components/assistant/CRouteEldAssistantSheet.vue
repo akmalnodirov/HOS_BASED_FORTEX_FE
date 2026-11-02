@@ -35,10 +35,26 @@
           v-else-if="!visibleItems.length && !isThinking && !assistant.error"
           class="py-6 text-center text-sm text-muted-foreground"
         >
-          Ask about violations, errors and warnings, or what to check first in this log.
+          Ask about this log, or describe an actual event correction and its factual reason.
         </p>
 
         <CRouteEldAssistantMessage v-for="item in visibleItems" :key="item.id" :item="item" />
+
+        <CRouteEldAssistantConfirmation
+          v-if="assistant.confirmation"
+          :confirmation="assistant.confirmation"
+          :busy="assistant.isDeciding || assistant.isLoading || clearing"
+          @decide="decide"
+        />
+        <Button
+          v-if="hasPendingDriverAcceptance"
+          variant="outline"
+          size="sm"
+          :disabled="assistant.isLoading || assistant.isDeciding || assistant.isSending || clearing"
+          @click="reload"
+        >
+          Check driver acceptance status
+        </Button>
 
         <div v-if="isThinking" class="flex justify-start">
           <div class="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground animate-pulse">
@@ -56,7 +72,9 @@
             variant="outline"
             size="sm"
             class="h-7 shrink-0 text-xs"
-            :disabled="assistant.isSending || assistant.isLoading || clearing"
+            :disabled="
+              assistant.isSending || assistant.isLoading || assistant.isDeciding || clearing
+            "
             @click="retry"
           >
             Retry
@@ -81,7 +99,7 @@
         <Textarea
           v-model="draft"
           class="max-h-40 resize-none"
-          placeholder="Ask a question about this log"
+          placeholder="Ask about this log or describe a factual correction"
           aria-label="Message to the assistant"
           :maxlength="MAX_LENGTH"
           @keydown="onKeydown"
@@ -110,6 +128,7 @@ import {
 import { RouteEldAssistantItemKind } from '../../types/assistant'
 import { useRouteEldAssistantStore } from '../../store/routeEldAssistant'
 import CRouteEldAssistantMessage from './CRouteEldAssistantMessage.vue'
+import CRouteEldAssistantConfirmation from './CRouteEldAssistantConfirmation.vue'
 
 const MAX_LENGTH = 2000
 
@@ -123,6 +142,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
+  (e: 'applied', value: { sessionId: string; tabId: string }): void
 }>()
 
 const chips = ['Explain violations', 'Explain errors and warnings', 'What should I check first?']
@@ -136,11 +156,15 @@ const isActive = ref(true)
 const visibleItems = computed(() =>
   assistant.items.filter((item) =>
     item.kind === RouteEldAssistantItemKind.Action
-      ? Boolean(item.action?.summary)
+      ? Boolean(item.action?.summary || item.action?.correction)
       : Boolean(item.text)
   )
 )
-const isThinking = computed(() => assistant.activeTurn !== null || assistant.isSending)
+const isThinking = computed(() => assistant.isProcessing)
+const hasPendingDriverAcceptance = computed(() =>
+  assistant.items.some((item) => item.action?.correction?.status === 'awaitingDriverAcceptance')
+)
+const refreshedProposals = new Set<string>()
 const canSend = computed(
   () => Boolean(props.sessionId && props.tabId) && !assistant.isBusy && !clearing.value
 )
@@ -189,6 +213,12 @@ async function retry() {
   if (accepted && draft.value.trim() === text.trim()) draft.value = ''
 }
 
+async function decide(approve: boolean) {
+  const sessionId = props.sessionId
+  await assistant.decide(sessionId, approve)
+  stopIfHidden(sessionId)
+}
+
 async function clearChat() {
   if (!canClear.value) return
   clearing.value = true
@@ -216,6 +246,7 @@ watch(
   [() => props.open, () => props.sessionId],
   ([open, sessionId], previous) => {
     if (previous && previous[1] !== sessionId) {
+      refreshedProposals.clear()
       draft.value = ''
     }
     if (open && sessionId) void reload()
@@ -225,7 +256,21 @@ watch(
 )
 
 watch(
+  () => [assistant.appliedCorrections, props.sessionId, props.tabId] as const,
+  ([proposals]) => {
+    for (const proposal of proposals) {
+      if (refreshedProposals.has(proposal.id)) continue
+      const preview = proposal.preview
+      if (preview.sessionId !== props.sessionId || preview.tabId !== props.tabId) continue
+      refreshedProposals.add(proposal.id)
+      emit('applied', { sessionId: preview.sessionId, tabId: preview.tabId })
+    }
+  }
+)
+
+watch(
   () => [
+    assistant.confirmation?.id,
     visibleItems.value.length,
     isThinking.value,
     assistant.error,

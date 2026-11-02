@@ -381,6 +381,7 @@
       :tab-id="store.activeTabId ?? ''"
       :driver-name="session?.driverName ?? ''"
       :other-driver-selected="assistantOtherDriverSelected"
+      @applied="refreshAfterAssistantApplied"
     />
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
@@ -721,6 +722,17 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
+async function refreshAfterAssistantApplied(applied: { sessionId: string; tabId: string }) {
+  if (store.session?.id !== applied.sessionId || store.activeTabId !== applied.tabId) return
+  try {
+    await store.refreshWorkspace()
+  } catch {
+    toast.error(
+      'The correction was applied to the draft, but the workspace could not be refreshed. Reload the tab to see the updated events.'
+    )
+  }
+}
+
 const assistantOpen = ref(false)
 const assistantOtherDriverSelected = computed(() =>
   Boolean(
