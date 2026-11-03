@@ -23,6 +23,7 @@ import type {
   RouteEldWorkspaceEvent,
   TabResponse,
 } from '../types/boost'
+import { requestOriginFor } from '../utils/recordOrigin'
 import { useBoostWorkspaceStore } from '../store/boostWorkspace'
 import { useChartStore } from '@/modules/ELD/LogsModule/[Id]/store/chart'
 import type { DragColumnType } from './useDragDrop'
@@ -1077,11 +1078,12 @@ export function useScheduleBoost() {
         : timestampFromRouteEldZonedLocal(localDateTime, event?.timeZone ?? workspaceTimeZone.value),
       logDate: form.startDate.replaceAll('-', '/'),
       eventCode,
-      recordOrigin: /^DR_CERT_/i.test(eventCode)
-        ? null
-        : event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
-          ? 'OTHER_USER'
-          : requestedRecordOrigin,
+      recordOrigin: requestOriginFor(eventCode, requestedRecordOrigin, {
+        modifiedProviderEvent: Boolean(
+          event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
+        ),
+        previousEventCode: event?.eventCode,
+      }),
       recordStatus: form.recordStatus,
       vehicleId: form.vehicleId,
       odometerMiles: form.odometer,

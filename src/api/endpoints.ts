@@ -299,6 +299,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
   static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
@@ -313,6 +315,11 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR = (
+    sessionId: string,
+    tabId: string,
+    repairId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
     sessionId: string,
     tabId: string,

@@ -654,6 +654,9 @@ export interface RouteEldRepairOperation {
   eventId: string
   beforeTimestamp?: number | null
   afterTimestamp?: number | null
+  beforeEventCode?: string | null
+  afterEventCode?: string | null
+  timeZone?: string | null
 }
 
 export interface RouteEldRepairPreviewEvent {

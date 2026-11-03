@@ -89,8 +89,8 @@
             <div class="space-y-1">
               <label class="text-sm font-medium">Origin</label>
               <Select
-                :model-value="isCertificationSelected ? '' : String(form.origin ?? '')"
-                :disabled="isCertificationSelected"
+                :model-value="isCertificationSelected ? '' : originLockedToAuto ? '1' : String(form.origin ?? '')"
+                :disabled="isCertificationSelected || originLockedToAuto"
                 @update:model-value="onOriginChange"
               >
                 <SelectTrigger>
@@ -109,7 +109,7 @@
                 Certifications are saved without an origin, like in the Route ELD app.
               </p>
               <p
-                v-else-if="requiresOtherUserOrigin"
+                v-else-if="requiresOtherUserOrigin && !originLockedToAuto"
                 class="mt-1 text-[10px] text-amber-700 dark:text-amber-400"
               >
                 Origin changed to Other user because this provider-generated event type was modified.
@@ -430,6 +430,7 @@ import {
   readCoordinates,
 } from '../../utils/coordinateClipboard'
 import { isMeasurementDraft, parseMeasurement } from '../../utils/decimalInput'
+import { drivingOriginLocked, fixedOriginFor, originForEvent, Origin } from '../../utils/recordOrigin'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -742,30 +743,20 @@ const showRecordStatus = computed(
   () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
 )
 const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
-const fixedOrigin = computed<number | null>(() => {
-  if (requiresOtherUserOrigin.value) return 3
-  if (
-    ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
-      selectedEventKey.value
-    )
-  ) return 2
-  if (
-    [
-      'DS_D', 'LOG_NORMAL_PRECISION', 'LOG_REDUCED_PRECISION', 'DR_LOGIN', 'DR_LOGOUT',
-      'ENG_UP_NORMAL', 'ENG_UP_REDUCED', 'ENG_DOWN_NORMAL', 'ENG_DOWN_REDUCED',
-    ].includes(selectedEventKey.value)
-  ) return 1
-  return null
-})
+// Changing the status to driving (or adding a driving event) saves Auto (ELD); the save request uses the same rule.
+const originLockedToAuto = computed(() =>
+  drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined)
+)
+// Driving is always Auto (ELD); a changed device event is otherwise saved as Other user.
+const fixedOrigin = computed<number | null>(() =>
+  fixedOriginFor(selectedEventKey.value, { modifiedProviderEvent: requiresOtherUserOrigin.value })
+)
 
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
   const certification = /^DR_CERT_\d+$/.test(ev.id)
   const statusless = certification || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
-  const driverOrigin = ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
-    ev.id
-  )
   const modifiedProviderEvent = Boolean(
     props.form.eventId &&
     props.form.originalIsEditable === false &&
@@ -775,7 +766,7 @@ function onEventChange(key: unknown) {
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
     recordStatus: statusless ? 'NONE' : 'ACTIVE',
-    origin: certification ? null : modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
+    origin: originForEvent(ev.id, { modifiedProviderEvent }),
   })
 }
 
@@ -816,7 +807,12 @@ const eventClock = computed({
 })
 function onOriginChange(v: unknown) {
   const origin = Number(v)
-  patch({ origin: requiresOtherUserOrigin.value && origin === 1 ? 3 : origin })
+  // A change to driving is locked to Auto; a changed device event cannot claim Auto otherwise.
+  patch({
+    origin: originLockedToAuto.value
+      ? Origin.Eld
+      : requiresOtherUserOrigin.value && origin === Origin.Eld ? Origin.OtherUser : origin,
+  })
 }
 function onRecordStatusChange(v: unknown) {
   patch({ recordStatus: String(v) })
