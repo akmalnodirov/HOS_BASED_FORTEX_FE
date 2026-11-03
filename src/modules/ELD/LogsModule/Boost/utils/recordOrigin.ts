@@ -29,14 +29,17 @@ export function originForEvent(eventCode: string, context: OriginContext): numbe
   return fixedOriginFor(eventCode, context) ?? Origin.Eld
 }
 
-/** The origin sent to the server: driving as ELD; a changed device event never claims ELD otherwise. */
+/**
+ * The origin sent to the server. A status changed to driving (or a new driving event) is ELD; an event that
+ * already was driving keeps the chosen origin. A changed device event never claims ELD otherwise.
+ */
 export function requestOriginFor(
   eventCode: string,
   requested: string | null,
-  context: OriginContext
+  context: OriginContext & { previousEventCode: string | undefined }
 ): string | null {
   if (isCertification(eventCode)) return null
-  if (eventCode === 'DS_D') return 'ELD'
+  if (eventCode === 'DS_D' && context.previousEventCode !== 'DS_D') return 'ELD'
   if (context.modifiedProviderEvent && requested === 'ELD') return 'OTHER_USER'
   return requested
 }

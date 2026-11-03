@@ -803,9 +803,9 @@ const eventClock = computed({
 })
 function onOriginChange(v: unknown) {
   const origin = Number(v)
-  const fixed = fixedOrigin.value
+  // Only a device event whose status changed is locked: to Auto for driving, away from Auto otherwise.
   patch({
-    origin: fixed === Origin.Eld && selectedEventKey.value === 'DS_D'
+    origin: requiresOtherUserOrigin.value && selectedEventKey.value === 'DS_D'
       ? Origin.Eld
       : requiresOtherUserOrigin.value && origin === Origin.Eld ? Origin.OtherUser : origin,
   })

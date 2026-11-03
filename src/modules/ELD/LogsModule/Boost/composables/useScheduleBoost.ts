@@ -1082,6 +1082,7 @@ export function useScheduleBoost() {
         modifiedProviderEvent: Boolean(
           event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
         ),
+        previousEventCode: event?.eventCode,
       }),
       recordStatus: form.recordStatus,
       vehicleId: form.vehicleId,
