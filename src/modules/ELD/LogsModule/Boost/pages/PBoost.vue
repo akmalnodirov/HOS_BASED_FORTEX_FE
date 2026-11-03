@@ -381,6 +381,8 @@
       :tab-id="store.activeTabId ?? ''"
       :driver-name="session?.driverName ?? ''"
       :other-driver-selected="assistantOtherDriverSelected"
+      :can-apply="allowed('route_eld.log_details.boost')"
+      @applied="refreshAfterAssistantApplied"
     />
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
@@ -606,6 +608,7 @@ import CBoostEditDailyFormModal from '../components/modals/CBoostEditDailyFormMo
 import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.vue'
 import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
 import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
+import { useAssistantWorkspaceRefresh } from '../composables/useAssistantWorkspaceRefresh'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
@@ -721,6 +724,7 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
+const refreshAfterAssistantApplied = useAssistantWorkspaceRefresh()
 const assistantOpen = ref(false)
 const assistantOtherDriverSelected = computed(() =>
   Boolean(

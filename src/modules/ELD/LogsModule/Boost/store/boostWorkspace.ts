@@ -663,6 +663,14 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
   }
 
+  /** Reads one repair with option previews and live status; never mutates. */
+  async function getRepair(sessionId: string, tabId: string, repairId: string) {
+    const response = await api.get<
+      RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIR(sessionId, tabId, repairId))
+    return unwrap(response.data)
+  }
+
   async function applyRepair(repairId: string, optionId: string) {
     if (!session.value || !activeTabId.value)
       throw new Error('Open a session working tab before applying a repair option.')
@@ -903,6 +911,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     fetchReassignTargets,
     analyzeAiAdvice,
     generateRepair,
+    getRepair,
     applyRepair,
     normalize,
     submitOrRollback,
