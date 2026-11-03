@@ -47,7 +47,7 @@
             <div class="flex items-center">
               <span
                 class="text-sm font-semibold text-[#666666] dark:text-muted-foreground uppercase"
-              >Time ({{ timeZone || 'CT' }})</span
+              >Time ({{ routeEldTimeZoneLabel(timeZone) }})</span
               >
             </div>
             <div v-if="isColumnVisible('duration')" class="flex items-center">
@@ -735,6 +735,7 @@ import type {
 import { findEventByTypeAndCode, getEventLabel } from '@/utils/events.ts'
 import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
 import { copyCoordinates } from '../utils/coordinateClipboard'
+import { routeEldTimeZoneLabel } from '@/utils/routeEldTimeZone'
 
 const RECORD_ORIGIN_LABELS: Record<number, string> = {
   1: 'Auto',

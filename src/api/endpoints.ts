@@ -195,12 +195,6 @@ export class ApiEndpoints {
   // Audit endpoints
   private static readonly AUDIT_URL = `${this.BASE_URL}/audit`
   static readonly AUDIT = this.AUDIT_URL
-  static readonly AUDIT_EVENTS = `${this.AUDIT_URL}/events`
-  static readonly AUDIT_SUMMARY = `${this.AUDIT_URL}/summary`
-  static readonly AUDIT_GRAPH = `${this.AUDIT_URL}/graph`
-  static readonly AUDIT_VIOLATIONS = `${this.AUDIT_URL}/violations`
-  static readonly AUDIT_WEIGHT_STATIONS = `${this.AUDIT_URL}/weight-stations`
-  static readonly AUDIT_TRACKING = `${this.AUDIT_URL}/tracking`
 
   // Portal Users endpoints
   private static readonly PORTAL_USERS_URL = `${this.BASE_URL}/portal-users`

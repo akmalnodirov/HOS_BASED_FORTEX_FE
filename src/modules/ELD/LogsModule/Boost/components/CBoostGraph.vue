@@ -456,6 +456,7 @@ const props = withDefaults(
     toDate: string
     timeZone?: string | null
     sessionCreatedAt?: string | null
+    isAudit?: boolean
     selectedEventId?: string | null
     boostSelectedIds?: string[]
     freeTimes?: RouteEldScheduleCalculations['freeTimes']
@@ -470,6 +471,7 @@ const props = withDefaults(
     events: () => [],
     timeZone: 'CT',
     sessionCreatedAt: null,
+    isAudit: false,
     selectedEventId: null,
     boostSelectedIds: () => [],
     freeTimes: () => [],
@@ -518,6 +520,7 @@ const periodEndTimestamp = computed(() => {
   return zonedTimestamp(`${nextDate(props.toDate)}T00:00:00`, graphTimeZone.value)
 })
 const graphEndTimestamp = computed(() => {
+  if (props.isAudit) return periodEndTimestamp.value
   return Math.min(
     routeEldSessionTimelineCutoff(props.sessionCreatedAt),
     periodEndTimestamp.value
@@ -608,7 +611,7 @@ const dutyPath = computed(() => {
   let path = `M ${points[0].x} ${points[0].y}`
   for (let index = 1; index < points.length; index += 1)
     path += ` H ${points[index].x} V ${points[index].y}`
-  return `${path} H ${lastEndX.value}`
+  return `${path} H ${Math.max(points.at(-1)!.x, lastEndX.value)}`
 })
 const dutyPoints = computed(() =>
   activeDutyEvents.value.map(({ event, x, y }) => ({

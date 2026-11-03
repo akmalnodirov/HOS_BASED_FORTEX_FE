@@ -297,6 +297,7 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/users.svg',
         uppercase: true,
         children: [
+          { id: 'tools-audit', label: 'Audit', icon: null, path: '/tools/audit' },
           { id: 'tools-monitoring', label: 'Monitoring', icon: null, path: '/tools/monitoring' },
           {
             id: 'tools-dot-inspection',
