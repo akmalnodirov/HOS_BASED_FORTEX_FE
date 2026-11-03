@@ -35,3 +35,18 @@ test('the origin field is locked to Auto for driving', async () => {
   assert.equal(fixedOriginFor('DS_SB', { modifiedProviderEvent: false }), 2)
   assert.equal(fixedOriginFor('INTERMEDIATE', { modifiedProviderEvent: false }), null)
 })
+
+test('the origin field is locked to Auto exactly when the save will send ELD for driving', async () => {
+  const { drivingOriginLocked, requestOriginFor } = await import('../src/modules/ELD/LogsModule/Boost/utils/recordOrigin.ts')
+  const cases = [
+    ['DS_D', 'DS_ON', true],
+    ['DS_D', undefined, true],
+    ['DS_D', 'DS_D', false],
+    ['DS_ON', 'DS_D', false],
+  ]
+  for (const [eventCode, previousEventCode, locked] of cases) {
+    assert.equal(drivingOriginLocked(eventCode, previousEventCode), locked, `${previousEventCode} → ${eventCode}`)
+    const sent = requestOriginFor(eventCode, 'DRIVER', { modifiedProviderEvent: false, previousEventCode })
+    assert.equal(sent === 'ELD', locked, `save matches the lock for ${previousEventCode} → ${eventCode}`)
+  }
+})

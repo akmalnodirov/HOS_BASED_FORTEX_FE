@@ -29,6 +29,11 @@ export function originForEvent(eventCode: string, context: OriginContext): numbe
   return fixedOriginFor(eventCode, context) ?? Origin.Eld
 }
 
+/** True when the status is changed to driving (or a driving event is added): its origin is then always Auto. */
+export function drivingOriginLocked(eventCode: string, previousEventCode: string | undefined) {
+  return eventCode === 'DS_D' && previousEventCode !== 'DS_D'
+}
+
 /**
  * The origin sent to the server. A status changed to driving (or a new driving event) is ELD; an event that
  * already was driving keeps the chosen origin. A changed device event never claims ELD otherwise.
@@ -39,7 +44,7 @@ export function requestOriginFor(
   context: OriginContext & { previousEventCode: string | undefined }
 ): string | null {
   if (isCertification(eventCode)) return null
-  if (eventCode === 'DS_D' && context.previousEventCode !== 'DS_D') return 'ELD'
+  if (drivingOriginLocked(eventCode, context.previousEventCode)) return 'ELD'
   if (context.modifiedProviderEvent && requested === 'ELD') return 'OTHER_USER'
   return requested
 }
