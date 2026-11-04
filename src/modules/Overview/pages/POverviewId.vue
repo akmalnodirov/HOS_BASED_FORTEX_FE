@@ -209,6 +209,7 @@
           :points="tracking?.points || []"
           :is-live="isToday"
           :current-status="tracking?.driver.currentStatus"
+          :vehicle-name="tracking?.driver.vehicleName"
         />
         <div
           v-if="isLoading"
