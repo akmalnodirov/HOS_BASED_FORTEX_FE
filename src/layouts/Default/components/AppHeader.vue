@@ -232,7 +232,7 @@
                 v-if="canViewOwnKpi"
                 variant="ghost"
                 size="icon"
-                class="h-15 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="My KPI"
                 aria-label="My KPI"
                 @click.stop="openMyKpi"
@@ -242,7 +242,17 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-15 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
+                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                title="Change password"
+                aria-label="Change password"
+                @click.stop="openChangePassword"
+              >
+                <KeyRound class="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-20 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
                 @click.stop="handleLogout"
               >
                 <LogOut class="w-5 h-5 text-[#C53030] transition-transform group-hover:scale-110" />
@@ -276,6 +286,7 @@ import {
   Eye,
   Check,
   BadgeDollarSign,
+  KeyRound,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -460,6 +471,11 @@ const pageTitle = computed(() => {
 const handleProfileClick = () => {
   isDropdownOpen.value = false
   router.push('/profile')
+}
+
+const openChangePassword = () => {
+  isDropdownOpen.value = false
+  router.push('/profile#password')
 }
 
 const handleLogout = async () => {

@@ -89,7 +89,7 @@ const entryType = ref<Record<string, string>>({ company: 'all', driver: 'all' })
 const entrySort = ref<Record<string, boolean>>({ company: false, driver: false })
 const rowSearch = ref('')
 const moneyColumns = new Set(['dailySalary', 'earnedBase', 'fixedSalary', 'latenessPenalty', 'undertimePenalty', 'penalty', 'pointsValue', 'bonusTotal', 'chargeTotal', 'totalKpi'])
-const moneyMetrics = new Set(['Lateness penalty', 'Undertime penalty', 'Total penalty', 'Fixed salary', 'Charges', 'Bonuses', 'KPI value', 'Total KPI', 'Total Salary'])
+const moneyMetrics = new Set(['Lateness penalty', 'Undertime penalty', 'Total penalty', 'Earned salary', 'Charges', 'Bonuses', 'KPI value', 'Total KPI', 'Total Salary'])
 const sortKey = ref('')
 const sortDirection = ref<'asc' | 'desc'>('asc')
 const visibleRows = computed(() => {
@@ -125,7 +125,7 @@ const columns = computed(() =>
         { key: 'teamName', label: 'Team' },
         { key: 'dailySalary', label: 'Daily $' },
         { key: 'attendedDays', label: 'Attended' },
-        { key: 'earnedBase', label: 'Fixed salary' },
+        { key: 'earnedBase', label: 'Earned salary' },
         { key: 'lateMinutes', label: 'Late (min)' },
         { key: 'undertimeMinutes', label: 'Undertime (min)' },
         { key: 'latenessPenalty', label: 'Lateness −' },
@@ -138,7 +138,9 @@ const columns = computed(() =>
           { key: 'roleName', label: 'Role' },
           { key: 'levelName', label: 'Level' },
           { key: 'teamName', label: 'Team' },
-          { key: 'fixedSalary', label: 'Fixed salary' },
+          { key: 'dailySalary', label: 'Daily rate' },
+          { key: 'attendedDays', label: 'Attended days' },
+          { key: 'fixedSalary', label: 'Earned salary' },
           { key: 'completedTaskCount', label: 'Tasks' },
           { key: 'taskPoints', label: 'Task pts' },
           { key: 'checkerGainedPoints', label: 'Checker +' },
@@ -174,7 +176,7 @@ const metrics = computed(() =>
       ]
     : mode.value === 'kpi'
       ? [
-          { label: 'Fixed salary', value: data.value.totalFixedSalary },
+          { label: 'Earned salary', value: data.value.totalFixedSalary },
           { label: 'Charges', value: data.value.totalCharge },
           { label: 'Bonuses', value: data.value.totalBonus },
           { label: 'Total points', value: data.value.totalPoints },
@@ -599,7 +601,7 @@ onMounted(async () => {
           <Input v-model="rowSearch" placeholder="Search employees" class="h-9 w-56" />
         </div>
         <div class="min-h-0 flex-1 overflow-auto">
-          <table class="w-full text-left text-sm" :class="mode === 'kpi' ? 'min-w-[1900px]' : 'min-w-[1300px]'">
+          <table class="w-full text-left text-sm" :class="mode === 'kpi' ? 'min-w-[2100px]' : 'min-w-[1300px]'">
             <thead class="sticky top-0 z-10 bg-muted text-muted-foreground">
               <tr>
                 <th class="px-4 py-3 font-medium">No</th>
@@ -698,13 +700,14 @@ onMounted(async () => {
             </div>
           </div>
           <div class="overflow-auto rounded-lg border border-border">
-            <table class="w-full min-w-[900px] text-left text-xs">
+            <table class="w-full min-w-[1000px] text-left text-xs">
               <thead class="bg-muted text-muted-foreground">
                 <tr>
                   <th
                     v-for="column in [
                       'Date',
                       'Shift',
+                      'Daily rate',
                       'Clock in',
                       'Clock out',
                       'Worked',
@@ -728,6 +731,7 @@ onMounted(async () => {
                 >
                   <td class="px-3 py-2">{{ display(day.date) }}</td>
                   <td class="px-3 py-2">{{ display(day.shiftName) }}</td>
+                  <td class="px-3 py-2">{{ reportMoney(day.dailyRate) }}</td>
                   <td class="px-3 py-2">{{ display(day.clockInTime) }}</td>
                   <td class="px-3 py-2">{{ display(day.clockOutTime) }}</td>
                   <td class="px-3 py-2">{{ display(day.workedMinutes) }}</td>
@@ -737,7 +741,7 @@ onMounted(async () => {
                   <td class="px-3 py-2">{{ reportMoney(day.undertimePenalty) }}</td>
                 </tr>
                 <tr v-if="!asRows(detail.days).length">
-                  <td colspan="9" class="px-3 py-8 text-center text-muted-foreground">
+                  <td colspan="10" class="px-3 py-8 text-center text-muted-foreground">
                     No attendance days.
                   </td>
                 </tr>

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import CReportDateField from '@/modules/Report/components/CReportDateField.vue'
+import CReportMonthField from '@/modules/Report/components/CReportMonthField.vue'
 import CReportAdminHeader from '@/modules/Report/components/CReportAdminHeader.vue'
 import { reportMoney } from '@/modules/Report/utils/money'
 
@@ -68,6 +69,7 @@ const canCreate = computed(() => hasPermission(auth.token, `report.${permission.
 const canEdit = computed(() => hasPermission(auth.token, `report.${permission.value}.edit`))
 const canDelete = computed(() => hasPermission(auth.token, `report.${permission.value}.delete`))
 const search = ref('')
+const salaryMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)
 const rows = ref<(Salary | Adjustment)[]>([])
 const employees = ref<Employee[]>([])
 const loading = ref(false)
@@ -103,7 +105,9 @@ async function load() {
       rows.value = adjustmentResponse.data.successResult ?? []
       employees.value = employeeResponse.data.successResult ?? []
     } else {
-      const response = await api.get<{ successResult: Salary[] }>('/report/api/kpi/salaries')
+      const response = await api.get<{ successResult: Salary[] }>('/report/api/kpi/salaries', {
+        params: { month: `${salaryMonth.value}-01` },
+      })
       rows.value = response.data.successResult ?? []
       employees.value = (response.data.successResult ?? []).map((item) => ({
         id: item.userId,
@@ -125,7 +129,8 @@ function openEditor(row: Salary | Adjustment | null = null) {
   type.value = row && 'type' in row ? String(row.type) : '0'
   amount.value = String(row ? ('amount' in row ? row.amount : row.fixedSalary) : 0)
   reason.value = row && 'reason' in row ? (row.reason ?? '') : ''
-  effectiveDate.value = row?.effectiveDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
+  effectiveDate.value = row?.effectiveDate?.slice(0, 10) ??
+    (bonuses.value ? new Date().toISOString().slice(0, 10) : `${salaryMonth.value}-01`)
   dialogOpen.value = true
 }
 
@@ -188,6 +193,9 @@ async function openHistory(userId: string) {
 }
 
 watch(bonuses, load)
+watch(salaryMonth, () => {
+  if (!bonuses.value) void load()
+})
 onMounted(load)
 </script>
 
@@ -198,9 +206,10 @@ onMounted(load)
     <CReportAdminHeader
       v-model:search="search"
       :title="bonuses ? 'Bonuses & Charges' : 'Salary'"
-      :subtitle="bonuses ? 'Adjust employee earnings.' : 'Manage monthly employee salaries.'"
+      :subtitle="bonuses ? 'Adjust employee earnings.' : 'Set daily salary rates by effective date. Earned salary sums the rate for each attended workday.'"
       placeholder="Search employees"
     >
+      <CReportMonthField v-if="!bonuses" v-model="salaryMonth" />
       <Button v-if="bonuses ? canCreate : canEdit" @click="openEditor()"
         ><Plus class="mr-2 h-4 w-4" />{{ bonuses ? 'Add adjustment' : 'Set salary' }}</Button
       >
@@ -216,7 +225,7 @@ onMounted(load)
               <th class="px-4 font-medium">Employee</th>
               <th class="px-4 font-medium">{{ bonuses ? 'Type' : 'Role' }}</th>
               <th v-if="!bonuses" class="px-4 font-medium">Level</th>
-              <th class="px-4 font-medium">{{ bonuses ? 'Amount' : 'Salary' }}</th>
+              <th class="px-4 font-medium">{{ bonuses ? 'Amount' : 'Daily salary' }}</th>
               <th class="px-4 font-medium">{{ bonuses ? 'Reason' : 'Team' }}</th>
               <th class="px-4 font-medium">Effective date</th>
               <th v-if="canEdit || canDelete || !bonuses" class="px-4 text-right font-medium">
@@ -287,7 +296,7 @@ onMounted(load)
     <Dialog v-model:open="dialogOpen"
       ><DialogContent class="max-w-md"
         ><DialogHeader
-          ><DialogTitle>{{ bonuses ? 'Adjustment' : 'Salary' }}</DialogTitle></DialogHeader
+          ><DialogTitle>{{ bonuses ? 'Adjustment' : 'Daily salary rate' }}</DialogTitle></DialogHeader
         >
         <form class="grid gap-4" @submit.prevent="save">
           <label class="grid gap-1.5 text-sm"
@@ -314,7 +323,7 @@ onMounted(load)
               ></Select
             ></label
           ><label class="grid gap-1.5 text-sm"
-            >Amount ($)<Input v-model="amount" type="number" min="0" step="0.01" required /></label
+            >{{ bonuses ? 'Amount ($)' : 'Daily rate ($)' }}<Input v-model="amount" type="number" min="0" step="0.01" required /></label
           ><label v-if="bonuses" class="grid gap-1.5 text-sm"
             >Reason<Input v-model="reason" /></label
           ><label class="grid gap-1.5 text-sm"
@@ -356,7 +365,7 @@ onMounted(load)
             <thead class="bg-muted">
               <tr>
                 <th class="px-3 py-2">Effective date</th>
-                <th class="px-3 py-2">Salary</th>
+                <th class="px-3 py-2">Daily rate</th>
                 <th class="px-3 py-2">Changed</th>
               </tr>
             </thead>

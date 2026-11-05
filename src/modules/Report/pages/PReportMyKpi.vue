@@ -47,8 +47,8 @@ async function onRange(range: { startTime: string; endTime: string }) {
   <div class="flex h-[calc(100dvh-65px)] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar :key="route.fullPath" :title="pageTitle" :subtitle="employeeId ? 'Employee points, earnings, and calculation details' : 'Your points, earnings, and calculation details'" :initial-range="initialRange" default-period="month" full-periods @change="onRange">
       <template #actions>
-        <span v-if="detail" class="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">Team: <strong class="font-semibold text-foreground">{{ detail.teamName || 'Unassigned' }}</strong></span>
         <Button v-if="employeeId" variant="outline" @click="router.push('/report/kpi')"><ArrowLeft class="mr-2 h-4 w-4" />Back</Button>
+        <span v-if="detail" class="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">Team: <strong class="font-semibold text-foreground">{{ detail.teamName || 'Unassigned' }}</strong></span>
       </template>
     </CReportToolbar>
     <div class="min-h-0 flex-1 overflow-auto p-4">

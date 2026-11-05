@@ -11,11 +11,11 @@ const auth = useAuthStore()
 const canViewTaskHistory = computed(() => hasPermission(auth.token, 'report.tasks.view'))
 const historyOpen = ref(false)
 const historyTaskId = ref('')
-const moneyMetrics = new Set(['Daily salary', 'Fixed salary', 'KPI value', 'Bonuses', 'Charges', 'Lateness penalty', 'Undertime penalty', 'Total KPI'])
+const moneyMetrics = new Set(['Daily rate', 'Earned salary', 'KPI value', 'Bonuses', 'Charges', 'Lateness penalty', 'Undertime penalty', 'Total KPI'])
 const metrics = computed(() => [
-  { label: 'Daily salary', value: props.detail.dailySalary },
+  { label: 'Daily rate', value: props.detail.dailySalary },
   { label: 'Attended days', value: props.detail.attendedDays },
-  { label: 'Fixed salary', value: props.detail.fixedSalary },
+  { label: 'Earned salary', value: props.detail.fixedSalary },
   { label: 'Task points', value: props.detail.taskPoints },
   { label: 'Checker points', value: props.detail.checkerGainedPoints },
   { label: 'Deductions', value: props.detail.deductedPoints },
@@ -59,19 +59,23 @@ function openHistory(taskId: string) {
         <strong class="text-base">{{ moneyMetrics.has(metric.label) ? reportMoney(metric.value) : number(metric.value) }}</strong>
       </div>
     </div>
+    <p v-if="Number(detail.attendedDays ?? 0) === 0 && Number(detail.dailySalary ?? 0) > 0" class="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+      No attendance days were recorded for this period, so the daily rate earned $0. Clockster attendance or an attendance exception is required for fixed salary accrual.
+    </p>
     <section class="rounded-xl border border-border bg-card p-4">
       <h3 class="mb-3 text-sm font-semibold">Attendance — worked time and penalties</h3>
       <div class="overflow-auto">
-        <table class="w-full min-w-[1000px] text-left text-sm">
+        <table class="w-full min-w-[1100px] text-left text-sm">
           <thead class="bg-muted text-muted-foreground">
             <tr>
-              <th v-for="heading in ['Date', 'Shift', 'Clock in', 'Clock out', 'Worked (min)', 'Late (min)', 'Undertime (min)', 'Lateness −', 'Undertime −']" :key="heading" class="px-3 py-2 font-medium">{{ heading }}</th>
+              <th v-for="heading in ['Date', 'Shift', 'Daily rate', 'Clock in', 'Clock out', 'Worked (min)', 'Late (min)', 'Undertime (min)', 'Lateness −', 'Undertime −']" :key="heading" class="px-3 py-2 font-medium">{{ heading }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(day, index) in rows(detail.attendanceDays)" :key="index" class="border-t border-border">
               <td class="whitespace-nowrap px-3 py-2">{{ date(day.date) }}</td>
               <td class="px-3 py-2">{{ day.shiftName || '—' }}</td>
+              <td class="px-3 py-2">{{ reportMoney(day.dailyRate) }}</td>
               <td class="whitespace-nowrap px-3 py-2">{{ date(day.clockInTime) }}</td>
               <td class="whitespace-nowrap px-3 py-2">{{ date(day.clockOutTime) }}</td>
               <td class="px-3 py-2">{{ number(day.workedMinutes) }}</td>
@@ -80,7 +84,7 @@ function openHistory(taskId: string) {
               <td class="px-3 py-2 text-red-600">{{ reportMoney(day.latenessPenalty) }}</td>
               <td class="px-3 py-2 text-red-600">{{ reportMoney(day.undertimePenalty) }}</td>
             </tr>
-            <tr v-if="!rows(detail.attendanceDays).length"><td colspan="9" class="px-3 py-6 text-center text-muted-foreground">No attendance records.</td></tr>
+            <tr v-if="!rows(detail.attendanceDays).length"><td colspan="10" class="px-3 py-6 text-center text-muted-foreground">No attendance records.</td></tr>
           </tbody>
         </table>
       </div>

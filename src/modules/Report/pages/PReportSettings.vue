@@ -398,7 +398,7 @@ onMounted(load)
       <section class="rounded-lg border border-border bg-card p-5">
         <h2 class="text-sm font-semibold">Attendance exceptions</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Exclude selected employees from a shift's attendance calculation.
+          Selected employees earn their daily salary for Monday through Saturday without Clockster records, using the effective rate for each day.
         </p>
         <div v-if="canEdit" class="mt-4 flex flex-wrap gap-2">
           <Select v-model="ignoredUserId"
