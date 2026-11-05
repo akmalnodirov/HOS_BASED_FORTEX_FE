@@ -109,10 +109,10 @@
                 Certifications are saved without an origin, like in the Route ELD app.
               </p>
               <p
-                v-else-if="requiresOtherUserOrigin && !originLockedToAuto"
-                class="mt-1 text-[10px] text-amber-700 dark:text-amber-400"
+                v-else-if="isModifiedProviderEvent"
+                class="mt-1 text-[10px] text-muted-foreground"
               >
-                Origin changed to Other user because this provider-generated event type was modified.
+                Origin is Auto because this provider-generated event type was modified.
               </p>
               <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
                 Origin follows the selected event type.
@@ -618,7 +618,7 @@ watch(() => props.open, (open) => {
 onBeforeUnmount(cancelReverseGeocode)
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
-const requiresOtherUserOrigin = computed(() =>
+const isModifiedProviderEvent = computed(() =>
   Boolean(
     props.form.eventId &&
     props.form.originalIsEditable === false &&
@@ -743,13 +743,16 @@ const showRecordStatus = computed(
   () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
 )
 const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
-// Changing the status to driving (or adding a driving event) saves Auto (ELD); the save request uses the same rule.
-const originLockedToAuto = computed(() =>
-  drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined)
+// Changing the status to driving (or adding a driving event) or changing a device event saves Auto (ELD); the save request uses the same rule.
+const originLockedToAuto = computed(
+  () =>
+    !isCertificationSelected.value &&
+    (isModifiedProviderEvent.value ||
+      drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined))
 )
-// Driving is always Auto (ELD); a changed device event is otherwise saved as Other user.
+// Driving and changed device events are Auto (ELD).
 const fixedOrigin = computed<number | null>(() =>
-  fixedOriginFor(selectedEventKey.value, { modifiedProviderEvent: requiresOtherUserOrigin.value })
+  fixedOriginFor(selectedEventKey.value, { modifiedProviderEvent: isModifiedProviderEvent.value })
 )
 
 function onEventChange(key: unknown) {
@@ -807,12 +810,7 @@ const eventClock = computed({
 })
 function onOriginChange(v: unknown) {
   const origin = Number(v)
-  // A change to driving is locked to Auto; a changed device event cannot claim Auto otherwise.
-  patch({
-    origin: originLockedToAuto.value
-      ? Origin.Eld
-      : requiresOtherUserOrigin.value && origin === Origin.Eld ? Origin.OtherUser : origin,
-  })
+  patch({ origin: originLockedToAuto.value ? Origin.Eld : origin })
 }
 function onRecordStatusChange(v: unknown) {
   patch({ recordStatus: String(v) })

@@ -1080,7 +1080,7 @@ export function useScheduleBoost() {
       eventCode,
       recordOrigin: requestOriginFor(eventCode, requestedRecordOrigin, {
         modifiedProviderEvent: Boolean(
-          event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
+          event && !event.isEditable && eventCode !== event.eventCode
         ),
         previousEventCode: event?.eventCode,
       }),
