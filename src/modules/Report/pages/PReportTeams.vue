@@ -4,7 +4,7 @@ import { Loader2, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { hasPermission } from '@/router/permissions'
+import { hasPermission, readTokenPermissions } from '@/router/permissions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -54,6 +54,7 @@ const auth = useAuthStore()
 const canCreate = computed(() => hasPermission(auth.token, 'report.teams.create'))
 const canEdit = computed(() => hasPermission(auth.token, 'report.teams.edit'))
 const canDelete = computed(() => hasPermission(auth.token, 'report.teams.delete'))
+const canManageTeamDefinitions = computed(() => readTokenPermissions(auth.token).systemAdmin)
 const month = ref(new Date().toISOString().slice(0, 7))
 const employeeSearch = ref('')
 const companySearch = ref('')
@@ -183,8 +184,8 @@ onMounted(load)
     class="flex h-[calc(100vh-65px)] min-h-0 flex-col overflow-hidden bg-white p-[16px_24px] dark:bg-background"
   >
     <CReportAdminHeader title="Teams" subtitle="Manage employee and company assignments.">
+      <Button v-if="canCreate && canManageTeamDefinitions" @click="openEditor()"><Plus class="mr-2 h-4 w-4" />Add team</Button>
       <CReportMonthField v-model="month" />
-      <Button v-if="canCreate" @click="openEditor()"><Plus class="mr-2 h-4 w-4" />Add team</Button>
       <Button
         v-if="canEdit"
         variant="outline"
@@ -209,14 +210,14 @@ onMounted(load)
             <strong class="text-sm">{{ team.name }}</strong>
             <div class="flex gap-1">
               <Button
-                v-if="canEdit"
+                v-if="canEdit && canManageTeamDefinitions"
                 size="icon-sm"
                 variant="ghost"
                 title="Edit"
                 @click="openEditor(team)"
                 ><Pencil class="h-4 w-4" /></Button
               ><Button
-                v-if="canDelete"
+                v-if="canDelete && canManageTeamDefinitions"
                 size="icon-sm"
                 variant="ghost"
                 title="Delete"
@@ -255,7 +256,10 @@ onMounted(load)
                   :key="item.userId"
                   class="border-t border-border"
                 >
-                  <td class="px-4 py-2">{{ item.fullName || item.userName }}</td>
+                  <td class="px-4 py-2">
+                    <span>{{ item.fullName || item.userName }}</span>
+                    <span v-if="item.fullName" class="ml-1 text-xs text-muted-foreground">({{ item.userName }})</span>
+                  </td>
                   <td class="px-4 py-2">{{ item.roleName || '—' }}</td>
                   <td class="px-4 py-2">
                     <Select v-model="employeeTeams[item.userId]" :disabled="!canEdit"

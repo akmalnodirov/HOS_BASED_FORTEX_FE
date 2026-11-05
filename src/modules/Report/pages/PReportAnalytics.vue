@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportActivityChart from '@/modules/Report/components/CReportActivityChart.vue'
+import { reportMoney } from '@/modules/Report/utils/money'
 
 interface Result {
   successResult: Record<string, unknown>
@@ -20,6 +21,24 @@ interface Result {
 interface Range {
   startTime: string
   endTime: string
+}
+interface KpiBreakdown {
+  startTime: string
+  endTime: string
+  eachPointValue: number
+  totalTasks: number
+  taskPoints: number
+  checkerGainedPoints: number
+  deductedPoints: number
+  totalPoints: number
+  totalPointsValue: number
+  totalBonus: number
+  totalCharge: number
+  totalLatenessPenalty: number
+  totalUndertimePenalty: number
+  totalFixedSalary: number
+  totalKpi: number
+  notes: { noteTitle: string; taskCount: number; points: number; pointsValue: number }[]
 }
 const api = useApi()
 const auth = useAuthStore()
@@ -61,14 +80,43 @@ const detail = ref<Record<string, unknown> | null>(null)
 const detailName = ref('')
 const detailOpen = ref(false)
 const detailLoading = ref(false)
+const breakdown = ref<KpiBreakdown | null>(null)
+const breakdownOpen = ref(false)
+const breakdownLoading = ref(false)
+let breakdownRequestVersion = 0
 const entrySearch = ref<Record<string, string>>({ company: '', driver: '' })
 const entryType = ref<Record<string, string>>({ company: 'all', driver: 'all' })
 const entrySort = ref<Record<string, boolean>>({ company: false, driver: false })
 const rowSearch = ref('')
-const visibleRows = computed(() => rows.value.filter(row =>
-  `${row.fullName ?? ''} ${row.userName ?? ''} ${row.teamName ?? ''} ${roleNames.value[String(row.userId)] ?? row.roleName ?? ''}`
-    .toLowerCase().includes(rowSearch.value.trim().toLowerCase())
-))
+const moneyColumns = new Set(['dailySalary', 'earnedBase', 'fixedSalary', 'latenessPenalty', 'undertimePenalty', 'penalty', 'pointsValue', 'bonusTotal', 'chargeTotal', 'totalKpi'])
+const moneyMetrics = new Set(['Lateness penalty', 'Undertime penalty', 'Total penalty', 'Fixed salary', 'Charges', 'Bonuses', 'KPI value', 'Total KPI', 'Total Salary'])
+const sortKey = ref('')
+const sortDirection = ref<'asc' | 'desc'>('asc')
+const visibleRows = computed(() => {
+  const filtered = rows.value.filter(row =>
+    `${row.fullName ?? ''} ${row.userName ?? ''} ${row.teamName ?? ''} ${roleNames.value[String(row.userId)] ?? row.roleName ?? ''}`
+      .toLowerCase().includes(rowSearch.value.trim().toLowerCase())
+  )
+  if (!sortKey.value || mode.value === 'statistics') return filtered
+  return filtered.sort((left, right) => {
+    const first = cellValue(left, sortKey.value)
+    const second = cellValue(right, sortKey.value)
+    if (first == null || first === '') return second == null || second === '' ? 0 : 1
+    if (second == null || second === '') return -1
+    const comparison = typeof first === 'number' && typeof second === 'number'
+      ? first - second
+      : String(first).localeCompare(String(second), undefined, { numeric: true, sensitivity: 'base' })
+    return sortDirection.value === 'asc' ? comparison : -comparison
+  })
+})
+
+function sortBy(key: string) {
+  if (sortKey.value === key) sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  else {
+    sortKey.value = key
+    sortDirection.value = 'asc'
+  }
+}
 const columns = computed(() =>
   mode.value === 'attendance'
     ? [
@@ -101,7 +149,7 @@ const columns = computed(() =>
           { key: 'chargeTotal', label: 'Charge' },
           { key: 'latenessPenalty', label: 'Lateness −' },
           { key: 'undertimePenalty', label: 'Undertime −' },
-          { key: 'totalKpi', label: 'Total KPI' },
+          { key: 'totalKpi', label: 'Salary' },
         ]
       : [
           { key: 'name', label: 'Name' },
@@ -133,7 +181,7 @@ const metrics = computed(() =>
           { label: 'KPI value', value: data.value.totalPointsValue },
           { label: 'Lateness penalty', value: data.value.totalLatenessPenalty },
           { label: 'Undertime penalty', value: data.value.totalUndertimePenalty },
-          { label: 'Total KPI', value: data.value.totalKpi },
+          { label: 'Total Salary', value: data.value.totalKpi },
         ]
       : [
           { label: 'Companies added', value: data.value.companiesAdded },
@@ -144,6 +192,24 @@ const metrics = computed(() =>
           { label: 'Active drivers', value: selectedActive.value.find(item => item.title === 'Drivers')?.active ?? 0 },
         ]
 )
+const breakdownItems = computed(() => {
+  const value = breakdown.value
+  if (!value) return []
+  return [
+    { label: 'Total tasks', value: value.totalTasks, money: false },
+    { label: 'Task points', value: value.taskPoints, money: false },
+    { label: 'Checker +', value: value.checkerGainedPoints, money: false },
+    { label: 'Deducted −', value: value.deductedPoints, money: false },
+    { label: 'Total points', value: value.totalPoints, money: false },
+    { label: 'Point earnings', value: value.totalPointsValue, money: true },
+    { label: 'Bonuses', value: value.totalBonus, money: true },
+    { label: 'Charges', value: value.totalCharge, money: true },
+    { label: 'Lateness penalty', value: value.totalLatenessPenalty, money: true },
+    { label: 'Undertime penalty', value: value.totalUndertimePenalty, money: true },
+    { label: 'Earned salary', value: value.totalFixedSalary, money: true },
+    { label: 'Total KPI', value: value.totalKpi, money: true },
+  ]
+})
 const statusGroups = computed(() =>
   (['Companies', 'Drivers'] as const).map((title) => {
     const kind = title === 'Companies' ? 'Companies' : 'Drivers'
@@ -263,6 +329,25 @@ async function syncAttendance() {
   }
 }
 
+async function openBreakdown() {
+  if (!range.value) return
+  const version = ++breakdownRequestVersion
+  breakdown.value = null
+  breakdownOpen.value = true
+  breakdownLoading.value = true
+  try {
+    const response = await api.post<{ successResult: KpiBreakdown }>('/report/api/kpi/statistics/breakdown', {
+      ...range.value,
+      teamId: teamId.value === 'all' ? null : teamId.value,
+    })
+    if (version === breakdownRequestVersion) breakdown.value = response.data.successResult
+  } catch {
+    if (version === breakdownRequestVersion) toast.error('Could not load KPI totals breakdown.')
+  } finally {
+    if (version === breakdownRequestVersion) breakdownLoading.value = false
+  }
+}
+
 function onRange(value: Range) {
   range.value = value
   void load()
@@ -303,6 +388,11 @@ function openEmployee(row: Record<string, unknown>) {
 watch(mode, () => {
   data.value = {}
   status.value = {}
+  breakdownOpen.value = false
+  breakdown.value = null
+  breakdownRequestVersion++
+  sortKey.value = ''
+  sortDirection.value = 'asc'
   void load()
 })
 watch(teamId, load)
@@ -371,7 +461,8 @@ onMounted(async () => {
           :class="metric.label.startsWith('Total ') ? 'bg-slate-900 text-white dark:bg-foreground dark:text-background' : ''"
         >
           <div class="text-xs" :class="metric.label.startsWith('Total ') ? 'opacity-75' : 'text-muted-foreground'">{{ metric.label }}</div>
-          <strong class="text-xl font-semibold">{{ display(metric.value ?? 0) }}</strong>
+          <strong class="text-xl font-semibold">{{ moneyMetrics.has(metric.label) ? reportMoney(metric.value ?? 0) : display(metric.value ?? 0) }}</strong>
+          <button v-if="mode === 'kpi' && metric.label === 'Total Salary'" type="button" class="mt-1 w-fit text-left text-xs font-medium underline underline-offset-2 opacity-80 hover:opacity-100" @click="openBreakdown">Details</button>
         </div>
       </div>
       <template v-if="mode === 'statistics'">
@@ -512,8 +603,10 @@ onMounted(async () => {
             <thead class="sticky top-0 z-10 bg-muted text-muted-foreground">
               <tr>
                 <th class="px-4 py-3 font-medium">No</th>
-                <th v-for="column in columns" :key="column.key" class="px-4 py-3 font-medium">
-                  {{ column.label }}
+                <th v-for="column in columns" :key="column.key" class="px-4 py-3 font-medium" :aria-sort="sortKey === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+                  <button type="button" class="inline-flex items-center gap-1.5 whitespace-nowrap text-left hover:text-foreground" @click="sortBy(column.key)">
+                    {{ column.label }}<span class="text-xs" :class="sortKey === column.key ? 'text-foreground' : 'text-muted-foreground/60'">{{ sortKey === column.key ? (sortDirection === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                  </button>
                 </th>
                 <th v-if="mode === 'kpi'" class="px-4 py-3 text-right font-medium">Action</th>
               </tr>
@@ -529,7 +622,7 @@ onMounted(async () => {
                 <td class="px-4 py-3 text-muted-foreground">{{ index + 1 }}</td>
                 <td v-for="column in columns" :key="column.key" class="whitespace-nowrap px-4 py-3" :class="column.key.includes('Penalty') || column.key === 'chargeTotal' ? 'text-red-600' : column.key === 'bonusTotal' || column.key === 'checkerGainedPoints' ? 'text-emerald-600' : ''">
                   {{
-                    display(cellValue(row, column.key))
+                    moneyColumns.has(column.key) ? reportMoney(cellValue(row, column.key)) : display(cellValue(row, column.key))
                   }}
                 </td>
                 <td v-if="mode === 'kpi'" class="px-4 py-3 text-right">
@@ -552,6 +645,34 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <Dialog v-if="mode === 'kpi'" v-model:open="breakdownOpen">
+      <DialogContent class="max-h-[85vh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader><DialogTitle>Totals breakdown</DialogTitle></DialogHeader>
+        <div v-if="breakdownLoading" class="py-12 text-center text-sm text-muted-foreground">Loading totals…</div>
+        <div v-else-if="breakdown" class="space-y-5">
+          <p class="text-xs text-muted-foreground">{{ breakdown.startTime.slice(0, 10) }} – {{ breakdown.endTime.slice(0, 10) }} · Point value {{ reportMoney(breakdown.eachPointValue) }}</p>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <div v-for="item in breakdownItems" :key="item.label" class="flex min-h-16 flex-col justify-center gap-1 rounded-lg border border-border bg-card px-3 py-2" :class="item.label === 'Total KPI' ? 'bg-slate-900 text-white dark:bg-foreground dark:text-background' : ''">
+              <span class="text-xs" :class="item.label === 'Total KPI' ? 'opacity-75' : 'text-muted-foreground'">{{ item.label }}</span>
+              <strong class="text-sm font-semibold">{{ item.money ? reportMoney(item.value) : display(item.value) }}</strong>
+            </div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-border">
+            <div class="border-b border-border px-3 py-2 text-sm font-semibold">By note</div>
+            <div class="max-h-72 overflow-auto">
+              <table class="w-full min-w-[520px] text-left text-sm">
+                <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th class="px-3 py-2 font-medium">Note</th><th class="px-3 py-2 font-medium">Tasks</th><th class="px-3 py-2 font-medium">Points</th><th class="px-3 py-2 font-medium">Point earnings</th></tr></thead>
+                <tbody>
+                  <tr v-for="note in breakdown.notes" :key="note.noteTitle" class="border-t border-border"><td class="px-3 py-2">{{ note.noteTitle }}</td><td class="px-3 py-2">{{ display(note.taskCount) }}</td><td class="px-3 py-2">{{ display(note.points) }}</td><td class="px-3 py-2">{{ reportMoney(note.pointsValue) }}</td></tr>
+                  <tr v-if="!breakdown.notes.length"><td colspan="4" class="px-3 py-8 text-center text-muted-foreground">No configured note activity.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <p v-else class="py-8 text-center text-sm text-muted-foreground">Totals are unavailable for this period.</p>
+      </DialogContent>
+    </Dialog>
     <Dialog v-if="mode === 'attendance'" v-model:open="detailOpen"
       ><DialogContent class="max-h-[85vh] max-w-5xl overflow-auto"
         ><DialogHeader
@@ -573,7 +694,7 @@ onMounted(async () => {
               class="rounded-lg border border-border p-3"
             >
               <div class="text-xs text-muted-foreground">{{ metric.label }}</div>
-              <strong>{{ display(metric.value ?? 0) }}</strong>
+              <strong>{{ metric.label === 'Total penalty' ? reportMoney(metric.value ?? 0) : display(metric.value ?? 0) }}</strong>
             </div>
           </div>
           <div class="overflow-auto rounded-lg border border-border">
@@ -612,8 +733,8 @@ onMounted(async () => {
                   <td class="px-3 py-2">{{ display(day.workedMinutes) }}</td>
                   <td class="px-3 py-2">{{ display(day.lateMinutes) }}</td>
                   <td class="px-3 py-2">{{ display(day.undertimeMinutes) }}</td>
-                  <td class="px-3 py-2">{{ display(day.latenessPenalty) }}</td>
-                  <td class="px-3 py-2">{{ display(day.undertimePenalty) }}</td>
+                  <td class="px-3 py-2">{{ reportMoney(day.latenessPenalty) }}</td>
+                  <td class="px-3 py-2">{{ reportMoney(day.undertimePenalty) }}</td>
                 </tr>
                 <tr v-if="!asRows(detail.days).length">
                   <td colspan="9" class="px-3 py-8 text-center text-muted-foreground">

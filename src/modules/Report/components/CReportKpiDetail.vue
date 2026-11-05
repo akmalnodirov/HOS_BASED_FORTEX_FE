@@ -4,12 +4,14 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
 import CReportKpiEntryTable from '@/modules/Report/components/CReportKpiEntryTable.vue'
 import CReportTaskHistoryModal from '@/modules/Report/components/CReportTaskHistoryModal.vue'
+import { reportMoney } from '@/modules/Report/utils/money'
 
 const props = defineProps<{ detail: Record<string, unknown> }>()
 const auth = useAuthStore()
 const canViewTaskHistory = computed(() => hasPermission(auth.token, 'report.tasks.view'))
 const historyOpen = ref(false)
 const historyTaskId = ref('')
+const moneyMetrics = new Set(['Daily salary', 'Fixed salary', 'KPI value', 'Bonuses', 'Charges', 'Lateness penalty', 'Undertime penalty', 'Total KPI'])
 const metrics = computed(() => [
   { label: 'Daily salary', value: props.detail.dailySalary },
   { label: 'Attended days', value: props.detail.attendedDays },
@@ -54,7 +56,7 @@ function openHistory(taskId: string) {
     <div class="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
       <div v-for="metric in metrics" :key="metric.label" class="flex flex-col gap-1 rounded-lg border border-border p-3" :class="metric.label === 'Total KPI' ? 'bg-slate-900 text-white' : 'bg-card'">
         <span class="text-xs" :class="metric.label === 'Total KPI' ? 'opacity-75' : 'text-muted-foreground'">{{ metric.label }}</span>
-        <strong class="text-base">{{ number(metric.value) }}</strong>
+        <strong class="text-base">{{ moneyMetrics.has(metric.label) ? reportMoney(metric.value) : number(metric.value) }}</strong>
       </div>
     </div>
     <section class="rounded-xl border border-border bg-card p-4">
@@ -75,8 +77,8 @@ function openHistory(taskId: string) {
               <td class="px-3 py-2">{{ number(day.workedMinutes) }}</td>
               <td class="px-3 py-2">{{ number(day.lateMinutes) }}</td>
               <td class="px-3 py-2">{{ number(day.undertimeMinutes) }}</td>
-              <td class="px-3 py-2 text-red-600">{{ number(day.latenessPenalty) }}</td>
-              <td class="px-3 py-2 text-red-600">{{ number(day.undertimePenalty) }}</td>
+              <td class="px-3 py-2 text-red-600">{{ reportMoney(day.latenessPenalty) }}</td>
+              <td class="px-3 py-2 text-red-600">{{ reportMoney(day.undertimePenalty) }}</td>
             </tr>
             <tr v-if="!rows(detail.attendanceDays).length"><td colspan="9" class="px-3 py-6 text-center text-muted-foreground">No attendance records.</td></tr>
           </tbody>
@@ -94,7 +96,7 @@ function openHistory(taskId: string) {
               <td class="px-3 py-2">{{ date(item.effectiveDate) }}</td>
               <td class="px-3 py-2">{{ item.type === 0 ? 'Bonus' : 'Charge' }}</td>
               <td class="px-3 py-2">{{ item.reason || '—' }}</td>
-              <td class="px-3 py-2" :class="item.type === 0 ? 'text-emerald-600' : 'text-red-600'">{{ number(item.amount) }}</td>
+              <td class="px-3 py-2" :class="item.type === 0 ? 'text-emerald-600' : 'text-red-600'">{{ reportMoney(item.amount) }}</td>
             </tr>
             <tr v-if="!rows(detail.adjustments).length"><td colspan="4" class="px-3 py-6 text-center text-muted-foreground">No adjustments.</td></tr>
           </tbody>

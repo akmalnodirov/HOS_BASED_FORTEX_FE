@@ -67,6 +67,12 @@ const useGlobalReportSocket = createGlobalState(() => {
       return
     }
     if (event.type !== 1) return
+    if (event.target === 'ReportTeamsChanged') {
+      reconnect()
+      if (window.location.pathname.startsWith('/report/'))
+        setTimeout(() => window.location.reload(), 500)
+      return
+    }
     if (event.target === 'NewTaskQueued' || event.target === 'TaskUpdated' || event.target === 'TaskDeleted') {
       if (!hasPermission(token.value, 'report.tasks.view')) return
       taskVersion.value += 1

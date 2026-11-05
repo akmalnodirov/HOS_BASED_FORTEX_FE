@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import CReportDateField from '@/modules/Report/components/CReportDateField.vue'
 import CReportAdminHeader from '@/modules/Report/components/CReportAdminHeader.vue'
+import { reportMoney } from '@/modules/Report/utils/money'
 
 interface Salary {
   userId: string
@@ -32,6 +33,7 @@ interface Salary {
   lastName: string | null
   fixedSalary: number
   roleName: string | null
+  levelName: string | null
   teamName: string | null
   effectiveDate: string
 }
@@ -207,12 +209,13 @@ onMounted(load)
       class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <div class="min-h-0 flex-1 overflow-auto">
-        <table class="w-full min-w-[720px] text-left text-sm">
+        <table class="w-full text-left text-sm" :class="bonuses ? 'min-w-[720px]' : 'min-w-[840px]'">
           <thead class="sticky top-0 z-20 bg-[#f0f0f0] text-muted-foreground dark:bg-muted/50">
             <tr class="h-11">
               <th class="px-4 font-medium">No</th>
               <th class="px-4 font-medium">Employee</th>
               <th class="px-4 font-medium">{{ bonuses ? 'Type' : 'Role' }}</th>
+              <th v-if="!bonuses" class="px-4 font-medium">Level</th>
               <th class="px-4 font-medium">{{ bonuses ? 'Amount' : 'Salary' }}</th>
               <th class="px-4 font-medium">{{ bonuses ? 'Reason' : 'Team' }}</th>
               <th class="px-4 font-medium">Effective date</th>
@@ -234,7 +237,8 @@ onMounted(load)
               <td class="px-4">
                 {{ 'id' in item ? (item.type === 0 ? 'Bonus' : 'Charge') : item.roleName || '—' }}
               </td>
-              <td class="px-4">{{ 'id' in item ? item.amount : item.fixedSalary }}</td>
+              <td v-if="!bonuses" class="px-4">{{ 'levelName' in item ? item.levelName || '—' : '—' }}</td>
+              <td class="px-4">{{ reportMoney('id' in item ? item.amount : item.fixedSalary) }}</td>
               <td class="px-4">{{ 'id' in item ? item.reason || '—' : item.teamName || '—' }}</td>
               <td class="px-4">{{ item.effectiveDate?.slice(0, 10) }}</td>
               <td v-if="canEdit || canDelete || !bonuses" class="px-4">
@@ -267,7 +271,7 @@ onMounted(load)
             </tr>
             <tr v-if="!filtered.length">
               <td
-                :colspan="canEdit || canDelete || !bonuses ? 7 : 6"
+                :colspan="(canEdit || canDelete || !bonuses ? 7 : 6) + (bonuses ? 0 : 1)"
                 class="px-4 py-12 text-center text-muted-foreground"
               >
                 {{ loading ? 'Loading…' : 'No entries found.' }}
@@ -310,7 +314,7 @@ onMounted(load)
               ></Select
             ></label
           ><label class="grid gap-1.5 text-sm"
-            >Amount<Input v-model="amount" type="number" min="0" step="0.01" required /></label
+            >Amount ($)<Input v-model="amount" type="number" min="0" step="0.01" required /></label
           ><label v-if="bonuses" class="grid gap-1.5 text-sm"
             >Reason<Input v-model="reason" /></label
           ><label class="grid gap-1.5 text-sm"
@@ -363,7 +367,7 @@ onMounted(load)
                 class="border-t border-border"
               >
                 <td class="px-3 py-2">{{ entry.effectiveDate.slice(0, 10) }}</td>
-                <td class="px-3 py-2">{{ entry.amount }}</td>
+                <td class="px-3 py-2">{{ reportMoney(entry.amount) }}</td>
                 <td class="px-3 py-2">{{ entry.changedDate.slice(0, 10) }}</td>
               </tr>
             </tbody>

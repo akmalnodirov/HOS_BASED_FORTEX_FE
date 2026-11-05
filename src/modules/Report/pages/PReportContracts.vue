@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import CReportDateField from '@/modules/Report/components/CReportDateField.vue'
+import { reportMoney } from '@/modules/Report/utils/money'
 import CReportAdminHeader from '@/modules/Report/components/CReportAdminHeader.vue'
 
 interface Contract {
@@ -186,7 +187,7 @@ onMounted(load)
               <td class="px-4 text-muted-foreground">{{ index + 1 }}</td>
               <td class="px-4 font-medium">{{ item.name }}</td>
               <td class="px-4">{{ item.trucksCount }}</td>
-              <td class="px-4">{{ item.price }}</td>
+              <td class="px-4">{{ reportMoney(item.price) }}</td>
               <td class="px-4">{{ item.periodMonths }} months</td>
               <td class="px-4">{{ item.signedDate?.slice(0, 10) || '—' }}</td>
               <td class="px-4">{{ item.withDashCam ? 'Yes' : 'No' }}</td>
@@ -246,7 +247,7 @@ onMounted(load)
             <label class="grid gap-1 text-sm"
               >Trucks<Input v-model.number="trucksCount" type="number" min="0" /></label
             ><label class="grid gap-1 text-sm"
-              >Price<Input v-model.number="price" type="number" min="0" step="0.01" /></label
+              >Price ($)<Input v-model.number="price" type="number" min="0" step="0.01" /></label
             ><label class="grid gap-1 text-sm"
               >Period (months)<Input v-model.number="periodMonths" type="number" min="0" /></label
             ><label class="grid gap-1 text-sm"

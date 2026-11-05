@@ -39,7 +39,7 @@
             class="w-full text-sm"
             :style="{ minWidth: `${Math.max(760, 312 + columns.length * 104)}px` }"
           >
-            <thead class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
+            <thead ref="tableHeader" class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
               <tr class="h-10 border-b border-border text-left">
                 <th
                   :rowspan="shiftBased ? 2 : 1"
@@ -86,11 +86,11 @@
                 >
                   <td
                     class="sticky left-0 z-[25] w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
-                    :class="virtualized ? '' : shiftBased ? 'top-20' : 'top-10'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                   <td
                     class="sticky left-14 z-[25] w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
-                    :class="virtualized ? '' : shiftBased ? 'top-20' : 'top-10'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   >
                     <span
                       class="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide mr-2"
@@ -102,7 +102,8 @@
                   <td
                     :colspan="columns.length"
                     class="z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
-                    :class="virtualized ? '' : shiftBased ? 'sticky top-20' : 'sticky top-10'"
+                    :class="virtualized ? '' : 'sticky'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                 </tr>
                 <tr v-else class="group h-14 border-b border-border/60 hover:bg-muted/30">
@@ -189,7 +190,7 @@
             </tbody>
           </table>
           </div>
-          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700" :class="shiftBased ? 'top-20' : 'top-10'">
+          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700" :style="{ top: `${headerHeight}px` }">
             <span class="w-14 min-w-14 max-w-14"></span>
             <span class="flex h-full w-64 min-w-64 max-w-64 items-center border-r border-slate-700 px-4 font-semibold">
               <span class="mr-2 rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide">Company</span>
@@ -323,6 +324,8 @@ const { activityVersion } = useReportSocket()
 const editingCell = ref<string | null>(null)
 const savingCell = ref<string | null>(null)
 const tableScroll = ref<HTMLElement | null>(null)
+const tableHeader = ref<HTMLTableSectionElement | null>(null)
+const headerHeight = ref(0)
 const currentReportDay = ref(reportToday())
 const result = shallowRef<ReportDriverActivityTable>()
 const companies = shallowRef<ReportOperationCompany[]>([])
@@ -344,7 +347,9 @@ const range = ref<DateRange>({
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let dayTimer: ReturnType<typeof setInterval> | undefined
+let headerResizeObserver: ResizeObserver | undefined
 let requestVersion = 0
+let scrollToEndOnNextResult = false
 const columns = computed<ReportDriverActivityTable['columns']>(() => {
   if (result.value?.columns?.length) return result.value.columns
     .filter(column => shiftBased.value || column.colNumber === 0)
@@ -458,6 +463,16 @@ function queueRefresh() {
 
 function onRange(value: DateRange) {
   range.value = value
+  requestVersion += 1
+  result.value = undefined
+  loading.value = true
+  initialLoad.value = true
+  loadError.value = ''
+  page.value = 1
+  virtualStart.value = 0
+  currentScrollIndex.value = 0
+  scrollToEndOnNextResult = true
+  if (tableScroll.value) tableScroll.value.scrollTop = 0
   queueRefresh()
 }
 
@@ -554,18 +569,32 @@ async function refresh(nextPage = page.value) {
 
 watch([companyId, driverId], queueRefresh)
 watch(pageSizeSelection, () => { page.value = 1; queueRefresh() })
-watch(result, async () => { await nextTick(); onTableScroll() })
+watch(result, async (value) => {
+  await nextTick()
+  onTableScroll()
+  if (value && scrollToEndOnNextResult && tableScroll.value) {
+    tableScroll.value.scrollLeft = tableScroll.value.scrollWidth - tableScroll.value.clientWidth
+    scrollToEndOnNextResult = false
+  }
+})
 
 watch(activityVersion, queueRefresh)
 
 onMounted(async () => {
-  ready.value = true
+  if (tableHeader.value) {
+    headerResizeObserver = new ResizeObserver(() => {
+      headerHeight.value = tableHeader.value?.getBoundingClientRect().height ?? 0
+    })
+    headerResizeObserver.observe(tableHeader.value)
+    headerHeight.value = tableHeader.value.getBoundingClientRect().height
+  }
   try {
     const response = await api.get<{ successResult: { activityShiftBased: boolean } }>('/report/api/features')
     shiftBased.value = response.data.successResult.activityShiftBased ?? true
   } catch {
     shiftBased.value = true
   }
+  ready.value = true
   dayTimer = setInterval(() => { currentReportDay.value = reportToday() }, 60_000)
   const initialRefresh = refresh(1)
   void operations.getLookups().then((lookups) => {
@@ -580,6 +609,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  headerResizeObserver?.disconnect()
   if (refreshTimer) clearTimeout(refreshTimer)
   if (dayTimer) clearInterval(dayTimer)
   requestVersion += 1

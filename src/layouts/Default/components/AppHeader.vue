@@ -220,20 +220,19 @@
                 @click="handleProfileClick"
               >
                 <User class="w-[18px] h-[18px] text-[#090909] dark:text-gray-200" />
-                <span class="text-sm font-semibold text-[#090909] dark:text-gray-100">
-                  {{
-                    authStore.user
-                      ? `${authStore.user.firstName} ${authStore.user.lastName}`
-                      : 'User'
-                  }}
-                  ({{ authStore.user?.roles?.[0]?.name || 'Admin' }})
+                <span class="flex min-w-0 flex-col text-[#090909] dark:text-gray-100">
+                  <span class="text-sm font-semibold">
+                    {{ authStore.user ? `${authStore.user.firstName} ${authStore.user.lastName}` : 'User' }}
+                    ({{ authStore.user?.roles?.[0]?.name || 'Admin' }})
+                  </span>
+                  <span v-if="teamInfoLoaded" class="text-xs text-muted-foreground">Team: {{ teamName || 'Unassigned' }}</span>
                 </span>
               </div>
               <Button
                 v-if="canViewOwnKpi"
                 variant="ghost"
                 size="icon"
-                class="h-11 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-15 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="My KPI"
                 aria-label="My KPI"
                 @click.stop="openMyKpi"
@@ -243,7 +242,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-11 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
+                class="h-15 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
                 @click.stop="handleLogout"
               >
                 <LogOut class="w-5 h-5 text-[#C53030] transition-transform group-hover:scale-110" />
@@ -291,6 +290,7 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { useApi } from '@/composables/useAxiosService'
 import { hasPermission } from '@/router/permissions'
 import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
@@ -331,6 +331,9 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+const api = useApi()
+const teamName = ref<string | null>(null)
+const teamInfoLoaded = ref(false)
 const canViewOwnKpi = computed(() => hasPermission(authStore.token, 'report.my_kpi.view'))
 function openMyKpi() {
   isDropdownOpen.value = false
@@ -368,8 +371,21 @@ const handleCompanySelection = async (company: RouteEldCompany) => {
 }
 
 watch(isDropdownOpen, (open) => {
-  if (open) loadCompanies()
+  if (open) {
+    loadCompanies()
+    void loadTeamInfo()
+  }
 })
+
+async function loadTeamInfo() {
+  try {
+    const response = await api.get<{ successResult: { teamName: string | null } }>('/report/api/team-info')
+    teamName.value = response.data.successResult.teamName
+    teamInfoLoaded.value = true
+  } catch {
+    teamInfoLoaded.value = false
+  }
+}
 
 const pageTitle = computed(() => {
   const path = route.path

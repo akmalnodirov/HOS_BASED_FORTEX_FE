@@ -337,7 +337,7 @@ onMounted(load)
         <h2 class="text-sm font-semibold">KPI calculation</h2>
         <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label class="grid gap-1.5 text-sm"
-            >Value per point<Input
+            >Value per point ($)<Input
               v-model.number="kpi.eachPointValue"
               type="number"
               min="0"
