@@ -84,14 +84,12 @@ const props = withDefaults(defineProps<{
   targetDurationMs: number
   affectedCount: number
   selectionError?: string
-  externalError?: string
   timeZone?: string | null
   loading?: boolean
-}>(), { selectionError: '', externalError: '', timeZone: 'CT', loading: false })
+}>(), { selectionError: '', timeZone: 'CT', loading: false })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'reset-error': []
   switch: []
   submit: [seconds: number]
 }>()
@@ -113,10 +111,7 @@ const error = computed(() => {
   if (totalSeconds.value * 1000 > availableMs.value) return 'Transfer time exceeds the available source duration.'
   return ''
 })
-const displayError = computed(() => error.value || props.externalError)
-watch([hours, minutes, seconds], () => {
-  if (props.externalError) emit('reset-error')
-})
+const displayError = computed(() => error.value)
 const EventCard = defineComponent({
   props: {
     event: { type: Object as PropType<RouteEldHosEvent>, required: true },
