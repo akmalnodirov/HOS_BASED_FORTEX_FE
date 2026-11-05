@@ -118,9 +118,15 @@ const employees = ref<Employee[]>([])
 const employeeOptions = computed(() =>
   employees.value.map((item) => ({
     id: item.id,
-    name: `${item.firstName ?? ''} ${item.lastName ?? ''}`.trim() || item.userName,
+    name: `${item.firstName ?? ''} ${item.lastName ?? ''} (${item.userName})`.trim() || item.userName,
   }))
 )
+function mappingOptions(index: number) {
+  const selectedIds = new Set(
+    mapping.value.filter((_, rowIndex) => rowIndex !== index).map((item) => item.reportId)
+  )
+  return employeeOptions.value.filter((employee) => !selectedIds.has(employee.id))
+}
 const ignored = ref<IgnoredEmployee[]>([])
 const ignoredUserId = ref('')
 const ignoredShift = ref('0')
@@ -484,7 +490,7 @@ onMounted(load)
               :disabled="true"
             /><CReportSearchSelect
               :model-value="item.reportId ?? ''"
-              :options="employeeOptions"
+              :options="mappingOptions(index)"
               placeholder="Select Vectorium employee"
               empty-label="Unassigned"
               empty-value=""
