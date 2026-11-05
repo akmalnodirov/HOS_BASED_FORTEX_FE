@@ -317,14 +317,9 @@
       :target-duration-ms="rangeBoostTargetDurationMs"
       :affected-count="rangeBoostAffectedCount"
       :selection-error="rangeBoostSelectionError"
-      :external-error="rangeBoostFailureReason"
       :time-zone="workspaceTimeZone"
       :loading="store.isMutating"
-      @reset-error="rangeBoostFailureReason = ''"
-      @switch="
-        rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0;
-        rangeBoostFailureReason = ''
-      "
+      @switch="rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0"
       @submit="confirmRangeBoost"
     />
     <CBoostReassignModal
@@ -993,7 +988,6 @@ const selectedSourceEvents = computed(() =>
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
 const rangeBoostModalOpen = ref(false)
-const rangeBoostFailureReason = ref('')
 const rangeBoostSelectedEvents = computed(() =>
   rangeBoostSelectedIds.value
     .map((id) => graphEvents.value.find((event) => event.id === id))
@@ -1514,19 +1508,16 @@ const onGraphBoostSelect = (eventId: string) => {
     return
   }
   if (rangeBoostSelectedIds.value.includes(eventId)) {
-    rangeBoostFailureReason.value = ''
     rangeBoostSelectedIds.value = rangeBoostSelectedIds.value.filter((id) => id !== eventId)
     return
   }
   const next = [...rangeBoostSelectedIds.value, eventId]
   if (next.length > 2) next.shift()
-  rangeBoostFailureReason.value = ''
   rangeBoostSelectedIds.value = next
 }
 const clearRangeBoost = () => {
   rangeBoostSelectedIds.value = []
   rangeBoostSourceIndex.value = 0
-  rangeBoostFailureReason.value = ''
 }
 watch([() => session.value?.id, () => store.activeTabId], clearRangeBoost)
 const openRangeBoostModal = () => {
@@ -1540,7 +1531,6 @@ const openRangeBoostModal = () => {
   rangeBoostSourceIndex.value = rangeBoostChronologicalEvents.value.findIndex(
     (event) => event.id === firstClickedId
   )
-  rangeBoostFailureReason.value = ''
   rangeBoostModalOpen.value = true
 }
 const confirmRangeBoost = async (seconds: number) => {
@@ -1553,18 +1543,13 @@ const confirmRangeBoost = async (seconds: number) => {
     return
   }
   try {
-    rangeBoostFailureReason.value = ''
     const deltaSeconds = source.id === left.id ? -seconds : seconds
     await store.boostEvents([left.id, right.id], deltaSeconds)
     rangeBoostModalOpen.value = false
     clearRangeBoost()
     toast.success('Time boost saved to the active Boost tab')
   } catch (error: any) {
-    rangeBoostFailureReason.value = getApiErrorMessage(
-      error,
-      'The time transfer could not be applied'
-    )
-    toast.error(rangeBoostFailureReason.value)
+    toast.error(getApiErrorMessage(error, 'The time transfer could not be applied'))
   }
 }
 const formatGraphEventTime = (timestamp: number) =>
