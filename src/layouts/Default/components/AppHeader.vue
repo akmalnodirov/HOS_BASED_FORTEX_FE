@@ -230,6 +230,17 @@
                 </span>
               </div>
               <Button
+                v-if="canViewOwnKpi"
+                variant="ghost"
+                size="icon"
+                class="h-11 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                title="My KPI"
+                aria-label="My KPI"
+                @click.stop="openMyKpi"
+              >
+                <BadgeDollarSign class="h-5 w-5" />
+              </Button>
+              <Button
                 variant="ghost"
                 size="icon"
                 class="h-11 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
@@ -265,6 +276,7 @@ import {
   ShieldAlert,
   Eye,
   Check,
+  BadgeDollarSign,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -279,6 +291,7 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
@@ -318,6 +331,11 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+const canViewOwnKpi = computed(() => hasPermission(authStore.token, 'report.my_kpi.view'))
+function openMyKpi() {
+  isDropdownOpen.value = false
+  void router.push('/report/my-kpi')
+}
 watch(() => authStore.loggedIn, (loggedIn) => { if (loggedIn) void refreshNotifications() }, { immediate: true })
 
 const {

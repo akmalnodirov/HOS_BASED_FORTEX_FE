@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Check, ChevronsUpDown, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useApi } from '@/composables/useAxiosService'
 
 const defaultNotes = ['ADD HOUR', 'BOL', 'BREAK', 'CYCLE', 'FIXED LOG', 'FIXED VIOLATION', 'PTI', 'SHIFT']
+let noteRequest: Promise<string[]> | null = null
+let lastInvalidated = 0
 const props = withDefaults(defineProps<{
   modelValue?: string
   placeholder?: string
@@ -21,9 +24,10 @@ const search = ref('')
 const selected = ref<string[]>([])
 const editableText = ref('')
 const initialValue = ref('')
+const catalogNotes = ref<string[]>(defaultNotes)
 const parse = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean)
 const joined = computed(() => selected.value.join(', '))
-const choices = computed(() => [...defaultNotes, ...selected.value.filter(item => !defaultNotes.some(note => note.toLowerCase() === item.toLowerCase()))])
+const choices = computed(() => [...catalogNotes.value, ...selected.value.filter(item => !catalogNotes.value.some(note => note.toLowerCase() === item.toLowerCase()))])
 const filtered = computed(() => choices.value.filter(note => note.toLowerCase().includes(search.value.trim().toLowerCase())))
 
 function setSelected(notes: string[]) {
@@ -76,6 +80,29 @@ watch(open, value => {
     if (value !== initialValue.value) emit('commit', value)
   }
 })
+
+const api = useApi()
+async function loadNotes() {
+  noteRequest ??= api.get<{ successResult: { title: string | null }[] }>('/report/api/note')
+    .then(response => (response.data.successResult ?? []).map(item => item.title?.trim()).filter((item): item is string => !!item))
+    .catch(() => defaultNotes)
+  catalogNotes.value = await noteRequest
+  if (!catalogNotes.value.length) catalogNotes.value = defaultNotes
+}
+
+function refreshNotes() {
+  if (Date.now() - lastInvalidated > 1000) {
+    noteRequest = null
+    lastInvalidated = Date.now()
+  }
+  void loadNotes()
+}
+
+onMounted(() => {
+  void loadNotes()
+  window.addEventListener('report-notes-updated', refreshNotes)
+})
+onUnmounted(() => window.removeEventListener('report-notes-updated', refreshNotes))
 </script>
 
 <template>
