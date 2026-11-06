@@ -339,6 +339,7 @@ function selectDraftCompany(value: string) {
   if (!driversForCompany(value).some((driver) => driver.id === draftDriverId.value)) draftDriverId.value = ''
 }
 const users = ref<ReportOperationUser[]>([])
+const companyUsers = ref<ReportOperationUser[] | null>(null)
 const loading = ref(false)
 const initialLoad = ref(true)
 const ready = ref(false)
@@ -356,8 +357,8 @@ const range = ref<DateRange>({
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let requestVersion = 0
 
-const assistants = computed(() => users.value)
-const logBookers = computed(() => users.value)
+const assistants = computed(() => companyUsers.value ?? users.value)
+const logBookers = computed(() => companyUsers.value ?? users.value)
 const assistantStatuses = routeTaskStatuses.slice(3)
 const uniqueTasks = computed(() => {
   const tasks = new Map<string, ReportTaskState['routeTask']>()
@@ -422,6 +423,24 @@ async function refresh() {
 
 watch(companyId, () => {
   if (!filteredDrivers.value.some((driver) => driver.id === driverId.value)) driverId.value = 'all'
+})
+
+let companyUsersRequest = 0
+watch(companyId, async (value) => {
+  const request = ++companyUsersRequest
+  assistantId.value = 'all'
+  logBookerId.value = 'all'
+  if (value === 'all') {
+    companyUsers.value = null
+    return
+  }
+  companyUsers.value = []
+  try {
+    const employees = await operations.getUsersForCompany(value)
+    if (request === companyUsersRequest) companyUsers.value = employees
+  } catch {
+    if (request === companyUsersRequest) toast.error('Could not load company employees')
+  }
 })
 
 watch([driverId, companyId, assistantId, logBookerId, status], queueRefresh)
