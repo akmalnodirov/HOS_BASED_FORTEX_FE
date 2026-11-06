@@ -2,6 +2,7 @@
   <div class="flex h-[calc(100vh-65px)] min-h-0 w-full overflow-hidden bg-white dark:bg-background">
     <aside class="flex w-[420px] shrink-0 flex-col border-r border-border bg-white dark:bg-card">
       <div
+        ref="driverInfoCard"
         class="shrink-0 px-4 py-3 text-white"
         :style="{ backgroundColor: statusColor(tracking?.driver.currentStatus || '') }"
       >
@@ -16,6 +17,7 @@
           </div>
           <div class="flex gap-2">
             <Button
+              v-if="canUseHosCalculator"
               variant="ghost"
               size="icon"
               class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
@@ -26,6 +28,7 @@
               <Clock class="h-4 w-4" />
             </Button>
             <Button
+              v-if="canCreateLiveShare"
               variant="ghost"
               size="icon"
               class="h-8 w-8 bg-white/20 text-white hover:bg-white/30 hover:text-white"
@@ -149,20 +152,28 @@
                   <span class="mr-1 font-medium text-muted-foreground">
                     {{ historyEntries.length - index }}.
                   </span>
-                  <template v-if="historyAddress(entry.point)">
+                  <span>{{ pointCoordinates(entry.point) }}</span>
+                  <button
+                    type="button"
+                    class="ml-1 inline-flex align-middle text-muted-foreground transition-colors hover:text-foreground"
+                    title="Copy coordinates"
+                    aria-label="Copy coordinates"
+                    @click="copyCoordinates(entry.point)"
+                  >
+                    <Copy class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    v-if="!historyAddress(entry.point)"
+                    type="button"
+                    class="ml-1.5 whitespace-nowrap text-xs font-medium text-primary hover:underline disabled:cursor-wait disabled:opacity-60"
+                    :disabled="isHistoryAddressLoading(entry.point)"
+                    @click="showHistoryAddress(entry.point)"
+                  >
+                    {{ isHistoryAddressLoading(entry.point) ? 'Loading…' : 'Show Address' }}
+                  </button>
+                  <span v-else class="ml-1.5 text-xs text-muted-foreground">
                     {{ historyAddress(entry.point) }}
-                  </template>
-                  <template v-else>
-                    <span>{{ pointCoordinates(entry.point) }}</span>
-                    <button
-                      type="button"
-                      class="ml-1.5 whitespace-nowrap text-xs font-medium text-primary hover:underline disabled:cursor-wait disabled:opacity-60"
-                      :disabled="isHistoryAddressLoading(entry.point)"
-                      @click="showHistoryAddress(entry.point)"
-                    >
-                      {{ isHistoryAddressLoading(entry.point) ? 'Loading…' : 'Show Address' }}
-                    </button>
-                  </template>
+                  </span>
                 </div>
                 <div
                   class="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground"
@@ -183,22 +194,34 @@
       </div>
     </aside>
 
-    <main class="relative min-w-0 flex-1">
-      <RouteEldTrackingMap
-        :key="`${id}:${selectedDate}`"
-        :points="tracking?.points || []"
-        :is-live="isToday"
-        :current-status="tracking?.driver.currentStatus"
+    <main class="flex min-w-0 flex-1 flex-col">
+      <RouteEldSpeedChart
+        v-if="canViewSpeedChart"
+        class="shrink-0 border-b border-border"
+        :style="{ height: speedChartHeight }"
+        :points="tracking?.speedChart || []"
+        :from-timestamp="tracking?.fromTimestamp ?? selectedDayStart"
+        :to-timestamp="tracking?.toTimestamp ?? selectedDayEnd"
       />
-      <div
-        v-if="isLoading"
-        class="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px]"
-      >
-        <LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+      <div class="relative min-h-0 flex-1">
+        <RouteEldTrackingMap
+          :key="`${id}:${selectedDate}`"
+          :points="tracking?.points || []"
+          :is-live="isToday"
+          :current-status="tracking?.driver.currentStatus"
+          :vehicle-name="tracking?.driver.vehicleName"
+        />
+        <div
+          v-if="isLoading"
+          class="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px]"
+        >
+          <LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     </main>
 
     <LiveShareModal
+      v-if="canCreateLiveShare"
       v-model:open="liveModal"
       :emails="liveState.emails"
       :telegrams="liveState.telegrams"
@@ -215,6 +238,7 @@
       @submit="submitLiveShare"
     />
     <HosCalculatorModal
+      v-if="canUseHosCalculator"
       v-model:open="calculatorOpen"
       :driver-id="driverId"
       :driver-name="tracking?.driver.driverName || 'Driver'"
@@ -226,11 +250,12 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { CalendarDate } from '@internationalized/date'
 import type { DateValue } from 'reka-ui'
-import { CalendarDays, Clock, LoaderCircle, Share2, X } from 'lucide-vue-next'
+import { CalendarDays, Clock, Copy, LoaderCircle, Share2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
@@ -238,8 +263,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Skeleton } from '@/components/ui/skeleton'
 import LiveShareModal from '../components/LiveShareModal.vue'
 import HosCalculatorModal from '../components/HosCalculatorModal.vue'
+import RouteEldSpeedChart from '../components/RouteEldSpeedChart.vue'
 import RouteEldTrackingMap from '../components/RouteEldTrackingMap.vue'
 import type { RouteEldLiveTrackingPoint } from '../types'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import {
   createRouteEldLiveShare,
   localDateKey,
@@ -249,12 +277,33 @@ import { useGeoLocationsStore } from '../store/geoLocations'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
+const authStore = useAuthStore()
 const geoLocationsStore = useGeoLocationsStore()
 const driverId = computed(() => props.id)
+const canViewSpeedChart = computed(() =>
+  hasPermission(authStore.token, 'route_eld.live_tracking.speed_chart')
+)
+const canUseHosCalculator = computed(() =>
+  hasPermission(authStore.token, 'route_eld.live_tracking.hos_calculator')
+)
+const canCreateLiveShare = computed(() =>
+  hasPermission(authStore.token, 'route_eld.live_tracking.live_share')
+)
 const today = localDateKey(new Date())
 const selectedDate = ref(today)
 const calendarOpen = ref(false)
-const { tracking, isLoading, isToday, error } = useRouteEldDriverTracking(driverId, selectedDate)
+const { tracking, isLoading, isToday, error } = useRouteEldDriverTracking(
+  driverId,
+  selectedDate,
+  canViewSpeedChart
+)
+const driverInfoCard = ref<HTMLElement | null>(null)
+const { height: driverInfoCardHeight } = useElementSize(
+  driverInfoCard,
+  { width: 0, height: 0 },
+  { box: 'border-box' }
+)
+const speedChartHeight = computed(() => `${Math.max(145, driverInfoCardHeight.value || 160)}px`)
 const liveModal = ref(false)
 const calculatorOpen = ref(false)
 const saveLoading = ref(false)
@@ -272,6 +321,10 @@ const orderedPoints = computed(() =>
 )
 const firstPoint = computed(() => orderedPoints.value[0] ?? null)
 const lastPoint = computed(() => orderedPoints.value.at(-1) ?? null)
+const selectedDayStart = computed(() => new Date(`${selectedDate.value}T00:00:00`).getTime())
+const selectedDayEnd = computed(() => isToday.value
+  ? Date.now()
+  : new Date(`${selectedDate.value}T23:59:59.999`).getTime())
 const calculatorPoint = computed(() =>
   tracking.value?.driver.latestPoint ?? (isToday.value ? lastPoint.value : null)
 )
@@ -448,6 +501,15 @@ function historyPointKey(point: RouteEldLiveTrackingPoint) {
 
 function pointCoordinates(point: RouteEldLiveTrackingPoint) {
   return `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`
+}
+
+async function copyCoordinates(point: RouteEldLiveTrackingPoint) {
+  try {
+    await navigator.clipboard.writeText(pointCoordinates(point))
+    toast.success('Coordinates copied.')
+  } catch {
+    toast.error('Coordinates could not be copied.')
+  }
 }
 
 function historyAddress(point: RouteEldLiveTrackingPoint) {

@@ -91,14 +91,26 @@
         v-if="animatedPosition"
         :options="{ position: animatedPosition, anchorPoint: 'CENTER' }"
       >
-        <button
-          type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#465a95] text-white shadow-lg ring-4 ring-[#465a95]/20"
-          title="Current vehicle position"
-          @click="selectedPoint = latestPoint"
-        >
-          <Navigation class="h-5 w-5" :style="{ transform: `rotate(${bearing}deg)` }" />
-        </button>
+        <div class="relative flex flex-col items-center">
+          <div
+            v-if="vehicleName"
+            class="absolute bottom-full mb-1 max-w-32 truncate rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-900 shadow"
+            :title="vehicleName"
+          >
+            {{ vehicleName }}
+          </div>
+          <button
+            type="button"
+            class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#465a95] text-white shadow-lg ring-4"
+            title="Current vehicle position"
+            @click="selectedPoint = latestPoint"
+          >
+            <Navigation
+              class="h-5 w-5"
+              :style="{ transform: `rotate(${bearing - 45}deg)` }"
+            />
+          </button>
+        </div>
       </CustomMarker>
     </GoogleMap>
 
@@ -213,6 +225,7 @@ const props = defineProps<{
   points: RouteEldLiveTrackingPoint[]
   isLive: boolean
   currentStatus?: string | null
+  vehicleName?: string | null
 }>()
 
 const MAX_DIRECTIONS_POINTS = 20
@@ -699,11 +712,25 @@ function statusForPoint(point: RouteEldLiveTrackingPoint): Exclude<StatusFilter,
     point.id === validPoints.value.at(-1)?.id
       ? props.currentStatus || point.engineEventCode || ''
       : point.engineEventCode || ''
-  const status = rawStatus.replace(/[\s_-]/g, '').toUpperCase()
+  return statusFromValue(rawStatus)
+}
+
+function statusFromValue(value?: string | null): Exclude<StatusFilter, 'all'> {
+  const status = (value ?? '').replace(/[\s_-]/g, '').toUpperCase()
   if (status.includes('SLEEP') || status === 'SB') return 'sleeper'
   if (status.includes('DRIV') || status === 'D') return 'driving'
-  if (status.includes('ONDUTY') || status === 'ON') return 'onDuty'
+  if (status.includes('ONDUTY') || status.includes('YARD') || status === 'ON') return 'onDuty'
   return 'offDuty'
+}
+
+function statusValueHexColor(value?: string | null) {
+  const status = (value ?? '').replace(/[\s_-]/g, '').toUpperCase()
+  console.log('statusValueHexColor', value, status)
+  if (status.includes('DRIV') || status === 'D') return '#589e67'
+  if (status.includes('SLEEP') || status === 'SB') return '#954baf'
+  if (status.includes('ONDUTY') || status.includes('YARD') || status === 'ON') return '#6082e0'
+  if (status.includes('PERSONAL') || status === 'PC') return '#d28e3d'
+  return '#af4b4b'
 }
 
 function markerClass(point: RouteEldLiveTrackingPoint) {
