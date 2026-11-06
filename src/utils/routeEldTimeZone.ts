@@ -12,6 +12,27 @@ const routeEldTimeZones: Record<string, string> = {
   SK: 'America/Regina',
 }
 
-export function resolveRouteEldScheduleTimeZone(value?: string | null) {
-  return routeEldTimeZones[String(value || '').trim().toUpperCase()] ?? routeEldTimeZones.CT
+export function resolveRouteEldScheduleTimeZone(
+  value?: string | null,
+  fallback = routeEldTimeZones.CT
+) {
+  const code = String(value || '').trim().toUpperCase()
+  return routeEldTimeZones[code] ?? fallback
+}
+
+export function formatRouteEldEventTime(
+  timestamp: number,
+  timeZone?: string | null,
+  options: Intl.DateTimeFormatOptions = {}
+) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveRouteEldScheduleTimeZone(timeZone),
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    ...options,
+  }).format(timestamp)
 }

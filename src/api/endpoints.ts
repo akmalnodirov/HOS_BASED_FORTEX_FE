@@ -253,6 +253,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
   static readonly ROUTE_ELD_LOG_DETAILS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/details`
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
+  static readonly ROUTE_ELD_EVENT_SESSION_FILTER_OPTIONS = `${this.ROUTE_ELD_EVENT_SESSIONS}/filter-options`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
   static readonly ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER = (sessionId: string, tabId: string) =>
@@ -304,6 +305,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
   static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
@@ -316,6 +319,20 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/boost`
   static readonly ROUTE_ELD_EVENT_SESSION_DURATION_BOOST = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR = (
+    sessionId: string,
+    tabId: string,
+    repairId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
+    sessionId: string,
+    tabId: string,
+    repairId: string,
+    optionId: string
+  ) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}/options/${optionId}/apply`
   static readonly ROUTE_ELD_EVENT_SESSION_REASSIGN = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
   static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>
@@ -330,8 +347,6 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
   static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
-  static readonly ROUTE_ELD_DRIVER_RESPONSIBLE_USERS = (driverId: string) =>
-    `${this.ROUTE_ELD_DRIVERS}/${driverId}/responsible-users`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVERS = (driverId: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${driverId}/co-drivers`
   static readonly ROUTE_ELD_NORMALIZE = `${this.BASE_URL}/route-eld/normalize`

@@ -6,6 +6,7 @@ import { ApiEndpoints } from '@/api/endpoints'
 import {
   RouteEldAssistantItemKind,
   type RouteEldAssistantConversation,
+  type RouteEldAssistantDecisionRequest,
   type RouteEldAssistantItem,
   type RouteEldAssistantStartTurnRequest,
   type RouteEldAssistantTurn,
@@ -28,8 +29,6 @@ const POLL_MAX_CONSECUTIVE_FAILURES = 3
 const REQUEST_TIMEOUT_MS = 15_000
 const NETWORK_MESSAGE = 'Could not reach the server. Try again.'
 const TIMEOUT_MESSAGE = 'The assistant is taking too long. Try again.'
-const CONFIRMATION_MESSAGE =
-  'The assistant is waiting for a confirmation this version cannot show. Clear the chat to continue.'
 
 function unwrap<T>(value: T | ApiEnvelope<T>): T {
   if (value && typeof value === 'object' && 'successResult' in value) {
@@ -49,7 +48,10 @@ function statusOf(error: unknown) {
 function errorText(error: unknown, fallback: string) {
   if (!isAxiosError(error)) return fallback
   if (!error.response) return NETWORK_MESSAGE
-  if (error.response.status === 403) return 'You do not have access to the assistant.'
+  if (error.response.status === 401) return 'Your session expired. Sign in again.'
+  if (error.response.status === 403) {
+    return getApiErrorMessage(error, 'You do not have access to the assistant.')
+  }
   return getApiErrorMessage(error, fallback)
 }
 
@@ -82,11 +84,13 @@ function wait(ms: number, signal: AbortSignal) {
 export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => {
   const api = useApi()
   const sessionId = ref('')
+  const contextTabId = ref('')
   const conversationId = ref<string | null>(null)
   const items = ref<RouteEldAssistantItem[]>([])
   const activeTurn = ref<RouteEldAssistantTurn | null>(null)
   const isLoading = ref(false)
   const isSending = ref(false)
+  const isDeciding = ref(false)
   const error = ref<string | null>(null)
   const resendText = ref<string | null>(null)
 
@@ -94,9 +98,26 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
   let pollGeneration = 0
   let loadSequence = 0
   let pendingSend: PendingSend | null = null
+  let contextVersion = 0
+  let pendingDecision: object | null = null
   let acceptedTurn: { turnId: string; text: string } | null = null
 
-  const isBusy = computed(() => isSending.value || isLoading.value || activeTurn.value !== null)
+  const isBusy = computed(
+    () => isSending.value || isLoading.value || isDeciding.value || activeTurn.value !== null
+  )
+  const isProcessing = computed(
+    () => isSending.value || Boolean(activeTurn.value && isActiveStatus(activeTurn.value.status))
+  )
+  const confirmation = computed(() =>
+    activeTurn.value?.status === 'AWAITING_CONFIRMATION'
+      ? (activeTurn.value.confirmation ?? null)
+      : null
+  )
+  const appliedCorrections = computed(() =>
+    items.value.flatMap((item) =>
+      item.action?.correction?.status === 'applied' ? [item.action.correction] : []
+    )
+  )
 
   function stopPolling() {
     pollGeneration += 1
@@ -107,16 +128,30 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
   function resetFor(id: string) {
     stopPolling()
     loadSequence += 1
+    contextVersion += 1
+    pendingDecision = null
     sessionId.value = id
+    contextTabId.value = ''
     conversationId.value = null
     items.value = []
     activeTurn.value = null
     isLoading.value = false
     isSending.value = false
+    isDeciding.value = false
     error.value = null
     resendText.value = null
     pendingSend = null
     acceptedTurn = null
+  }
+
+  function setContext(id: string, tabId: string) {
+    if (sessionId.value !== id) resetFor(id)
+    if (contextTabId.value === tabId) return
+    contextTabId.value = tabId
+    contextVersion += 1
+    loadSequence += 1
+    isLoading.value = false
+    stopPolling()
   }
 
   function setError(message: string, resend: string | null = null) {
@@ -138,16 +173,19 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
 
   function mergeItems(incoming: RouteEldAssistantItem[]) {
     if (!incoming.length) return
-    const known = new Set(items.value.map((item) => item.id))
-    const added = incoming.filter((item) => !known.has(item.id))
-    if (added.length) items.value = [...items.value, ...added]
+    const updated = new Map(items.value.map((item) => [item.id, item]))
+    for (const item of incoming) updated.set(item.id, item)
+    items.value = [...updated.values()]
   }
 
   function applyTurn(turn: RouteEldAssistantTurn) {
     conversationId.value = turn.conversationId
     mergeItems(turn.items ?? [])
-    if (isActiveStatus(turn.status)) {
+    if (isActiveStatus(turn.status) || turn.status === 'AWAITING_CONFIRMATION') {
       activeTurn.value = turn
+      if (turn.status === 'AWAITING_CONFIRMATION' && !turn.confirmation) {
+        setError('The correction preview is unavailable. Reload the chat to check its status.')
+      }
       return
     }
     activeTurn.value = null
@@ -160,8 +198,6 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
       setError(turn.errorMessage || 'The request expired. Try again.', resendTextFor(turn))
     } else if (turn.status === 'CANCELLED') {
       setError(turn.errorMessage || 'The request was cancelled.', resendTextFor(turn))
-    } else if (turn.status === 'AWAITING_CONFIRMATION') {
-      setError(CONFIRMATION_MESSAGE)
     }
   }
 
@@ -222,7 +258,7 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
 
   async function load(id: string) {
     if (sessionId.value !== id) resetFor(id)
-    if (isSending.value) return
+    if (isSending.value || isDeciding.value) return
     const sequence = ++loadSequence
     isLoading.value = true
     error.value = null
@@ -247,7 +283,7 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
       activeTurn.value = null
       if (conversation.openTurn) {
         applyTurn(conversation.openTurn)
-        if (activeTurn.value) startPolling(conversation.openTurn)
+        if (isActiveStatus(conversation.openTurn.status)) startPolling(conversation.openTurn)
       }
     } catch (err) {
       if (sequence !== loadSequence || sessionId.value !== id) return
@@ -260,9 +296,10 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
   async function send(id: string, tabId: string, text: string) {
     const trimmed = text.trim()
     if (!trimmed) return false
-    if (sessionId.value !== id) resetFor(id)
+    setContext(id, tabId)
     if (isBusy.value) return false
 
+    const context = contextVersion
     isSending.value = true
     error.value = null
     try {
@@ -283,13 +320,13 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
         { tabId, clientTurnId: attempt.clientTurnId, text: trimmed },
         { _skipErrorToast: true }
       )
-      if (sessionId.value !== id) return false
+      if (sessionId.value !== id || context !== contextVersion) return false
       const turn = response.data ? unwrap(response.data) : null
       if (!turn) throw new Error('Empty turn response')
       if (pendingSend === attempt) pendingSend = null
       acceptedTurn = { turnId: turn.turnId, text: trimmed }
       applyTurn(turn)
-      if (activeTurn.value) startPolling(turn)
+      if (activeTurn.value && isActiveStatus(activeTurn.value.status)) startPolling(turn)
       return true
     } catch (err) {
       if (sessionId.value === id) {
@@ -301,6 +338,65 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
       return false
     } finally {
       if (sessionId.value === id) isSending.value = false
+    }
+  }
+
+  async function decide(id: string, tabId: string, approve: boolean, factualAttestation = false) {
+    const turn = activeTurn.value
+    const preview = confirmation.value
+    if (
+      sessionId.value !== id ||
+      contextTabId.value !== tabId ||
+      !turn ||
+      !preview ||
+      isDeciding.value ||
+      isLoading.value ||
+      isSending.value
+    )
+      return false
+    const correction = preview.correction
+    const expiry = Date.parse(preview.expiresAt)
+    if (
+      approve &&
+      (!factualAttestation ||
+        !correction ||
+        correction.sessionId !== id ||
+        correction.tabId !== tabId ||
+        !Number.isFinite(expiry) ||
+        expiry <= Date.now())
+    )
+      return false
+    const context = contextVersion
+    const attempt = {}
+    pendingDecision = attempt
+    isDeciding.value = true
+    error.value = null
+    resendText.value = null
+    try {
+      const response = await api.post<
+        RouteEldAssistantTurn | ApiEnvelope<RouteEldAssistantTurn>,
+        RouteEldAssistantDecisionRequest
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION(id, turn.turnId),
+        { confirmationId: preview.id, approve, factualAttestation: approve && factualAttestation },
+        { timeout: REQUEST_TIMEOUT_MS, _skipErrorToast: true }
+      )
+      if (sessionId.value !== id || context !== contextVersion) return false
+      const next = response.data ? unwrap(response.data) : null
+      if (!next) throw new Error('Empty decision response')
+      applyTurn(next)
+      if (isActiveStatus(next.status)) startPolling(next)
+      return true
+    } catch (err) {
+      if (sessionId.value === id && context === contextVersion) {
+        setError(errorText(err, 'Could not record the decision. Check status and try again.'))
+      }
+      return false
+    } finally {
+      if (pendingDecision === attempt) {
+        pendingDecision = null
+        isDeciding.value = false
+      }
     }
   }
 
@@ -319,16 +415,23 @@ export const useRouteEldAssistantStore = defineStore('routeEldAssistant', () => 
 
   return {
     sessionId,
+    contextTabId,
+    setContext,
     conversationId,
     items,
     activeTurn,
     isLoading,
     isSending,
+    isDeciding,
     isBusy,
+    isProcessing,
+    confirmation,
+    appliedCorrections,
     error,
     resendText,
     load,
     send,
+    decide,
     stopPolling,
     clear,
   }

@@ -14,20 +14,6 @@
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <fieldset :disabled="readonly" class="space-y-4 disabled:opacity-100">
-          <div v-if="!form.eventId" class="space-y-1">
-            <label class="text-sm font-medium">Responsible user</label>
-            <Select
-              :model-value="form.responsibleUserId ?? ''"
-              @update:model-value="patch({ responsibleUserId: String($event) })"
-            >
-              <SelectTrigger><SelectValue placeholder="Select responsible user" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="user in users" :key="user.id" :value="user.id">
-                  {{ user.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div class="grid grid-cols-12 gap-3">
             <div class="col-span-3 space-y-1">
               <label class="text-sm font-medium">Sequence ID</label>
@@ -103,8 +89,8 @@
             <div class="space-y-1">
               <label class="text-sm font-medium">Origin</label>
               <Select
-                :model-value="isCertificationSelected ? '' : String(form.origin ?? '')"
-                :disabled="isCertificationSelected"
+                :model-value="isCertificationSelected ? '' : originLockedToAuto ? '1' : String(form.origin ?? '')"
+                :disabled="isCertificationSelected || originLockedToAuto"
                 @update:model-value="onOriginChange"
               >
                 <SelectTrigger>
@@ -123,10 +109,10 @@
                 Certifications are saved without an origin, like in the Route ELD app.
               </p>
               <p
-                v-else-if="requiresOtherUserOrigin"
-                class="mt-1 text-[10px] text-amber-700 dark:text-amber-400"
+                v-else-if="isModifiedProviderEvent"
+                class="mt-1 text-[10px] text-muted-foreground"
               >
-                Origin changed to Other user because this provider-generated event type was modified.
+                Origin is Auto because this provider-generated event type was modified.
               </p>
               <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
                 Origin follows the selected event type.
@@ -432,7 +418,6 @@ import { allEvents } from '@/utils/events.ts'
 import type {
   BoostEventStatusForm,
   RouteEldEventEditOptions,
-  RouteEldResponsibleUser,
 } from '../../types/boost.ts'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
@@ -445,6 +430,7 @@ import {
   readCoordinates,
 } from '../../utils/coordinateClipboard'
 import { isMeasurementDraft, parseMeasurement } from '../../utils/decimalInput'
+import { drivingOriginLocked, fixedOriginFor, originForEvent, Origin } from '../../utils/recordOrigin'
 
 const NOTE_SHORTCUTS = [
   'PTI',
@@ -467,7 +453,6 @@ interface Props {
   open: boolean
   form: BoostEventStatusForm
   editOptions?: RouteEldEventEditOptions
-  users?: RouteEldResponsibleUser[]
   disableSleeperBerth?: boolean
   fromDate?: string
   toDate?: string
@@ -479,7 +464,6 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   readonly: false,
   editOptions: () => ({ vehicles: [], elds: [] }),
-  users: () => [],
   disableSleeperBerth: false,
   fromDate: '',
   toDate: '',
@@ -511,6 +495,11 @@ function coordinateValue(value: number | string | null): number | null {
 
 function fieldText(value: number | string | null) {
   return value === null || value === '' ? '' : String(value)
+}
+function displayText(field: DecimalField) {
+  const value = props.form[field]
+  if (field !== 'odometer' || value === null || value === '') return fieldText(value)
+  return String(Math.round(Number(value)))
 }
 
 const latitudeText = ref('')
@@ -547,7 +536,7 @@ function isFieldInvalid(field: DecimalField) {
 function syncFieldText(field: DecimalField) {
   const { text, parse } = decimalFields[field]
   if (parse(text.value) !== coordinateValue(props.form[field]))
-    text.value = fieldText(props.form[field])
+    text.value = displayText(field)
 }
 
 const latitudeInvalid = computed(() => isFieldInvalid('latitude'))
@@ -624,12 +613,12 @@ watch(() => props.open, (open) => {
     return
   }
   for (const field of decimalFieldNames)
-    decimalFields[field].text.value = fieldText(props.form[field])
+    decimalFields[field].text.value = displayText(field)
 })
 onBeforeUnmount(cancelReverseGeocode)
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
-const requiresOtherUserOrigin = computed(() =>
+const isModifiedProviderEvent = computed(() =>
   Boolean(
     props.form.eventId &&
     props.form.originalIsEditable === false &&
@@ -754,30 +743,23 @@ const showRecordStatus = computed(
   () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
 )
 const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
-const fixedOrigin = computed<number | null>(() => {
-  if (requiresOtherUserOrigin.value) return 3
-  if (
-    ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
-      selectedEventKey.value
-    )
-  ) return 2
-  if (
-    [
-      'DS_D', 'LOG_NORMAL_PRECISION', 'LOG_REDUCED_PRECISION', 'DR_LOGIN', 'DR_LOGOUT',
-      'ENG_UP_NORMAL', 'ENG_UP_REDUCED', 'ENG_DOWN_NORMAL', 'ENG_DOWN_REDUCED',
-    ].includes(selectedEventKey.value)
-  ) return 1
-  return null
-})
+// Changing the status to driving (or adding a driving event) or changing a device event saves Auto (ELD); the save request uses the same rule.
+const originLockedToAuto = computed(
+  () =>
+    !isCertificationSelected.value &&
+    (isModifiedProviderEvent.value ||
+      drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined))
+)
+// Driving and changed device events are Auto (ELD).
+const fixedOrigin = computed<number | null>(() =>
+  fixedOriginFor(selectedEventKey.value, { modifiedProviderEvent: isModifiedProviderEvent.value })
+)
 
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
   const certification = /^DR_CERT_\d+$/.test(ev.id)
   const statusless = certification || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
-  const driverOrigin = ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
-    ev.id
-  )
   const modifiedProviderEvent = Boolean(
     props.form.eventId &&
     props.form.originalIsEditable === false &&
@@ -787,7 +769,7 @@ function onEventChange(key: unknown) {
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
     recordStatus: statusless ? 'NONE' : 'ACTIVE',
-    origin: certification ? null : modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
+    origin: originForEvent(ev.id, { modifiedProviderEvent }),
   })
 }
 
@@ -828,7 +810,7 @@ const eventClock = computed({
 })
 function onOriginChange(v: unknown) {
   const origin = Number(v)
-  patch({ origin: requiresOtherUserOrigin.value && origin === 1 ? 3 : origin })
+  patch({ origin: originLockedToAuto.value ? Origin.Eld : origin })
 }
 function onRecordStatusChange(v: unknown) {
   patch({ recordStatus: String(v) })
@@ -854,7 +836,8 @@ function onMeasurementInput(field: MeasurementField, e: Event) {
   const { text, parse } = decimalFields[field]
   text.value = (e.target as HTMLInputElement).value
   if (isFieldBlocked(field)) return
-  const value = text.value.trim() === '' ? null : parse(text.value)
+  const parsed = text.value.trim() === '' ? null : parse(text.value)
+  const value = field === 'odometer' && parsed !== null ? Math.round(parsed) : parsed
   if (value !== coordinateValue(props.form[field]))
     patch({ [field]: value } as Partial<BoostEventStatusForm>)
 }
@@ -878,7 +861,6 @@ function onStringInput(field: keyof BoostEventStatusForm, e: Event) {
 }
 
 const isSubmitDisabled = computed(() => {
-  if (!props.form.eventId && !props.form.responsibleUserId) return true
   if (!dateWithinSession.value) return true
   if (!props.form.eventId && props.disableSleeperBerth && selectedEventKey.value === 'DS_SB')
     return true

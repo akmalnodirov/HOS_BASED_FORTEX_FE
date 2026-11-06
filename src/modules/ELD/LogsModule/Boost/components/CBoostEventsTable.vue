@@ -22,7 +22,7 @@
       ref="scrollContainer"
       class="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-lg"
     >
-      <div class="w-full select-none" :style="{ minWidth: `${tableMinWidth}px` }">
+      <div class="w-full select-text" :style="{ minWidth: `${tableMinWidth}px` }">
         <div class="sticky top-0 z-30 mb-1 rounded-lg bg-[#f0f0f0] dark:bg-muted/50">
           <div class="boost-events-grid grid gap-3 px-4 py-3" :style="gridStyle">
             <div class="flex items-center gap-2">
@@ -395,7 +395,7 @@
                         {{
                           event.eventType === 7 && event.eventName
                             ? event.eventName
-                            : findEventByTypeAndCode(event.eventType, event.eventCode)!.label
+                            : getEventLabel(event.eventType, event.eventCode, event.dateToCertify)
                         }}
                       </span>
                     </template>
@@ -457,9 +457,12 @@
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="draggableAttrs('location', event)"
+                    v-bind="dropAttrs('location', event)"
                   >
                     <div class="flex min-w-0 items-center gap-1.5">
+                      <span v-if="canDragCell('location', event)" class="dd-handle shrink-0" draggable="true" data-drag-field="location" data-drop-enabled="true" title="Drag location to another event" @click.stop>
+                        <GripVertical class="h-3.5 w-3.5" />
+                      </span>
                       <span class="min-w-0 truncate" :title="displayLocation(event)">{{ displayLocation(event) }}</span>
                       <span
                         v-if="hasManualLocationNote(event)"
@@ -492,9 +495,12 @@
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="draggableAttrs('odometer', event)"
+                    v-bind="dropAttrs('odometer', event)"
                   >
                     <div class="flex min-w-0 items-center gap-1.5">
+                      <span v-if="canDragCell('odometer', event)" class="dd-handle shrink-0" draggable="true" data-drag-field="odometer" data-drop-enabled="true" title="Drag odometer to another event" @click.stop>
+                        <GripVertical class="h-3.5 w-3.5" />
+                      </span>
                       <span class="min-w-0 truncate">
                         {{ event.vehicleMiles != null ? Math.round(event.vehicleMiles) : '-' }}
                       </span>
@@ -521,9 +527,12 @@
                         ? 'dd-cell'
                         : ''
                     "
-                    v-bind="draggableAttrs('engine_hours', event)"
+                    v-bind="dropAttrs('engine_hours', event)"
                   >
                     <div class="flex min-w-0 items-center gap-1.5">
+                      <span v-if="canDragCell('engine_hours', event)" class="dd-handle shrink-0" draggable="true" data-drag-field="engine_hours" data-drop-enabled="true" title="Drag engine hours to another event" @click.stop>
+                        <GripVertical class="h-3.5 w-3.5" />
+                      </span>
                       <span class="min-w-0 truncate">{{ event.engineHours ?? '-' }}</span>
                       <button
                         v-if="event.engineHours != null"
@@ -715,6 +724,7 @@ import {
   LoaderCircle,
   LockKeyhole,
   ShieldAlert,
+  GripVertical,
 } from 'lucide-vue-next'
 import {
   Accordion,
@@ -732,7 +742,7 @@ import type {
   BoostEventTableColumn,
   BoostEventTableColumnVisibility,
 } from '../composables/useBoostEventTableColumns'
-import { findEventByTypeAndCode } from '@/utils/events.ts'
+import { findEventByTypeAndCode, getEventLabel } from '@/utils/events.ts'
 import { useDragDrop, type DragColumnType } from '../composables/useDragDrop.ts'
 import { copyCoordinates } from '../utils/coordinateClipboard'
 
@@ -1008,17 +1018,20 @@ const { setup: setupDragDrop, cleanup: cleanupDragDrop, suppressClick } = useDra
     emit('drop-property', column, targetEventId, sourceEventId)
 )
 
-function draggableAttrs(column: DragColumnType, event: BoostUiEventRow) {
-  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.actionState === 8) return {}
-  const hasValue = column === 'location'
+function canDragCell(column: DragColumnType, event: BoostUiEventRow) {
+  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.actionState === 8) return false
+  return column === 'location'
     ? hasDraggableLocation(event)
     : column === 'odometer'
       ? event.vehicleMiles != null
       : event.engineHours != null
+}
+
+function dropAttrs(column: DragColumnType, event: BoostUiEventRow) {
+  if (!props.dragDropEnabled || !props.canEditEvents || props.mutationPending || event.actionState === 4 || event.actionState === 8) return {}
   return {
-    draggable: hasValue,
     'data-drag-field': column,
-    'data-drop-enabled': event.actionState === 8 || props.mutationPending ? 'false' : 'true',
+    'data-drop-enabled': 'true',
   }
 }
 
@@ -1099,6 +1112,7 @@ import ToggleEventsWorker from '../workers/toggleEvents.worker.ts?worker'
 
 function handleRowClick(eventId: string, clickEvent: MouseEvent) {
   if (suppressClick(clickEvent)) return
+  if (window.getSelection()?.toString()) return
   const event = allEvents.value.find((e) => e.eventId === eventId)
   if (event?.actionState === 4) return
   emit('toggle-selection', eventId)

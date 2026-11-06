@@ -26,6 +26,7 @@ export interface User {
   driversCount?: number
   state?: number
   roles: Role[]
+  effectivePermissions?: Permission[]
   toolCodes: number[] | null
 }
 

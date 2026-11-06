@@ -9,7 +9,7 @@
       <p v-if="subtitle" class="text-sm text-muted-foreground">{{ subtitle }}</p>
     </div>
 
-    <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4">
+    <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 xl:justify-end">
       <slot name="actions" />
 
       <template v-if="showFilters">
@@ -115,6 +115,7 @@ const props = withDefaults(
     defaultPeriod?: PeriodKey
     monthPicker?: boolean
     monthValue?: string
+    initialRange?: { startTime: string; endTime: string }
   }>(),
   { showFilters: true, hideDaily: false, fullPeriods: false, rollingWeek: false, defaultPeriod: 'day', monthPicker: false }
 )
@@ -163,8 +164,8 @@ function monthRange(value: string): { start: CalendarDate; end: CalendarDate } {
   return { start: new CalendarDate(y, m, 1), end: calFrom(new Date(y, m, 0)) }
 }
 
-const selectedPeriod = ref<PeriodKey>(props.monthPicker ? 'custom' : props.defaultPeriod)
-const dateRange = ref<any>(props.monthPicker ? monthRange(selectedMonth.value) : periodToRange(props.defaultPeriod))
+const selectedPeriod = ref<PeriodKey>(props.monthPicker || props.initialRange ? 'custom' : props.defaultPeriod)
+const dateRange = ref<any>(props.monthPicker ? monthRange(selectedMonth.value) : props.initialRange ? rangeFromDates(props.initialRange) : periodToRange(props.defaultPeriod))
 let programmatic = true
 
 function today(): CalendarDate {
@@ -174,6 +175,12 @@ function today(): CalendarDate {
 
 function calFrom(d: Date): CalendarDate {
   return new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
+}
+
+function rangeFromDates(value: { startTime: string; endTime: string }) {
+  const start = value.startTime.slice(0, 10).split('-').map(Number)
+  const end = value.endTime.slice(0, 10).split('-').map(Number)
+  return { start: new CalendarDate(start[0], start[1], start[2]), end: new CalendarDate(end[0], end[1], end[2]) }
 }
 
 function periodToRange(period: PeriodKey): { start: CalendarDate; end: CalendarDate } {
