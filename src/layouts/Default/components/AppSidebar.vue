@@ -7,16 +7,29 @@
   >
     <div class="flex flex-col h-full w-[248px]">
       <!-- Logo -->
-      <button type="button" class="flex w-full items-center gap-3 px-4 h-[65px] flex-shrink-0 text-left cursor-pointer" aria-label="Select company" @click="router.push('/initial/companies')">
+      <button
+        type="button"
+        class="flex w-full items-center gap-3 px-4 h-[65px] flex-shrink-0 text-left cursor-pointer"
+        :aria-label="ownerOnly ? 'Dashboard' : 'Select company'"
+        @click="
+          router.push(
+            ownerOnly
+              ? (ownerLandingPath(authStore.user, authStore.token) ?? '/report/owner/dashboard')
+              : '/initial/companies'
+          )
+        "
+      >
         <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
           <img src="/images/logo.svg" alt="Logo" class="w-5 h-5 dark:hidden" />
           <img src="/images/logo-white.svg" alt="Logo" class="w-5 h-5 hidden dark:block" />
         </div>
-        <span
-          v-show="isOpen"
-          class="text-xl font-semibold text-gray-900 dark:text-sidebar-foreground whitespace-nowrap"
-        >
-          L-LORA
+        <span v-show="isOpen" class="flex flex-col text-gray-900 dark:text-sidebar-foreground">
+          <span class="text-xl font-semibold leading-6 whitespace-nowrap">L-LORA</span>
+          <span
+            v-if="ownerOnly"
+            class="text-xs leading-4 text-gray-600 dark:text-sidebar-foreground/70"
+            >Finance</span
+          >
         </span>
       </button>
 
@@ -25,7 +38,7 @@
       <nav class="flex-1 overflow-y-auto py-4 px-2">
         <div v-for="section in menuItems" :key="section.id" class="mb-6">
           <div
-            v-if="isOpen"
+            v-if="isOpen && !ownerOnly"
             class="px-3 mb-2 text-xs font-semibold text-gray-600 dark:text-sidebar-foreground/70 uppercase tracking-wider"
           >
             {{ section.label }}
@@ -86,19 +99,43 @@
                         item.uppercase && 'uppercase',
                       ]"
                     >
-                      <img v-if="typeof subItem.icon === 'string'" :src="subItem.icon" alt="" class="h-4 w-4 shrink-0 sidebar-icon" />
-                      <component :is="subItem.icon" v-else-if="subItem.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <img
+                        v-if="typeof subItem.icon === 'string'"
+                        :src="subItem.icon"
+                        alt=""
+                        class="h-4 w-4 shrink-0 sidebar-icon"
+                      />
+                      <component
+                        :is="subItem.icon"
+                        v-else-if="subItem.icon"
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
                       <span class="flex-1 text-left">{{ subItem.label }}</span>
-                      <ChevronDown v-if="subItem.children" class="h-4 w-4 shrink-0 transition-transform" :class="isMenuExpanded(subItem.id) && 'rotate-180'" />
+                      <ChevronDown
+                        v-if="subItem.children"
+                        class="h-4 w-4 shrink-0 transition-transform"
+                        :class="isMenuExpanded(subItem.id) && 'rotate-180'"
+                      />
                     </button>
-                    <div v-if="subItem.children" v-show="isMenuExpanded(subItem.id)" class="ml-4 border-l border-[#dbdbdb] pl-2 dark:border-sidebar-border">
+                    <div
+                      v-if="subItem.children"
+                      v-show="isMenuExpanded(subItem.id)"
+                      class="ml-4 border-l border-[#dbdbdb] pl-2 dark:border-sidebar-border"
+                    >
                       <button
                         v-for="nestedItem in subItem.children"
                         :key="nestedItem.id"
                         class="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
-                        :class="isActive(nestedItem.path) ? 'bg-[#e6e6e6] text-gray-900 dark:bg-sidebar-accent dark:text-sidebar-accent-foreground' : 'text-gray-700 hover:bg-[#e6e6e6] dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent/50'"
+                        :class="
+                          isActive(nestedItem.path)
+                            ? 'bg-[#e6e6e6] text-gray-900 dark:bg-sidebar-accent dark:text-sidebar-accent-foreground'
+                            : 'text-gray-700 hover:bg-[#e6e6e6] dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent/50'
+                        "
                         @click="navigateTo(nestedItem.path)"
-                      >{{ nestedItem.label }}</button>
+                      >
+                        {{ nestedItem.label }}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -153,14 +190,22 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { FileBarChart2, LogOut, ChevronDown, Scale,
-         ClipboardClock, BadgeDollarSign, ChartColumn,
-         ListPlus, ClipboardPenLine
-  } from 'lucide-vue-next'
+import {
+  FileBarChart2,
+  LogOut,
+  ChevronDown,
+  Scale,
+  ClipboardClock,
+  BadgeDollarSign,
+  ChartColumn,
+  ListPlus,
+  ClipboardPenLine,
+} from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { canAccessPath, readTokenPermissions } from '@/router/permissions'
 import { useApi } from '@/composables/useAxiosService'
+import { isOwnerUser, ownerLandingPath } from '@/modules/Report/utils/ownerAccess'
 
 interface MenuItem {
   id: string
@@ -345,19 +390,77 @@ const allMenuItems: MenuItem[] = [
           { id: 'report-checker', label: 'Checker', icon: null, path: '/report/checker' },
           { id: 'report-assistant', label: 'Assistant', icon: null, path: '/report/assistant' },
           {
-            id: 'report-analytics', label: 'Analytics', icon: BadgeDollarSign,
+            id: 'report-owner',
+            label: 'Owner',
+            icon: BadgeDollarSign,
             children: [
-              { id: 'report-statistics', label: 'Companies & Drivers', icon: null, path: '/report/statistics' },
-              { id: 'report-attendance', label: 'Attendance', icon: null, path: '/report/attendance' },
+              {
+                id: 'report-owner-dashboard',
+                label: 'Dashboard',
+                icon: null,
+                path: '/report/owner/dashboard',
+              },
+              {
+                id: 'report-owner-inspections',
+                label: 'Inspections',
+                icon: null,
+                path: '/report/owner/inspections',
+              },
+              { id: 'report-owner-time', label: 'Time', icon: null, path: '/report/owner/time' },
+              { id: 'report-owner-teams', label: 'Teams', icon: null, path: '/report/owner/teams' },
+              {
+                id: 'report-owner-salary',
+                label: 'Salary',
+                icon: null,
+                path: '/report/owner/salary',
+              },
+              {
+                id: 'report-owner-expenses',
+                label: 'Expenses',
+                icon: null,
+                path: '/report/owner/expenses',
+              },
+              {
+                id: 'report-owner-settings',
+                label: 'Settings',
+                icon: null,
+                path: '/report/owner/settings',
+              },
+            ],
+          },
+          {
+            id: 'report-analytics',
+            label: 'Analytics',
+            icon: BadgeDollarSign,
+            children: [
+              {
+                id: 'report-statistics',
+                label: 'Companies & Drivers',
+                icon: null,
+                path: '/report/statistics',
+              },
+              {
+                id: 'report-attendance',
+                label: 'Attendance',
+                icon: null,
+                path: '/report/attendance',
+              },
               { id: 'report-kpi', label: 'KPI details', icon: null, path: '/report/kpi' },
             ],
           },
           {
-            id: 'report-operations', label: 'Operations', icon: ChartColumn,
+            id: 'report-operations',
+            label: 'Operations',
+            icon: ChartColumn,
             children: [
               { id: 'report-teams', label: 'Teams', icon: null, path: '/report/teams' },
               { id: 'report-salary', label: 'Salary', icon: null, path: '/report/salary' },
-              { id: 'report-bonuses', label: 'Bonuses & Charges', icon: null, path: '/report/bonuses' },
+              {
+                id: 'report-bonuses',
+                label: 'Bonuses & Charges',
+                icon: null,
+                path: '/report/bonuses',
+              },
               { id: 'report-notes', label: 'Notes', icon: null, path: '/report/notes' },
               { id: 'report-settings', label: 'Settings', icon: null, path: '/report/settings' },
               { id: 'report-contracts', label: 'Contracts', icon: null, path: '/report/contracts' },
@@ -365,22 +468,91 @@ const allMenuItems: MenuItem[] = [
             ],
           },
           {
-            id: 'report-inspection', label: 'Inspection', icon: ClipboardPenLine,
+            id: 'report-inspection',
+            label: 'Inspection',
+            icon: ClipboardPenLine,
             children: [
-              { id: 'report-violation', label: 'Violation', icon: null, path: '/report/inspection/violation' },
-              { id: 'report-no-violation', label: 'No Violation', icon: null, path: '/report/inspection/no-violation' },
+              {
+                id: 'report-violation',
+                label: 'Violation',
+                icon: null,
+                path: '/report/inspection/violation',
+              },
+              {
+                id: 'report-no-violation',
+                label: 'No Violation',
+                icon: null,
+                path: '/report/inspection/no-violation',
+              },
             ],
           },
           {
-            id: 'report-manage', label: 'Manage', icon: ListPlus,
+            id: 'report-manage',
+            label: 'Manage',
+            icon: ListPlus,
             children: [
-              { id: 'report-drivers', label: 'Drivers', icon: null, path: '/report/manage/drivers' },
-              { id: 'report-companies', label: 'Companies', icon: null, path: '/report/manage/companies' },
+              {
+                id: 'report-drivers',
+                label: 'Drivers',
+                icon: null,
+                path: '/report/manage/drivers',
+              },
+              {
+                id: 'report-companies',
+                label: 'Companies',
+                icon: null,
+                path: '/report/manage/companies',
+              },
             ],
           },
         ],
       },
     ],
+  },
+]
+
+const ownerMenuItems: MenuItem[] = [
+  {
+    id: 'owner-dashboard',
+    label: 'Dashboard',
+    icon: '/icons/pie-chart.svg',
+    path: '/report/owner/dashboard',
+  },
+  {
+    id: 'owner-inspections',
+    label: 'Inspection',
+    icon: ClipboardPenLine,
+    path: '/report/owner/inspections',
+  },
+  {
+    id: 'owner-time',
+    label: 'Time',
+    icon: ClipboardClock,
+    path: '/report/owner/time',
+  },
+  {
+    id: 'owner-teams',
+    label: 'Teams',
+    icon: '/icons/users.svg',
+    path: '/report/owner/teams',
+  },
+  {
+    id: 'owner-salary',
+    label: 'Salary',
+    icon: '/icons/shield-tick.svg',
+    path: '/report/owner/salary',
+  },
+  {
+    id: 'owner-expenses',
+    label: 'Expenses',
+    icon: '/icons/bank.svg',
+    path: '/report/owner/expenses',
+  },
+  {
+    id: 'owner-settings',
+    label: 'Settings',
+    icon: '/icons/settings.svg',
+    path: '/report/owner/settings',
   },
 ]
 
@@ -418,17 +590,21 @@ const hasActiveChild = (item: MenuItem): boolean => {
   )
 }
 
-watch(() => route.path, () => {
-  const expandActive = (items: MenuItem[]) => {
-    for (const item of items) {
-      if (item.children && hasActiveChild(item)) {
-        if (!expandedMenus.value.includes(item.id)) expandedMenus.value.push(item.id)
-        expandActive(item.children)
+watch(
+  () => route.path,
+  () => {
+    const expandActive = (items: MenuItem[]) => {
+      for (const item of items) {
+        if (item.children && hasActiveChild(item)) {
+          if (!expandedMenus.value.includes(item.id)) expandedMenus.value.push(item.id)
+          expandActive(item.children)
+        }
       }
     }
-  }
-  expandActive(allMenuItems)
-}, { immediate: true })
+    expandActive(allMenuItems)
+  },
+  { immediate: true }
+)
 
 const navigateTo = (path?: string) => {
   if (path) {
@@ -437,9 +613,17 @@ const navigateTo = (path?: string) => {
 }
 
 const authStore = useAuthStore()
+const ownerOnly = computed(() => isOwnerUser(authStore.user))
 const api = useApi()
 const reportFeatures = ref<Record<string, boolean>>({})
 const reportFeaturePaths: Record<string, string> = {
+  '/report/owner/dashboard': 'owner',
+  '/report/owner/inspections': 'owner',
+  '/report/owner/time': 'owner',
+  '/report/owner/teams': 'owner',
+  '/report/owner/salary': 'owner',
+  '/report/owner/expenses': 'owner',
+  '/report/owner/settings': 'owner',
   '/report/statistics': 'statistics',
   '/report/attendance': 'attendance',
   '/report/teams': 'teams',
@@ -454,9 +638,15 @@ const reportFeaturePaths: Record<string, string> = {
 
 async function loadReportFeatures() {
   const permissions = readTokenPermissions(authStore.token)
-  if (!permissions.systemAdmin && ![...permissions.codes].some(code => code.startsWith('report.'))) return
+  if (
+    !permissions.systemAdmin &&
+    ![...permissions.codes].some((code) => code.startsWith('report.'))
+  )
+    return
   try {
-    const response = await api.get<{ successResult: Record<string, boolean> }>('/report/api/features')
+    const response = await api.get<{ successResult: Record<string, boolean> }>(
+      '/report/api/features'
+    )
     reportFeatures.value = response.data.successResult ?? {}
   } catch {
     reportFeatures.value = {}
@@ -469,15 +659,26 @@ onUnmounted(() => window.removeEventListener('report-features-updated', loadRepo
 
 const visibleMenuItem = (item: MenuItem): MenuItem | null => {
   if (item.children) {
-    const children = item.children.map(visibleMenuItem).filter((child): child is MenuItem => child !== null)
+    const children = item.children
+      .map(visibleMenuItem)
+      .filter((child): child is MenuItem => child !== null)
     return children.length ? { ...item, children } : null
   }
   if (!item.path || !canAccessPath(item.path, authStore.token)) return null
+  if (item.path.startsWith('/report/owner/') && reportFeatures.value.owner === false) return null
   const feature = reportFeaturePaths[item.path]
   return feature && reportFeatures.value[feature] === false ? null : item
 }
 
-const menuItems = computed(() => allMenuItems.map(visibleMenuItem).filter((item): item is MenuItem => item !== null))
+const menuItems = computed(() => {
+  if (ownerOnly.value) {
+    const children = ownerMenuItems
+      .map(visibleMenuItem)
+      .filter((item): item is MenuItem => item !== null)
+    return children.length ? [{ id: 'owner-pages', label: '', icon: null, children }] : []
+  }
+  return allMenuItems.map(visibleMenuItem).filter((item): item is MenuItem => item !== null)
+})
 
 const handleLogout = async () => {
   await authStore.logout()
