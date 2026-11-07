@@ -37,6 +37,8 @@ interface KpiSettings {
   morningShiftStart: string
   afternoonShiftStart: string
   nightShiftStart: string
+  weekendDays: number[]
+  timeZoneId: string
 }
 interface Mapping {
   clocksterId: number
@@ -97,7 +99,45 @@ const kpi = ref<KpiSettings>({
   morningShiftStart: '09:00',
   afternoonShiftStart: '14:00',
   nightShiftStart: '22:00',
+  weekendDays: [0, 6],
+  timeZoneId: 'Asia/Tashkent',
 })
+// The shift times above are wall-clock times with no zone of their own, so the board needs to be
+// told which zone they are in. It also decides where the day boundary falls.
+const commonTimeZones = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Phoenix',
+  'America/Los_Angeles',
+  'Asia/Tashkent',
+  'Europe/Warsaw',
+  'UTC',
+]
+// A deployment may already be on a zone outside the shortlist; keep it selectable rather than
+// silently showing an empty box and resetting it on the next save.
+const timeZones = computed(() =>
+  commonTimeZones.includes(kpi.value.timeZoneId)
+    ? commonTimeZones
+    : [kpi.value.timeZoneId, ...commonTimeZones].filter(Boolean)
+)
+const weekdays = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+]
+
+function toggleWeekend(day: number) {
+  if (!canEdit.value) return
+  const current = kpi.value.weekendDays
+  // Every day being a day off would leave nobody with a working day, which the API rejects.
+  if (current.includes(day)) kpi.value.weekendDays = current.filter((item) => item !== day)
+  else if (current.length < 6) kpi.value.weekendDays = [...current, day].sort((a, b) => a - b)
+}
 const mapping = ref<Mapping[]>([])
 const mappingSearch = ref('')
 const discovering = ref(false)
@@ -175,7 +215,12 @@ async function load() {
       api.get<{ successResult: IgnoredEmployee[] }>('/report/api/attendance/ignored'),
     ])
     settings.value = settingsResponse.data.successResult
-    kpi.value = kpiResponse.data.successResult
+    const kpiResult = kpiResponse.data.successResult
+    kpi.value = {
+      ...kpiResult,
+      weekendDays: Array.isArray(kpiResult?.weekendDays) ? kpiResult.weekendDays : [0, 6],
+      timeZoneId: kpiResult?.timeZoneId || 'Asia/Tashkent',
+    }
     mapping.value = normalizeMapping(mappingResponse.data.successResult ?? [])
     notes.value = noteResponse.data.successResult ?? []
     levels.value = levelResponse.data.successResult ?? []
@@ -362,6 +407,45 @@ onMounted(load)
           ><label class="grid gap-1.5 text-sm"
             >Night shift<Input v-model="kpi.nightShiftStart" :disabled="!canEdit"
           /></label>
+        </div>
+        <div class="mt-5 border-t border-border pt-4">
+          <h3 class="text-sm font-medium">Days off</h3>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Selected days are never counted as worked and are not paid. This applies to employees
+            whose attendance is filled in automatically.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              v-for="day in weekdays"
+              :key="day.value"
+              type="button"
+              :disabled="!canEdit"
+              :aria-pressed="kpi.weekendDays.includes(day.value)"
+              class="min-w-14 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              :class="
+                kpi.weekendDays.includes(day.value)
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background hover:bg-muted'
+              "
+              @click="toggleWeekend(day.value)"
+            >
+              {{ day.label }}
+            </button>
+          </div>
+          <label class="mt-5 grid max-w-xs gap-1.5 text-sm">
+            Time zone
+            <Select v-model="kpi.timeZoneId" :disabled="!canEdit">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="zone in timeZones" :key="zone" :value="zone">{{
+                  zone
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <span class="text-xs text-muted-foreground">
+              The zone the shift times above are in, and the one that decides when a day ends.
+            </span>
+          </label>
         </div>
       </section>
       <section class="rounded-lg border border-border bg-card p-5">
