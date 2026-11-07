@@ -1,9 +1,9 @@
 name: Deploy HOS based FORTEX (Vue/Vite) for FDS
+run-name: Deploy FDS frontend from ${{ github.ref_name }} (by @${{ github.actor }})
 
+# Deploys are manual. Merging no longer ships anything: start a run from the Actions tab,
+# pick this workflow for the project and the branch you want to deploy from.
 on:
-  push:
-    branches:
-      - 'copy2fds-main'
   workflow_dispatch:
 
 jobs:
