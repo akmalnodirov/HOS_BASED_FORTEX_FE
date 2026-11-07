@@ -101,7 +101,7 @@
         <!--        </Button>-->
 
         <!-- Company Dropdown -->
-        <div v-if="isOwnerUser" class="flex h-10 items-center px-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Noor Express Logistics Inc</div>
+        <div v-if="isOwnerUser" class="flex h-10 items-center px-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ ownerDisplayName }}</div>
         <DropdownMenu v-else v-model:open="isDropdownOpen">
           <DropdownMenuTrigger as-child>
             <Button
@@ -266,7 +266,7 @@
   </header>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Menu,
@@ -345,7 +345,20 @@ const emit = defineEmits<{
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
 const isOwnerUser = computed(() => hasOwnerRole(authStore.user))
+const ownerDisplayName = ref('Owner')
 const api = useApi()
+async function loadOwnerDisplayName() {
+  if (!isOwnerUser.value) return
+  try {
+    const response = await api.get<{ successResult: { ownerDisplayName: string } }>('/report/api/features')
+    ownerDisplayName.value = response.data.successResult.ownerDisplayName || 'Owner'
+  } catch {
+    ownerDisplayName.value = 'Owner'
+  }
+}
+watch(isOwnerUser, (owner) => { if (owner) void loadOwnerDisplayName() }, { immediate: true })
+onMounted(() => window.addEventListener('report-features-updated', loadOwnerDisplayName))
+onUnmounted(() => window.removeEventListener('report-features-updated', loadOwnerDisplayName))
 const teamName = ref<string | null>(null)
 const teamInfoLoaded = ref(false)
 const canViewOwnKpi = computed(() => hasPermission(authStore.token, 'report.my_kpi.view'))

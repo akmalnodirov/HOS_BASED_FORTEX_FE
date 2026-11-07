@@ -6,6 +6,7 @@ import { useApi } from '@/composables/useAxiosService'
 import { Input } from '@/components/ui/input'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportMonthField from '@/modules/Report/components/CReportMonthField.vue'
+import { currentOwnerMonth } from '@/modules/Report/utils/ownerDates'
 import { reportMoney } from '@/modules/Report/utils/money'
 import { ownerRoleBadge, ownerShiftBadge } from '@/modules/Report/utils/ownerBadges'
 
@@ -37,7 +38,7 @@ interface Performance {
   color: string
 }
 const api = useApi()
-const month = ref(new Date().toISOString().slice(0, 7))
+const month = ref(currentOwnerMonth())
 const rows = ref<Row[]>([])
 const employees = ref<Employee[]>([])
 const performances = ref<Performance[]>([])

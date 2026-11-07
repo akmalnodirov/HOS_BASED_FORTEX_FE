@@ -57,7 +57,7 @@ const companies = ref<Company[]>([])
 const drivers = ref<Driver[]>([])
 const search = ref('')
 const range = ref({
-  startTime: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+  startTime: new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString(),
   endTime: new Date().toISOString(),
 })
 const loading = ref(false)

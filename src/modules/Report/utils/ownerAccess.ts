@@ -13,7 +13,7 @@ const ownerPages = [
 
 export function isOwnerUser(user: User | null): boolean {
   const roles = user?.roles ?? []
-  return roles.some((role) => role.type === 9) && !roles.some((role) => role.type === 1)
+  return roles.length > 0 && roles.every((role) => role.type === 9)
 }
 
 export function ownerLandingPath(user: User | null, token: string | null): string | null {

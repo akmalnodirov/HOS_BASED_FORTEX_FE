@@ -8,6 +8,7 @@ import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import COwnerDriverChart from '@/modules/Report/components/COwnerDriverChart.vue'
 import { reportMoney } from '@/modules/Report/utils/money'
 import { ownerShiftBadge } from '@/modules/Report/utils/ownerBadges'
+import { currentOwnerMonthRange } from '@/modules/Report/utils/ownerDates'
 
 interface Bucket {
   label: string
@@ -59,10 +60,7 @@ interface Performance {
 }
 const api = useApi()
 const router = useRouter()
-const range = ref({
-  startTime: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-  endTime: new Date().toISOString(),
-})
+const range = ref(currentOwnerMonthRange())
 const statistics = ref<Statistics>({ driversAdded: 0, driversDeleted: 0, buckets: [] })
 const status = ref<Status>({ totalDrivers: 0, activeDrivers: 0, inactiveDrivers: 0 })
 const inspections = ref<Inspection[]>([])
@@ -118,6 +116,12 @@ async function load() {
   loading.value = true
   try {
     const month = range.value.startTime.slice(0, 7) + '-01'
+    const settingsResponse = await api.get<{ successResult: { teamsVisible: boolean } }>(
+      '/report/api/owner/settings'
+    )
+    const showTeams = settingsResponse.data.successResult.teamsVisible
+    teamsVisible.value = showTeams
+    if (!showTeams) selectedTeam.value = 'all'
     const request = {
       ...range.value,
       teamId: selectedTeam.value === 'all' ? null : selectedTeam.value,
@@ -129,7 +133,6 @@ async function load() {
       expenseResponse,
       workerResponse,
       performanceResponse,
-      settingsResponse,
       teamResponse,
       assignmentResponse,
       salaryResponse,
@@ -152,15 +155,18 @@ async function load() {
       }>('/report/api/owner/expenses', { params: { month } }),
       api.get<{ successResult: Worker[] }>('/report/api/owner/employees', { params: { month } }),
       api.get<{ successResult: { definitions: Performance[] } }>('/report/api/owner/performances'),
-      api.get<{ successResult: { teamsVisible: boolean } }>('/report/api/owner/settings'),
-      api.get<{ successResult: { id: string; name: string }[] }>('/report/api/teams', {
-        params: { month },
-      }),
-      api.get<{
-        successResult: {
-          companies: { companyId: string; companyName: string; teamId: string | null }[]
-        }
-      }>('/report/api/teams/assignments', { params: { month } }),
+      showTeams
+        ? api.get<{ successResult: { id: string; name: string }[] }>('/report/api/teams', {
+            params: { month },
+          })
+        : Promise.resolve(null),
+      showTeams
+        ? api.get<{
+            successResult: {
+              companies: { companyId: string; companyName: string; teamId: string | null }[]
+            }
+          }>('/report/api/teams/assignments', { params: { month } })
+        : Promise.resolve(null),
       api.post<{ successResult: { rows: { userId: string; totalKpi: number }[] } }>(
         '/report/api/kpi/statistics',
         request
@@ -179,9 +185,8 @@ async function load() {
       periodSalary: periodSalaryByUser.get(item.userId) ?? 0,
     }))
     performances.value = performanceResponse.data.successResult.definitions ?? []
-    teamsVisible.value = settingsResponse.data.successResult.teamsVisible
-    teams.value = teamResponse.data.successResult ?? []
-    companyTeams.value = assignmentResponse.data.successResult.companies ?? []
+    teams.value = teamResponse?.data.successResult ?? []
+    companyTeams.value = assignmentResponse?.data.successResult.companies ?? []
   } catch {
     toast.error('Could not load Owner dashboard.')
   } finally {
@@ -190,6 +195,7 @@ async function load() {
 }
 
 function onRange(value: { startTime: string; endTime: string }) {
+  if (range.value.startTime === value.startTime && range.value.endTime === value.endTime) return
   range.value = value
   void load()
 }

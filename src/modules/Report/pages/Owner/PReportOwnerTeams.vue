@@ -16,6 +16,9 @@ import {
 } from '@/components/ui/select'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import CReportMonthField from '@/modules/Report/components/CReportMonthField.vue'
+import CReportEmployeeDaysOff from '@/modules/Report/components/CReportEmployeeDaysOff.vue'
+import { currentOwnerMonth } from '@/modules/Report/utils/ownerDates'
+import { parseEmployeeDaysOff, serializeEmployeeDaysOff } from '@/modules/Report/utils/employeeDaysOff'
 import { reportMoney } from '@/modules/Report/utils/money'
 import { ownerRoleBadge, ownerShiftBadge } from '@/modules/Report/utils/ownerBadges'
 
@@ -50,7 +53,7 @@ interface Rate {
 const api = useApi()
 const auth = useAuthStore()
 const canEdit = computed(() => hasPermission(auth.token, 'report.owner.teams.edit'))
-const month = ref(new Date().toISOString().slice(0, 7))
+const month = ref(currentOwnerMonth())
 const employees = ref<Employee[]>([])
 const original = ref<Record<string, string>>({})
 const performances = ref<Performance[]>([])
@@ -60,7 +63,6 @@ const search = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const shiftNames = ['Morning', 'Afternoon', 'Night']
-const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const roleNames = ['SystemAdmin', 'Manager', 'Logbooker', 'Checker', 'Assistant']
 const filteredEmployees = computed(() =>
   employees.value.filter((item) =>
@@ -76,23 +78,13 @@ function employeeName(item: Employee) {
     (item.userName.startsWith('vectorium:') ? 'Unnamed worker' : item.userName)
   )
 }
-function daysOff(item: Employee): number[] {
-  try {
-    return JSON.parse(item.daysOff) as number[]
-  } catch {
-    return []
-  }
-}
-function toggleDay(item: Employee, day: number) {
-  const selected = daysOff(item)
-  item.daysOff = JSON.stringify(
-    selected.includes(day) ? selected.filter((value) => value !== day) : [...selected, day].sort()
-  )
+function employeeDays(item: Employee): number[] {
+  return parseEmployeeDaysOff(item.daysOff)
 }
 function snapshot(item: Employee) {
   return JSON.stringify({
     shift: item.shift,
-    daysOff: daysOff(item),
+    daysOff: employeeDays(item),
     roleName: item.roleName,
     levelId: item.levelId,
     performanceId: item.performanceId,
@@ -150,7 +142,7 @@ async function save() {
         api.put(`/report/api/owner/employees/${item.userId}`, {
           month: `${month.value}-01`,
           shift: item.shift,
-          daysOff: daysOff(item),
+          daysOff: employeeDays(item),
           roleName: item.roleName,
           levelId: item.levelId,
           performanceId: item.performanceId,
@@ -284,24 +276,11 @@ onMounted(load)
                   </Select>
                 </td>
                 <td class="px-3 py-2">
-                  <div class="flex gap-1">
-                    <button
-                      v-for="(name, index) in dayNames"
-                      :key="name"
-                      type="button"
-                      :disabled="!canEdit"
-                      class="rounded px-1.5 py-1 text-[10px]"
-                      :class="
-                        daysOff(item).includes(index)
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-muted text-muted-foreground'
-                      "
-                      :title="name"
-                      @click="toggleDay(item, index)"
-                    >
-                      {{ name }}
-                    </button>
-                  </div>
+                  <CReportEmployeeDaysOff
+                    :model-value="employeeDays(item)"
+                    :disabled="!canEdit"
+                    @update:model-value="(days) => item.daysOff = serializeEmployeeDaysOff(days)"
+                  />
                 </td>
                 <td class="px-3 py-2">
                   <Select

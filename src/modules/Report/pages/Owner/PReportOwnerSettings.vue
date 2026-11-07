@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import TimePicker from '@/components/custom/time-picker/TimePicker.vue'
 import CReportColorField from '@/modules/Report/components/CReportColorField.vue'
+import { currentOwnerMonth } from '@/modules/Report/utils/ownerDates'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
 import { reportMoney } from '@/modules/Report/utils/money'
 
@@ -139,7 +140,7 @@ async function load() {
         ),
         api.get<{ successResult: Category[] }>('/report/api/owner/expense-categories'),
         api.get<{ successResult: Worker[] }>('/report/api/owner/employees', {
-          params: { month: new Date().toISOString().slice(0, 7) + '-01' },
+          params: { month: `${currentOwnerMonth()}-01` },
         }),
       ])
     enabled.value = settingsResponse.data.successResult.enabled
@@ -226,20 +227,19 @@ function deactivateCategory(item: Category) {
 async function save() {
   saving.value = true
   try {
-    await api.put('/report/api/owner/settings', {
-      enabled: enabled.value,
-      clocksterEnabled: clocksterEnabled.value,
-      eachPointValue: Number(eachPointValue.value),
-      lateGraceMinutes: Number(lateGraceMinutes.value),
-      morningShiftStart: morningShiftStart.value,
-      afternoonShiftStart: afternoonShiftStart.value,
-      nightShiftStart: nightShiftStart.value,
+    await api.put('/report/api/owner/all-settings', {
+      settings: {
+        enabled: enabled.value,
+        clocksterEnabled: clocksterEnabled.value,
+        eachPointValue: Number(eachPointValue.value),
+        lateGraceMinutes: Number(lateGraceMinutes.value),
+        morningShiftStart: morningShiftStart.value,
+        afternoonShiftStart: afternoonShiftStart.value,
+        nightShiftStart: nightShiftStart.value,
+      },
+      performances: { definitions: performances.value, rates: rates.value },
+      categories: categories.value,
     })
-    await api.put('/report/api/owner/performances', {
-      definitions: performances.value,
-      rates: rates.value,
-    })
-    await api.put('/report/api/owner/expense-categories', categories.value)
     toast.success('Owner settings saved.')
     window.dispatchEvent(new Event('report-features-updated'))
     await load()

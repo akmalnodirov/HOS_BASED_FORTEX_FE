@@ -57,7 +57,7 @@ const canSync = computed(
     hasPermission(auth.token, 'report.attendance.sync')
 )
 const range = ref({
-  startTime: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+  startTime: new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString(),
   endTime: new Date().toISOString(),
 })
 const stats = ref<Stats>({
