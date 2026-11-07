@@ -255,6 +255,21 @@
                     />
                     <Undo2 v-else class="h-4 w-4" />
                   </Button>
+                  <Button
+                    v-if="canDeleteSession"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    :disabled="deletingId !== null || rollingBackId !== null"
+                    title="Permanently delete session"
+                    @click.stop="openDeleteDialog(session)"
+                  >
+                    <LoaderCircle
+                      v-if="deletingId === session.id"
+                      class="h-4 w-4 animate-spin"
+                    />
+                    <Trash2 v-else class="h-4 w-4" />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -365,6 +380,61 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <Dialog :open="deleteTarget !== null" @update:open="handleDeleteDialog">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {{ deleteStep === 1 ? 'Delete this event session?' : 'Confirm permanent deletion' }}
+          </DialogTitle>
+          <DialogDescription v-if="deleteStep === 1">
+            This permanently removes the session and all of its tabs, events, profile forms,
+            histories, repairs, normalization records, ALPR routes and assistant records.
+          </DialogDescription>
+          <DialogDescription v-else>
+            This action cannot be undone. Type <span class="font-semibold text-foreground">DELETE</span>
+            to provide the second confirmation.
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="deleteTarget" class="rounded-md border border-border bg-muted/30 p-3 text-sm">
+          <div class="font-medium">{{ deleteTarget.name }}</div>
+          <div class="mt-1 text-muted-foreground">
+            {{ deleteTarget.driverName }} · {{ formatDay(deleteTarget.fromDate) }} –
+            {{ formatDay(deleteTarget.toDate) }} · {{ deleteTarget.tabCount }} tabs
+          </div>
+        </div>
+        <Input
+          v-if="deleteStep === 2"
+          v-model="deleteConfirmation"
+          autocomplete="off"
+          placeholder="Type DELETE"
+          @keyup.enter="deleteConfirmation === 'DELETE' && confirmDelete()"
+        />
+        <DialogFooter>
+          <Button variant="outline" :disabled="deletingId !== null" @click="closeDeleteDialog">
+            Cancel
+          </Button>
+          <Button
+            v-if="deleteStep === 1"
+            variant="destructive"
+            :disabled="deletingId !== null"
+            @click="deleteStep = 2"
+          >
+            Continue
+          </Button>
+          <Button
+            v-else
+            variant="destructive"
+            :disabled="deletingId !== null || deleteConfirmation !== 'DELETE'"
+            @click="confirmDelete"
+          >
+            <LoaderCircle v-if="deletingId !== null" class="mr-2 h-4 w-4 animate-spin" />
+            <Trash2 v-else class="mr-2 h-4 w-4" />
+            Permanently delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -382,6 +452,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
+  Trash2,
   Undo2,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -426,6 +497,9 @@ import type {
 
 const authStore = useAuthStore()
 const canRollback = computed(() => hasPermission(authStore.token, 'route_eld.log_details.rollback'))
+const canDeleteSession = computed(() =>
+  hasPermission(authStore.token, 'route_eld.event_sessions.delete')
+)
 
 type SessionSortKey =
   | 'name'
@@ -444,10 +518,12 @@ const {
   isLoading,
   isRefreshing,
   rollingBackId,
+  deletingId,
   error,
   fetchSessions,
   fetchFilterOptions,
   rollbackSession,
+  deleteSession,
 } = useEventSessions()
 
 const today = localDate(new Date())
@@ -477,6 +553,9 @@ const dateRange = computed<DateRange>({
 })
 const periodOpen = ref(false)
 const rollbackTarget = ref<EventSessionListItem | null>(null)
+const deleteTarget = ref<EventSessionListItem | null>(null)
+const deleteStep = ref<1 | 2>(1)
+const deleteConfirmation = ref('')
 
 const filters = computed<EventSessionFilters>(() => ({
   search: debouncedSearch.value.trim() || undefined,
@@ -611,6 +690,36 @@ async function confirmRollback() {
     toast.error(
       exception instanceof Error ? exception.message : 'The session could not be rolled back'
     )
+  }
+}
+
+function openDeleteDialog(session: EventSessionListItem) {
+  deleteTarget.value = session
+  deleteStep.value = 1
+  deleteConfirmation.value = ''
+}
+
+function closeDeleteDialog() {
+  if (deletingId.value !== null) return
+  deleteTarget.value = null
+  deleteStep.value = 1
+  deleteConfirmation.value = ''
+}
+
+function handleDeleteDialog(open: boolean) {
+  if (!open) closeDeleteDialog()
+}
+
+async function confirmDelete() {
+  const session = deleteTarget.value
+  if (!session || deleteStep.value !== 2 || deleteConfirmation.value !== 'DELETE') return
+  try {
+    await deleteSession(session.id)
+    closeDeleteDialog()
+    await fetchSessions(filters.value, true)
+    toast.success('The event session and all related records were permanently deleted')
+  } catch (exception) {
+    toast.error(exception instanceof Error ? exception.message : 'The session could not be deleted')
   }
 }
 
