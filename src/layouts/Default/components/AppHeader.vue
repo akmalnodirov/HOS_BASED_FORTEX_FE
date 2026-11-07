@@ -101,7 +101,8 @@
         <!--        </Button>-->
 
         <!-- Company Dropdown -->
-        <DropdownMenu v-model:open="isDropdownOpen">
+        <div v-if="isOwnerUser" class="flex h-10 items-center px-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Noor Express Logistics Inc</div>
+        <DropdownMenu v-else v-model:open="isDropdownOpen">
           <DropdownMenuTrigger as-child>
             <Button
               variant="ghost"
@@ -303,6 +304,7 @@ import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useApi } from '@/composables/useAxiosService'
 import { hasPermission } from '@/router/permissions'
+import { isOwnerUser as hasOwnerRole } from '@/modules/Report/utils/ownerAccess'
 import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
@@ -342,6 +344,7 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+const isOwnerUser = computed(() => hasOwnerRole(authStore.user))
 const api = useApi()
 const teamName = ref<string | null>(null)
 const teamInfoLoaded = ref(false)

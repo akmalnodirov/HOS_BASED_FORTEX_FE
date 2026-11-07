@@ -1,6 +1,7 @@
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { canAccessPath } from './permissions'
+import { ownerLandingPath } from '@/modules/Report/utils/ownerAccess'
 
 const publicRoutes = ['Login', 'RouteEldLiveShare']
 
@@ -25,6 +26,13 @@ export const authMiddleware = async (
 
   const token = authStore.getTokens()
   const continueOrForbid = () => {
+    if (to.path === '/initial/companies' || to.path === '/initial') {
+      const ownerHome = ownerLandingPath(authStore.user, authStore.getTokens())
+      if (ownerHome) {
+        next(ownerHome)
+        return
+      }
+    }
     if (canAccessPath(to.path, authStore.getTokens())) next()
     else next({ name: 'Forbidden' })
   }

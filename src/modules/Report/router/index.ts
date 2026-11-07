@@ -22,6 +22,13 @@ const routes: Readonly<RouteRecordRaw[]> = [
   { path: '/report/settings', name: 'ReportSettings', component: () => import('@/modules/Report/pages/PReportSettings.vue') },
   { path: '/report/contracts', name: 'ReportContracts', component: () => import('@/modules/Report/pages/PReportContracts.vue') },
   { path: '/report/statement', name: 'ReportStatement', component: () => import('@/modules/Report/pages/PReportStatement.vue') },
+  { path: '/report/owner/dashboard', name: 'ReportOwnerDashboard', component: () => import('@/modules/Report/pages/Owner/PReportOwnerDashboard.vue') },
+  { path: '/report/owner/inspections', name: 'ReportOwnerInspections', component: () => import('@/modules/Report/pages/Owner/PReportOwnerInspections.vue') },
+  { path: '/report/owner/time', name: 'ReportOwnerTime', component: () => import('@/modules/Report/pages/Owner/PReportOwnerTime.vue') },
+  { path: '/report/owner/teams', name: 'ReportOwnerTeams', component: () => import('@/modules/Report/pages/Owner/PReportOwnerTeams.vue') },
+  { path: '/report/owner/salary', name: 'ReportOwnerSalary', component: () => import('@/modules/Report/pages/Owner/PReportOwnerSalary.vue') },
+  { path: '/report/owner/expenses', name: 'ReportOwnerExpenses', component: () => import('@/modules/Report/pages/Owner/PReportOwnerExpenses.vue') },
+  { path: '/report/owner/settings', name: 'ReportOwnerSettings', component: () => import('@/modules/Report/pages/Owner/PReportOwnerSettings.vue') },
 ]
 
 export default routes
