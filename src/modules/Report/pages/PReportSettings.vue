@@ -38,6 +38,7 @@ interface KpiSettings {
   afternoonShiftStart: string
   nightShiftStart: string
   weekendDays: number[]
+  timeZoneId: string
 }
 interface Mapping {
   clocksterId: number
@@ -99,7 +100,27 @@ const kpi = ref<KpiSettings>({
   afternoonShiftStart: '14:00',
   nightShiftStart: '22:00',
   weekendDays: [0, 6],
+  timeZoneId: 'Asia/Tashkent',
 })
+// The shift times above are wall-clock times with no zone of their own, so the board needs to be
+// told which zone they are in. It also decides where the day boundary falls.
+const commonTimeZones = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Phoenix',
+  'America/Los_Angeles',
+  'Asia/Tashkent',
+  'Europe/Warsaw',
+  'UTC',
+]
+// A deployment may already be on a zone outside the shortlist; keep it selectable rather than
+// silently showing an empty box and resetting it on the next save.
+const timeZones = computed(() =>
+  commonTimeZones.includes(kpi.value.timeZoneId)
+    ? commonTimeZones
+    : [kpi.value.timeZoneId, ...commonTimeZones].filter(Boolean)
+)
 const weekdays = [
   { value: 1, label: 'Mon' },
   { value: 2, label: 'Tue' },
@@ -198,6 +219,7 @@ async function load() {
     kpi.value = {
       ...kpiResult,
       weekendDays: Array.isArray(kpiResult?.weekendDays) ? kpiResult.weekendDays : [0, 6],
+      timeZoneId: kpiResult?.timeZoneId || 'Asia/Tashkent',
     }
     mapping.value = normalizeMapping(mappingResponse.data.successResult ?? [])
     notes.value = noteResponse.data.successResult ?? []
@@ -410,6 +432,20 @@ onMounted(load)
               {{ day.label }}
             </button>
           </div>
+          <label class="mt-5 grid max-w-xs gap-1.5 text-sm">
+            Time zone
+            <Select v-model="kpi.timeZoneId" :disabled="!canEdit">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="zone in timeZones" :key="zone" :value="zone">{{
+                  zone
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <span class="text-xs text-muted-foreground">
+              The zone the shift times above are in, and the one that decides when a day ends.
+            </span>
+          </label>
         </div>
       </section>
       <section class="rounded-lg border border-border bg-card p-5">
