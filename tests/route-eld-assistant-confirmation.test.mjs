@@ -36,6 +36,39 @@ const confirmation = {
 const render = (component, props) =>
   renderToString(createSSRApp({ render: () => h(component, props) }))
 
+test('new actual status preview shows an insertion without nonexistent repair identifiers', async () => {
+  const html = await render(Confirmation, {
+    confirmation: {
+      ...confirmation,
+      correction: {
+        ...preview,
+        repairId: '00000000-0000-0000-0000-000000000000',
+        optionId: '00000000-0000-0000-0000-000000000000',
+        isNewStatus: true,
+        operations: [
+          {
+            order: 1,
+            type: 'InsertDutyStatus',
+            eventId: 'new-status',
+            beforeTimestamp: null,
+            afterTimestamp: 1790816400000,
+            beforeEventCode: null,
+            afterEventCode: 'DS_ON',
+            timeZone: 'UTC',
+          },
+        ],
+      },
+    },
+  })
+  assert.match(html, /New status event/)
+  assert.match(html, /Before: No event/)
+  assert.match(html, /On Duty/)
+  assert.match(html, /2026-10-01T01:00:00\.000Z/)
+  assert.match(html, /Reject status event/)
+  assert.match(html, /actual events/)
+  assert.doesNotMatch(html, /00000000|Repair:|Option:|Event: new-status/)
+})
+
 test('confirmation renders the exact reason, original request, event and timestamp operations', async () => {
   const html = await render(Confirmation, { confirmation })
   for (const value of [
