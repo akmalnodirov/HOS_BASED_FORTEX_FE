@@ -91,17 +91,26 @@
         v-if="animatedPosition"
         :options="{ position: animatedPosition, anchorPoint: 'CENTER' }"
       >
-        <button
-          type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#465a95] text-white shadow-lg ring-4 ring-[#465a95]/20"
-          title="Current vehicle position"
-          @click="selectedPoint = latestPoint"
-        >
-          <Navigation
-            class="h-5 w-5"
-            :style="{ transform: `rotate(${markerRotation(bearing)}deg)` }"
-          />
-        </button>
+        <div class="relative flex flex-col items-center">
+          <div
+            v-if="vehicleName"
+            class="absolute bottom-full mb-1 max-w-32 truncate rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-900 shadow"
+            :title="vehicleName"
+          >
+            {{ vehicleName }}
+          </div>
+          <button
+            type="button"
+            class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#465a95] text-white shadow-lg ring-4 ring-[#465a95]/20"
+            title="Current vehicle position"
+            @click="selectedPoint = latestPoint"
+          >
+            <Navigation
+              class="h-5 w-5"
+              :style="{ transform: `rotate(${markerRotation(bearing)}deg)` }"
+            />
+          </button>
+        </div>
       </CustomMarker>
     </GoogleMap>
 
@@ -212,6 +221,7 @@ const props = defineProps<{
   points: RouteEldLiveTrackingPoint[]
   isLive: boolean
   currentStatus?: string | null
+  vehicleName?: string | null
 }>()
 
 const MAX_DIRECTIONS_POINTS = 20

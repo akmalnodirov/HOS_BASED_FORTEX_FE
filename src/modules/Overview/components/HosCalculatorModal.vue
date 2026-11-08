@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { LoaderCircle } from 'lucide-vue-next'
+import { LoaderCircle, Navigation } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/custom/modal'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -185,6 +186,19 @@ function selectDestination(location: AlprLocation) {
   destination.value = location
   destinationLabel.value = location.label
   void calculateRouteMiles()
+}
+
+function openGoogleMapsDirections() {
+  const selected = destination.value
+  const origin = props.origin
+  if (!selected || !origin) return
+  const query = new URLSearchParams({
+    api: '1',
+    origin: `${origin.latitude},${origin.longitude}`,
+    destination: `${selected.latitude},${selected.longitude}`,
+    travelmode: 'driving',
+  })
+  window.open(`https://www.google.com/maps/dir/?${query.toString()}`, '_blank', 'noopener,noreferrer')
 }
 
 const borderOptions: { value: Border; label: string; delay: number }[] = [
@@ -411,12 +425,26 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
               Recalculate
             </button>
           </div>
-          <CAlprLocationInput
-            v-model="destinationLabel"
-            placeholder="Search a destination or enter coordinates"
-            @select="selectDestination"
-            @clear="clearDestination"
-          />
+          <div class="flex items-start gap-2">
+            <CAlprLocationInput
+              v-model="destinationLabel"
+              class="min-w-0 flex-1"
+              placeholder="Search a destination or enter coordinates"
+              @select="selectDestination"
+              @clear="clearDestination"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              class="h-10 w-10 shrink-0"
+              :disabled="!destination || !origin"
+              title="Open directions in Google Maps"
+              aria-label="Open directions in Google Maps"
+              @click="openGoogleMapsDirections"
+            >
+              <Navigation class="h-4 w-4" />
+            </Button>
+          </div>
           <p class="text-[11px] text-muted-foreground">
             <template v-if="displayedOrigin">
               From last known driver location: {{ originLocation }} · {{ new Date(displayedOrigin.timestamp).toLocaleString() }}
