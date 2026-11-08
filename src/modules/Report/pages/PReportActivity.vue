@@ -39,16 +39,16 @@
             class="w-full text-sm"
             :style="{ minWidth: `${Math.max(760, 312 + columns.length * 104)}px` }"
           >
-            <thead class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
+            <thead ref="tableHeader" class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
               <tr class="h-10 border-b border-border text-left">
                 <th
-                  rowspan="2"
+                  :rowspan="shiftBased ? 2 : 1"
                   class="sticky left-0 z-40 w-14 min-w-14 max-w-14 bg-muted px-4 py-3 font-medium"
                 >
                   #
                 </th>
                 <th
-                  rowspan="2"
+                  :rowspan="shiftBased ? 2 : 1"
                   class="sticky left-14 z-40 w-64 min-w-64 max-w-64 border-r border-border bg-muted px-4 py-3 font-medium shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]"
                 >
                   <span class="block mb-1">Company / Driver</span>
@@ -57,13 +57,13 @@
                 <th
                   v-for="date in columnDates"
                   :key="date"
-                  :colspan="3"
+                  :colspan="shiftBased ? 3 : 1"
                   class="border-l border-border px-3 py-2 font-medium text-center"
                 >
                   {{ formatActivityDay(date) }}
                 </th>
               </tr>
-              <tr class="h-10 border-b border-border">
+              <tr v-if="shiftBased" class="h-10 border-b border-border">
                 <th v-for="column in columns" :key="`${column.date}-${column.colNumber}`" class="min-w-[104px] border-l border-border px-1 py-2 text-center font-medium">
                   {{ periodLabel(column.colNumber) }}
                 </th>
@@ -86,11 +86,11 @@
                 >
                   <td
                     class="sticky left-0 z-[25] w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
-                    :class="virtualized ? '' : 'top-20'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                   <td
                     class="sticky left-14 z-[25] w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
-                    :class="virtualized ? '' : 'top-20'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   >
                     <span
                       class="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide mr-2"
@@ -102,7 +102,8 @@
                   <td
                     :colspan="columns.length"
                     class="z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
-                    :class="virtualized ? '' : 'sticky top-20'"
+                    :class="virtualized ? '' : 'sticky'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                 </tr>
                 <tr v-else class="group h-14 border-b border-border/60 hover:bg-muted/30">
@@ -189,7 +190,7 @@
             </tbody>
           </table>
           </div>
-          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 top-20 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700">
+          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700" :style="{ top: `${headerHeight}px` }">
             <span class="w-14 min-w-14 max-w-14"></span>
             <span class="flex h-full w-64 min-w-64 max-w-64 items-center border-r border-slate-700 px-4 font-semibold">
               <span class="mr-2 rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide">Company</span>
@@ -236,6 +237,7 @@ import { toast } from 'vue-sonner'
 import { Loader2, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { getApiErrorMessage } from '@/composables/useAxiosService'
+import { useApi } from '@/composables/useAxiosService'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
 import CReportOverviewCurtain from '@/modules/Report/components/CReportOverviewCurtain.vue'
@@ -265,6 +267,8 @@ import {
 type ActivityRow = ReportDriverActivityTable['rows'][number]
 
 const operations = useReportOperations()
+const api = useApi()
+const shiftBased = ref(true)
 async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number], status: number) {
   if (!row.driverId || savingCell.value || activityDateKey(column.date) > reportToday()) return
   const key = cellKey(row, column)
@@ -294,8 +298,8 @@ async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivity
           pageNumber: 1,
           pageSize: 1,
         })
-        const currentId = current.rows.find(item => item.driverId === row.driverId)
-          ?.dateStatuses?.[`${activityDateKey(column.date)}#${column.colNumber}`]?.id
+        const currentRow = current.rows.find(item => item.driverId === row.driverId)
+        const currentId = currentRow ? activityFor(currentRow, column)?.id : undefined
         if (currentId && currentId !== '00000000-0000-0000-0000-000000000000' && canEdit.value) {
           await operations.updateActivity(currentId, body)
           await refresh(page.value)
@@ -320,6 +324,8 @@ const { activityVersion } = useReportSocket()
 const editingCell = ref<string | null>(null)
 const savingCell = ref<string | null>(null)
 const tableScroll = ref<HTMLElement | null>(null)
+const tableHeader = ref<HTMLTableSectionElement | null>(null)
+const headerHeight = ref(0)
 const currentReportDay = ref(reportToday())
 const result = shallowRef<ReportDriverActivityTable>()
 const companies = shallowRef<ReportOperationCompany[]>([])
@@ -341,9 +347,13 @@ const range = ref<DateRange>({
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let dayTimer: ReturnType<typeof setInterval> | undefined
+let headerResizeObserver: ResizeObserver | undefined
 let requestVersion = 0
+let scrollToEndOnNextResult = false
 const columns = computed<ReportDriverActivityTable['columns']>(() => {
-  if (result.value?.columns?.length) return result.value.columns.map(column => ({
+  if (result.value?.columns?.length) return result.value.columns
+    .filter(column => shiftBased.value || column.colNumber === 0)
+    .map(column => ({
     date: activityDateKey(column.date),
     colNumber: column.colNumber,
   }))
@@ -352,7 +362,7 @@ const columns = computed<ReportDriverActivityTable['columns']>(() => {
   if (!start.isValid() || !end.isValid() || end.isBefore(start)) return []
 
   return Array.from({ length: end.diff(start, 'day') + 1 }, (_, index) =>
-    [0, 1, 2].map(period => ({
+    (shiftBased.value ? [0, 1, 2] : [0]).map(period => ({
       date: start.add(index, 'day').format('YYYY-MM-DD'),
       colNumber: period,
     }))
@@ -413,9 +423,9 @@ const filteredDrivers = computed(() =>
 )
 const activityEntries = computed(() =>
   driverRows.value.flatMap((row) =>
-    Object.values(row.dateStatuses ?? {}).filter(
-      (activity) => activity.status != null && activity.status !== 9
-    )
+    columns.value
+      .map(column => activityFor(row, column))
+      .filter((activity): activity is ReportDriverActivity => activity?.status != null && activity.status !== 9)
   )
 )
 const companyCount = computed(
@@ -453,6 +463,16 @@ function queueRefresh() {
 
 function onRange(value: DateRange) {
   range.value = value
+  requestVersion += 1
+  result.value = undefined
+  loading.value = true
+  initialLoad.value = true
+  loadError.value = ''
+  page.value = 1
+  virtualStart.value = 0
+  currentScrollIndex.value = 0
+  scrollToEndOnNextResult = true
+  if (tableScroll.value) tableScroll.value.scrollTop = 0
   queueRefresh()
 }
 
@@ -474,7 +494,14 @@ function cellKey(row: ActivityRow, column: ReportDriverActivityTable['columns'][
 }
 
 function activityFor(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): ReportDriverActivity | undefined {
-  return row.dateStatuses?.[`${activityDateKey(column.date)}#${column.colNumber}`]
+  const date = activityDateKey(column.date)
+  if (!shiftBased.value) {
+    return [2, 1, 0]
+      .map(period => row.dateStatuses?.[`${date}#${period}`])
+      .find(activity => activity?.status != null && activity.status !== 9)
+      ?? row.dateStatuses?.[`${date}#0`]
+  }
+  return row.dateStatuses?.[`${date}#${column.colNumber}`]
 }
 
 function canChangeCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): boolean {
@@ -542,11 +569,31 @@ async function refresh(nextPage = page.value) {
 
 watch([companyId, driverId], queueRefresh)
 watch(pageSizeSelection, () => { page.value = 1; queueRefresh() })
-watch(result, async () => { await nextTick(); onTableScroll() })
+watch(result, async (value) => {
+  await nextTick()
+  onTableScroll()
+  if (value && scrollToEndOnNextResult && tableScroll.value) {
+    tableScroll.value.scrollLeft = tableScroll.value.scrollWidth - tableScroll.value.clientWidth
+    scrollToEndOnNextResult = false
+  }
+})
 
 watch(activityVersion, queueRefresh)
 
 onMounted(async () => {
+  if (tableHeader.value) {
+    headerResizeObserver = new ResizeObserver(() => {
+      headerHeight.value = tableHeader.value?.getBoundingClientRect().height ?? 0
+    })
+    headerResizeObserver.observe(tableHeader.value)
+    headerHeight.value = tableHeader.value.getBoundingClientRect().height
+  }
+  try {
+    const response = await api.get<{ successResult: { activityShiftBased: boolean } }>('/report/api/features')
+    shiftBased.value = response.data.successResult.activityShiftBased ?? true
+  } catch {
+    shiftBased.value = true
+  }
   ready.value = true
   dayTimer = setInterval(() => { currentReportDay.value = reportToday() }, 60_000)
   const initialRefresh = refresh(1)
@@ -562,6 +609,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  headerResizeObserver?.disconnect()
   if (refreshTimer) clearTimeout(refreshTimer)
   if (dayTimer) clearInterval(dayTimer)
   requestVersion += 1

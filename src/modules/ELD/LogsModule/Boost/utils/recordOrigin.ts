@@ -14,10 +14,10 @@ interface OriginContext {
 
 const isCertification = (code: string) => /^DR_CERT_\d+$/.test(code)
 
-/** The origin the field is locked to for this event, or null when the user may choose. Driving is always Auto. */
+/** The origin the field is locked to for this event, or null when the user may choose. Driving and changed device events are Auto. */
 export function fixedOriginFor(eventCode: string, context: OriginContext): number | null {
   if (eventCode === 'DS_D') return Origin.Eld
-  if (context.modifiedProviderEvent) return Origin.OtherUser
+  if (context.modifiedProviderEvent) return Origin.Eld
   if (DRIVER_ORIGIN_CODES.includes(eventCode)) return Origin.Driver
   if (AUTO_ORIGIN_CODES.includes(eventCode)) return Origin.Eld
   return null
@@ -35,8 +35,8 @@ export function drivingOriginLocked(eventCode: string, previousEventCode: string
 }
 
 /**
- * The origin sent to the server. A status changed to driving (or a new driving event) is ELD; an event that
- * already was driving keeps the chosen origin. A changed device event never claims ELD otherwise.
+ * The origin sent to the server. A status changed to driving (or a new driving event) and a changed device
+ * event are ELD; an event that already was driving keeps the chosen origin.
  */
 export function requestOriginFor(
   eventCode: string,
@@ -45,6 +45,6 @@ export function requestOriginFor(
 ): string | null {
   if (isCertification(eventCode)) return null
   if (drivingOriginLocked(eventCode, context.previousEventCode)) return 'ELD'
-  if (context.modifiedProviderEvent && requested === 'ELD') return 'OTHER_USER'
+  if (context.modifiedProviderEvent) return 'ELD'
   return requested
 }

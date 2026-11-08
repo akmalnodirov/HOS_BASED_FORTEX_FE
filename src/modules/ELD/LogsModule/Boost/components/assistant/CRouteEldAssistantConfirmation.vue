@@ -13,7 +13,11 @@
     </dl>
     <p class="text-xs text-muted-foreground">Expires: {{ confirmation.expiresAt }}</p>
     <p class="text-xs text-muted-foreground">
-      Review these exact operations before applying this factual correction to the draft.
+      {{
+        confirmation.correction?.isNewStatus
+          ? 'Review the actual status and time before adding this event to the draft.'
+          : 'Review these exact operations before applying this factual correction to the draft.'
+      }}
     </p>
     <label class="flex items-start gap-2 text-xs">
       <Checkbox
@@ -34,7 +38,7 @@
         {{ busy ? 'Recording decision…' : 'Apply to draft' }}
       </Button>
       <Button variant="outline" size="sm" :disabled="busy" @click="decide(false)">
-        Reject correction
+        {{ confirmation.correction?.isNewStatus ? 'Reject status event' : 'Reject correction' }}
       </Button>
     </div>
   </section>
