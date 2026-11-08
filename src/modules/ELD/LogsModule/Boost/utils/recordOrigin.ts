@@ -7,44 +7,30 @@ const AUTO_ORIGIN_CODES = [
   'ENG_UP_NORMAL', 'ENG_UP_REDUCED', 'ENG_DOWN_NORMAL', 'ENG_DOWN_REDUCED',
 ]
 
-interface OriginContext {
-  /** An event recorded by the device whose status is being changed by another user. */
-  modifiedProviderEvent: boolean
-}
-
 const isCertification = (code: string) => /^DR_CERT_\d+$/.test(code)
 
-/** The origin the field is locked to for this event, or null when the user may choose. Driving and changed device events are Auto. */
-export function fixedOriginFor(eventCode: string, context: OriginContext): number | null {
+export function fixedOriginFor(eventCode: string): number | null {
   if (eventCode === 'DS_D') return Origin.Eld
-  if (context.modifiedProviderEvent) return Origin.Eld
   if (DRIVER_ORIGIN_CODES.includes(eventCode)) return Origin.Driver
   if (AUTO_ORIGIN_CODES.includes(eventCode)) return Origin.Eld
   return null
 }
 
-/** The origin the form switches to when the event type changes. */
-export function originForEvent(eventCode: string, context: OriginContext): number | null {
+export function originForEvent(eventCode: string): number | null {
   if (isCertification(eventCode)) return null
-  return fixedOriginFor(eventCode, context) ?? Origin.Eld
+  return fixedOriginFor(eventCode) ?? Origin.Eld
 }
 
-/** True when the status is changed to driving (or a driving event is added): its origin is then always Auto. */
 export function drivingOriginLocked(eventCode: string, previousEventCode: string | undefined) {
   return eventCode === 'DS_D' && previousEventCode !== 'DS_D'
 }
 
-/**
- * The origin sent to the server. A status changed to driving (or a new driving event) and a changed device
- * event are ELD; an event that already was driving keeps the chosen origin.
- */
 export function requestOriginFor(
   eventCode: string,
   requested: string | null,
-  context: OriginContext & { previousEventCode: string | undefined }
+  previousEventCode: string | undefined
 ): string | null {
   if (isCertification(eventCode)) return null
-  if (drivingOriginLocked(eventCode, context.previousEventCode)) return 'ELD'
-  if (context.modifiedProviderEvent) return 'ELD'
+  if (drivingOriginLocked(eventCode, previousEventCode)) return 'ELD'
   return requested
 }

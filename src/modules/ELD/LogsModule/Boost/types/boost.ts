@@ -208,7 +208,6 @@ export interface BoostEventStatusForm {
   event: { eventCode: number | null; eventType: number | null }
   eventCodeId?: string | null
   originalEventCode?: string | null
-  originalIsEditable?: boolean
   origin: number | null
   recordStatus: string | null
   vehicleId: string | null
