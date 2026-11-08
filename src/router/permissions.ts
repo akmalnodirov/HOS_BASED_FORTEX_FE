@@ -1,4 +1,11 @@
 const pagePermissions: { pattern: RegExp; any: string[] }[] = [
+  { pattern: /^\/report\/owner\/dashboard(?:\/|$)/, any: ['report.owner.dashboard.view'] },
+  { pattern: /^\/report\/owner\/inspections(?:\/|$)/, any: ['report.owner.inspections.view'] },
+  { pattern: /^\/report\/owner\/time(?:\/|$)/, any: ['report.owner.time.view'] },
+  { pattern: /^\/report\/owner\/teams(?:\/|$)/, any: ['report.owner.teams.view'] },
+  { pattern: /^\/report\/owner\/salary(?:\/|$)/, any: ['report.owner.salary.view'] },
+  { pattern: /^\/report\/owner\/expenses(?:\/|$)/, any: ['report.owner.expenses.view'] },
+  { pattern: /^\/report\/owner\/settings(?:\/|$)/, any: ['report.owner.settings.view'] },
   { pattern: /^\/report\/inspection\/violation(?:\/|$)/, any: ['report.inspection.violation.view'] },
   { pattern: /^\/report\/inspection\/no-violation(?:\/|$)/, any: ['report.inspection.no_violation.view'] },
   { pattern: /^\/report\/manage\/drivers(?:\/|$)/, any: ['report.drivers.view'] },
