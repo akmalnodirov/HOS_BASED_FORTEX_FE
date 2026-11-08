@@ -136,7 +136,12 @@
             :title="driver.driverName"
             @click="openDriver(driver.driverId)"
           >
-            <Navigation class="h-4 w-4" />
+            <Navigation
+              class="h-4 w-4"
+              :style="{
+                transform: `rotate(${markerRotation(driver.latestPoint?.bearing)}deg)`,
+              }"
+            />
           </button>
         </CustomMarker>
       </GoogleMap>
@@ -250,6 +255,11 @@ function handleFullscreenChange() {
     const googleMaps = (window as any).google?.maps
     if (rawMap.value && googleMaps?.event) googleMaps.event.trigger(rawMap.value, 'resize')
   })
+}
+
+function markerRotation(value: number | null | undefined) {
+  const bearing = value != null && Number.isFinite(value) ? value : 0
+  return bearing - 45
 }
 
 function statusLabel(value: string) {
