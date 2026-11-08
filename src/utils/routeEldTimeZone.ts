@@ -12,7 +12,10 @@ const routeEldTimeZones: Record<string, string> = {
   SK: 'America/Regina',
 }
 
-export function resolveRouteEldScheduleTimeZone(value?: string | null) {
+export function resolveRouteEldScheduleTimeZone(
+  value?: string | null,
+  fallback = routeEldTimeZones.CT
+) {
   const code = String(value || '').trim()
   const known = routeEldTimeZones[code.toUpperCase()]
   if (known) return known
@@ -20,9 +23,11 @@ export function resolveRouteEldScheduleTimeZone(value?: string | null) {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: code })
       return code
-    } catch { /* Fall back to the Route ELD default below. */ }
+    } catch {
+      return fallback
+    }
   }
-  return routeEldTimeZones.CT
+  return fallback
 }
 
 export function routeEldTimeZoneLabel(value?: string | null) {

@@ -5,7 +5,7 @@
       :tabs="tabs"
       :selected-tab="selectedTab"
       :session-status="session?.status"
-      :is-audit="session?.name?.startsWith('Audit:') || route.query.auditSessionId === session?.id"
+      :is-audit="!!session && (session.name?.startsWith('Audit:') || route.query.auditSessionId === session.id)"
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
       :rollback-blocked="Boolean(session?.isRollbackBlocked)"

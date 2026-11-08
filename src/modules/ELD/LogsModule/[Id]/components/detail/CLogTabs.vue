@@ -472,6 +472,7 @@ watch(
           )
           if (workspace) {
             if (workspace.session.driverId.toLowerCase() !== normalizedDriverId.toLowerCase()) {
+              boostStore.clear()
               throw new Error('This session belongs to a different driver.')
             }
             await applyBoostWorkspaceRoute(workspace)
