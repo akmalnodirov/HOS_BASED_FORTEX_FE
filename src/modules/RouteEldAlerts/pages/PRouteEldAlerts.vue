@@ -87,31 +87,26 @@
           <X class="h-4 w-4" />
         </Button>
       </div>
-      <div v-if="mapSelection.latitude !== null && mapSelection.longitude !== null && mapApiKey" class="relative h-72">
-      <div class="absolute right-3 top-3 z-10"><CMapTypeControl v-model="mapType" :get-map="getMap" /></div>
-      <GoogleMap
+      <div v-if="mapSelection.latitude !== null && mapSelection.longitude !== null" class="relative h-72">
+      <div class="absolute right-3 top-3 z-10"><CMapTypeControl /></div>
+      <CMap
         ref="mapRef"
-        :api-key="mapApiKey"
         :center="{ lat: mapSelection.latitude, lng: mapSelection.longitude }"
         :zoom="12"
-        :styles="mapStyles"
-        :map-type-id="mapType"
-        :disable-default-ui="true"
-        :zoom-control="true"
-        class="h-full w-full"
         @ready="fitMapSelection"
       >
-        <CustomMarker :options="{ position: { lat: mapSelection.latitude, lng: mapSelection.longitude }, anchorPoint: 'CENTER' }">
+        <CMapMarker :position="{ lat: mapSelection.latitude, lng: mapSelection.longitude }" :z-index="showDriverInfo ? 2 : 1">
           <div class="relative">
           <button type="button" class="rounded-full border-2 border-white bg-blue-600 p-2 text-white shadow-lg" :title="mapSelection.driver" @click.stop="showDriverInfo = true">
             <Truck class="h-4 w-4" />
           </button>
           <CMapMarkerInfo v-if="showDriverInfo" placement="left" :title="mapSelection.driver" :rows="mapSelection.driverRows" @close="showDriverInfo = false" />
           </div>
-        </CustomMarker>
-        <CustomMarker
+        </CMapMarker>
+        <CMapMarker
           v-if="mapSelection.targetLatitude !== null && mapSelection.targetLongitude !== null"
-          :options="{ position: { lat: mapSelection.targetLatitude, lng: mapSelection.targetLongitude }, anchorPoint: 'CENTER' }"
+          :position="{ lat: mapSelection.targetLatitude, lng: mapSelection.targetLongitude }"
+          :z-index="showTargetInfo ? 2 : 1"
         >
           <div class="relative">
           <button type="button" class="rounded-full border-2 border-white bg-emerald-600 p-2 text-white shadow-lg" :title="mapSelection.reason" @click.stop="showTargetInfo = true">
@@ -119,11 +114,11 @@
           </button>
           <CMapMarkerInfo v-if="showTargetInfo" placement="right" :title="mapSelection.targetName || mapSelection.reason" :rows="mapSelection.targetRows" @close="showTargetInfo = false" />
           </div>
-        </CustomMarker>
-      </GoogleMap>
+        </CMapMarker>
+      </CMap>
       </div>
       <div v-else class="flex h-28 items-center justify-center text-sm text-muted-foreground">
-        {{ mapApiKey ? 'Coordinates are unavailable for this notification.' : 'Map is unavailable: Google Maps key is not configured.' }}
+        Coordinates are unavailable for this notification.
       </div>
     </section>
 
@@ -565,10 +560,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Check, ChevronLeft, ChevronRight, LoaderCircle, MapPin, MapPinned, RefreshCw, Search, Truck, X } from 'lucide-vue-next'
-import { CustomMarker, GoogleMap } from 'vue3-google-map'
-import CMapTypeControl, { type MapType } from '@/components/custom/CMapTypeControl.vue'
+import type { Map as MapLibreMap } from 'maplibre-gl'
+import CMap from '@/components/custom/CMap.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 import CMapMarkerInfo from '@/components/custom/CMapMarkerInfo.vue'
-import { mapMarkerInfoPadding, mapStyles } from '@/utils/maps'
+import { mapMarkerInfoPadding, positionsBounds } from '@/utils/maps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -654,10 +651,8 @@ const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
 const pageSize = ref(25)
-const mapApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-const mapRef = ref<any>(null)
-const mapType = ref<MapType>('roadmap')
-const getMap = () => mapRef.value?.map ?? null
+const mapRef = ref<InstanceType<typeof CMap> | null>(null)
+const getMap = () => mapRef.value?.getMap() ?? null
 interface AlertMapSelection {
   driver: string
   reason: string
@@ -1100,23 +1095,19 @@ function formatCoordinates(latitude: number | null, longitude: number | null) {
   return latitude === null || longitude === null ? '—' : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
 
-function fitMapSelection(instance?: any) {
+function fitMapSelection(instance?: MapLibreMap) {
   const selection = mapSelection.value
-  const map = instance?.map ?? instance ?? getMap()
-  const googleMaps = (window as any).google?.maps
-  if (!selection || !map || !googleMaps || selection.latitude === null || selection.longitude === null) return
+  const map = instance ?? getMap()
+  if (!selection || !map || selection.latitude === null || selection.longitude === null) return
   const driver = { lat: selection.latitude, lng: selection.longitude }
   if (selection.targetLatitude === null || selection.targetLongitude === null ||
       (selection.targetLatitude === selection.latitude && selection.targetLongitude === selection.longitude)) {
-    map.setCenter(driver)
-    map.setZoom(12)
-    map.panBy?.(0, -75)
+    map.jumpTo({ center: driver, zoom: 12 })
+    map.panBy([0, -75], { duration: 0 })
     return
   }
-  const bounds = new googleMaps.LatLngBounds()
-  bounds.extend(driver)
-  bounds.extend({ lat: selection.targetLatitude, lng: selection.targetLongitude })
-  map.fitBounds(bounds, mapMarkerInfoPadding(map))
+  const bounds = positionsBounds([driver, { lat: selection.targetLatitude, lng: selection.targetLongitude }])
+  if (bounds) map.fitBounds(bounds, { padding: mapMarkerInfoPadding(map), duration: 0 })
 }
 
 function rowNumber(index: number) {
