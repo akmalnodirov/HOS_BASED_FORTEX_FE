@@ -96,38 +96,16 @@
       ]"
     >
       <CMapControls
-        v-model:map-type="mapType"
         v-model:current-filter="statusFilter"
         :filter-options="driverStatuses"
         :is-fullscreen="isFullscreen"
-        :get-map="getMap"
         @toggle-fullscreen="toggleFullscreen"
       />
-      <div
-        v-if="!apiKey"
-        class="flex h-full items-center justify-center text-sm text-muted-foreground"
-      >
-        Google Maps API key is not configured.
-      </div>
-      <GoogleMap
-        v-else
-        :api-key="apiKey"
-        :center="mapCenter"
-        :zoom="4"
-        :styles="mapStyles"
-        :map-type-id="mapType"
-        :disable-default-ui="true"
-        :zoom-control="true"
-        style="height: 100%; width: 100%"
-        @ready="handleMapReady"
-      >
-        <CustomMarker
+      <CMap :center="mapCenter" :zoom="4">
+        <CMapMarker
           v-for="driver in locatedDrivers"
           :key="driver.driverId"
-          :options="{
-            position: { lat: driver.latestPoint!.latitude, lng: driver.latestPoint!.longitude },
-            anchorPoint: 'CENTER',
-          }"
+          :position="{ lat: driver.latestPoint!.latitude, lng: driver.latestPoint!.longitude }"
         >
           <div class="relative flex flex-col items-center">
             <div
@@ -152,34 +130,31 @@
               />
             </button>
           </div>
-        </CustomMarker>
-      </GoogleMap>
+        </CMapMarker>
+      </CMap>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CustomMarker, GoogleMap } from 'vue3-google-map'
 import { Navigation, RefreshCw, Search, Wifi } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import CMap from '@/components/custom/CMap.vue'
 import CMapControls from '@/components/custom/CMapControls.vue'
-import { mapStyles } from '@/utils/maps'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import { useRouteEldOverviewDrivers } from '../composables/useRouteEldOverview'
 
 const router = useRouter()
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const search = ref('')
 const activityFilter = ref<'active' | 'inactive' | 'all'>('active')
 const statusFilter = ref('all')
-const mapType = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const mapCenter = { lat: 39.8283, lng: -98.5795 }
 const mapContainer = ref<HTMLElement | null>(null)
-const rawMap = ref<any>(null)
 const isFullscreen = ref(false)
 const { drivers, isLoading, isRefreshing, error, load } = useRouteEldOverviewDrivers()
 
@@ -277,24 +252,15 @@ function dutyStatus(value: string) {
   return 'offDuty'
 }
 
-function handleMapReady(instance: any) {
-  rawMap.value = instance?.map ?? instance
-}
-
-const getMap = () => rawMap.value
-
 async function toggleFullscreen() {
-  if (!mapContainer.value) return
-  if (document.fullscreenElement === mapContainer.value) await document.exitFullscreen()
-  else await mapContainer.value.requestFullscreen()
+  const element = mapContainer.value
+  if (!element) return
+  if (document.fullscreenElement === element) await document.exitFullscreen().catch(() => {})
+  else await element.requestFullscreen().catch(() => {})
 }
 
 function handleFullscreenChange() {
   isFullscreen.value = document.fullscreenElement === mapContainer.value
-  nextTick(() => {
-    const googleMaps = (window as any).google?.maps
-    if (rawMap.value && googleMaps?.event) googleMaps.event.trigger(rawMap.value, 'resize')
-  })
 }
 
 function markerRotation(value: number | null | undefined) {

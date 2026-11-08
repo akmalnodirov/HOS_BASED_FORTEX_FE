@@ -86,130 +86,111 @@
         ]"
       >
         <div
-          v-if="!apiKey"
-          class="h-full flex items-center justify-center text-sm text-muted-foreground bg-muted/30"
+          class="absolute left-3 top-3 z-10 rounded-md bg-white/95 dark:bg-card/95 px-3 py-2 shadow"
         >
-          Google Maps API key is not configured.
+          <div class="text-sm font-medium">All matching stations</div>
+          <div class="text-xs text-muted-foreground">
+            <template v-if="stationClustersFetching">Loading map clusters…</template>
+            <template v-else-if="stationClustersError">Unable to load map clusters</template>
+            <template v-else>
+              {{ page?.pagination.totalCount ?? 0 }} stations · click a cluster to zoom
+            </template>
+          </div>
         </div>
-        <template v-else>
-          <div
-            class="absolute left-3 top-3 z-10 rounded-md bg-white/95 dark:bg-card/95 px-3 py-2 shadow"
+        <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
+          <CMapTypeControl />
+          <button
+            type="button"
+            title="Toggle fullscreen"
+            class="flex h-10 w-10 items-center justify-center rounded-md bg-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 dark:bg-card dark:text-foreground dark:hover:bg-muted"
+            @click="toggleMapFullscreen"
           >
-            <div class="text-sm font-medium">All matching stations</div>
-            <div class="text-xs text-muted-foreground">
-              <template v-if="stationClustersFetching">Loading map clusters…</template>
-              <template v-else-if="stationClustersError">Unable to load map clusters</template>
-              <template v-else>
-                {{ page?.pagination.totalCount ?? 0 }} stations · click a cluster to zoom
-              </template>
-            </div>
-          </div>
-          <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
-            <CMapTypeControl v-model="mapTypeId" :get-map="getStationMap" />
+            <Minimize v-if="isMapFullscreen" class="h-5 w-5" />
+            <Maximize v-else class="h-5 w-5" />
+          </button>
+        </div>
+        <CMap
+          ref="stationMapRef"
+          :center="mapCenter"
+          :zoom="4"
+          :zoom-control="false"
+          @ready="onMapReady"
+        >
+          <CMapMarker
+            v-for="cluster in visibleStationClusters"
+            :key="clusterKey(cluster)"
+            :position="{ lat: cluster.latitude, lng: cluster.longitude }"
+          >
             <button
+              v-if="cluster.count > 1"
               type="button"
-              title="Toggle fullscreen"
-              class="flex h-10 w-10 items-center justify-center rounded-md bg-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 dark:bg-card dark:text-foreground dark:hover:bg-muted"
-              @click="toggleMapFullscreen"
+              class="flex items-center justify-center rounded-full border-2 border-white bg-orange-500 font-semibold text-white shadow-lg transition-transform hover:scale-110"
+              :style="stationClusterStyle(cluster.count)"
+              @click.stop="focusStationCluster(cluster)"
             >
-              <Minimize v-if="isMapFullscreen" class="h-5 w-5" />
-              <Maximize v-else class="h-5 w-5" />
+              {{ formatClusterCount(cluster.count) }}
             </button>
-          </div>
-          <GoogleMap
-            ref="stationMapRef"
-            :api-key="apiKey"
-            :styles="mapStyles"
-            :center="mapCenter"
-            :zoom="4"
-            :map-type-id="mapTypeId"
-            :disable-default-ui="true"
-            :street-view-control="true"
-            style="width: 100%; height: 100%"
-            @ready="onMapReady"
-            @idle="scheduleClusterRefresh"
-          >
-            <CustomMarker
-              v-for="cluster in visibleStationClusters"
-              :key="clusterKey(cluster)"
-              :options="{
-                position: { lat: cluster.latitude, lng: cluster.longitude },
-                anchorPoint: 'CENTER',
-              }"
+            <button
+              v-else
+              type="button"
+              class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-white shadow-md transition-transform hover:scale-110"
+              :style="{ backgroundColor: stationClusterColor(cluster) }"
+              @click.stop="focusStationCluster(cluster)"
             >
-              <button
-                v-if="cluster.count > 1"
-                type="button"
-                class="flex items-center justify-center rounded-full border-2 border-white bg-orange-500 font-semibold text-white shadow-lg transition-transform hover:scale-110"
-                :style="stationClusterStyle(cluster.count)"
-                @click.stop="focusStationCluster(cluster)"
-              >
-                {{ formatClusterCount(cluster.count) }}
-              </button>
-              <button
-                v-else
-                type="button"
-                class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-white shadow-md transition-transform hover:scale-110"
-                :style="{ backgroundColor: stationClusterColor(cluster) }"
-                @click.stop="focusStationCluster(cluster)"
-              >
-                <Scale class="h-4 w-4" />
-              </button>
-            </CustomMarker>
+              <Scale class="h-4 w-4" />
+            </button>
+          </CMapMarker>
 
-            <CustomMarker
-              v-if="selectedStation"
-              :options="{
-                position: { lat: selectedStation.latitude, lng: selectedStation.longitude },
-                anchorPoint: 'CENTER',
-              }"
-            >
-              <div class="relative cursor-pointer">
-                <div
-                  class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-white shadow-lg ring-2 ring-primary/30"
-                  :style="{ backgroundColor: stationColor(selectedStation) }"
-                >
-                  <Scale class="h-5 w-5" />
-                </div>
-                <div
-                  class="absolute bottom-full left-1/2 z-50 mb-3 min-w-[240px] -translate-x-1/2 cursor-default rounded-lg border border-gray-200 bg-white shadow-xl dark:border-border dark:bg-card"
-                  @click.stop
-                >
-                  <div class="space-y-2 px-4 py-3 text-xs">
-                    <button
-                      type="button"
-                      title="Close"
-                      class="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                      @click.stop="closeStationInfo"
-                    >
-                      <X class="h-4 w-4" />
-                    </button>
-                    <div class="border-b border-border pb-2 pr-6 text-sm font-semibold">
-                      {{ selectedStation.name || 'Unnamed station' }}
-                    </div>
-                    <div class="flex justify-between gap-4">
-                      <span class="text-muted-foreground">Location</span>
-                      <span class="max-w-[150px] text-right">{{
-                        selectedStation.location || '—'
-                      }}</span>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                      <span class="text-muted-foreground">Direction</span>
-                      <span>{{ selectedStation.direction || '—' }}</span>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                      <span class="text-muted-foreground">Type</span>
-                      <span>{{ selectedStation.type || '—' }}</span>
-                    </div>
-                  </div>
-                  <div
-                    class="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-[8px] border-transparent border-t-white dark:border-t-card"
-                  ></div>
-                </div>
+          <CMapMarker
+            v-if="selectedStation"
+            :position="{ lat: selectedStation.latitude, lng: selectedStation.longitude }"
+            :z-index="1"
+          >
+            <div class="relative cursor-pointer">
+              <div
+                class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-white shadow-lg ring-2 ring-primary/30"
+                :style="{ backgroundColor: stationColor(selectedStation) }"
+              >
+                <Scale class="h-5 w-5" />
               </div>
-            </CustomMarker>
-          </GoogleMap>
-        </template>
+              <div
+                class="absolute bottom-full left-1/2 z-50 mb-3 min-w-[240px] -translate-x-1/2 cursor-default rounded-lg border border-gray-200 bg-white shadow-xl dark:border-border dark:bg-card"
+                @click.stop
+              >
+                <div class="space-y-2 px-4 py-3 text-xs">
+                  <button
+                    type="button"
+                    title="Close"
+                    class="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    @click.stop="closeStationInfo"
+                  >
+                    <X class="h-4 w-4" />
+                  </button>
+                  <div class="border-b border-border pb-2 pr-6 text-sm font-semibold">
+                    {{ selectedStation.name || 'Unnamed station' }}
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Location</span>
+                    <span class="max-w-[150px] text-right">{{
+                      selectedStation.location || '—'
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Direction</span>
+                    <span>{{ selectedStation.direction || '—' }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Type</span>
+                    <span>{{ selectedStation.type || '—' }}</span>
+                  </div>
+                </div>
+                <div
+                  class="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-[8px] border-transparent border-t-white dark:border-t-card"
+                ></div>
+              </div>
+            </div>
+          </CMapMarker>
+        </CMap>
       </div>
     </div>
 
@@ -352,7 +333,7 @@ import {
   Search,
   X,
 } from 'lucide-vue-next'
-import { CustomMarker, GoogleMap } from 'vue3-google-map'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -371,10 +352,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import CMap from '@/components/custom/CMap.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
-import type { MapType } from '@/components/custom/CMapTypeControl.vue'
 import { useWeightStationAddressReveal } from '../composables/useWeightStationAddressReveal'
-import { mapStyles } from '@/utils/maps'
+import { mapViewport as currentMapViewport } from '@/utils/maps'
 import { US_STATES } from '../usStates'
 import { useWeightStationClusters, useWeightStations } from '../composables/useWeightStations'
 import type { WeightStation, WeightStationCluster } from '../types'
@@ -385,13 +367,10 @@ const stateCode = ref('')
 const marker = ref('all')
 const pageNumber = ref(1)
 const pageSize = ref(25)
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-const stationMapRef = ref<any>(null)
+const stationMapRef = ref<InstanceType<typeof CMap> | null>(null)
 const mapSectionEl = ref<HTMLElement | null>(null)
 const mapContainerEl = ref<HTMLElement | null>(null)
-const mapCenter = ref({ lat: 39.5, lng: -98.35 })
-const mapTypeId = ref<MapType>('roadmap')
-const mapReady = ref(false)
+const mapCenter = { lat: 39.5, lng: -98.35 }
 const isMapFullscreen = ref(false)
 const activeStationId = ref<string | null>(null)
 const selectedStation = ref<WeightStation | null>(null)
@@ -405,7 +384,6 @@ const mapViewport = ref<{
 const { address, isLoading: isAddressLoading, reveal } = useWeightStationAddressReveal()
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 let clusterRefreshTimer: ReturnType<typeof setTimeout> | null = null
-let stationRawMap: any = null
 
 watch(searchDraft, (value) => {
   if (searchTimer) clearTimeout(searchTimer)
@@ -476,21 +454,10 @@ const mobileCount = computed(
   () => visibleStations.value.filter((item) => item.type === 'Mobile').length
 )
 
-const getStationMap = () => stationMapRef.value?.map ?? stationRawMap ?? null
+const getStationMap = () => stationMapRef.value?.getMap() ?? null
 
-watch(
-  () => stationMapRef.value?.ready || !!stationMapRef.value?.map,
-  (ready) => {
-    if (!ready) return
-    mapReady.value = true
-    scheduleClusterRefresh()
-  },
-  { immediate: true }
-)
-
-function onMapReady(instance: any) {
-  stationRawMap = instance
-  mapReady.value = true
+function onMapReady(map: MapLibreMap) {
+  map.on('moveend', scheduleClusterRefresh)
   refreshClusterViewport()
 }
 
@@ -504,9 +471,7 @@ async function toggleMapFullscreen() {
 function syncMapFullscreen() {
   isMapFullscreen.value = document.fullscreenElement === mapContainerEl.value
   void nextTick().then(() => {
-    const map = getStationMap()
-    const googleMaps = (window as any).google?.maps
-    if (map && googleMaps?.event) googleMaps.event.trigger(map, 'resize')
+    getStationMap()?.resize()
     scheduleClusterRefresh()
   })
 }
@@ -521,22 +486,20 @@ function scheduleClusterRefresh() {
 
 function refreshClusterViewport() {
   const map = getStationMap()
-  const bounds = map?.getBounds?.()
-  if (!mapReady.value || !map || !bounds) return
+  const bounds = map ? currentMapViewport(map) : null
+  if (!map || !bounds) return
 
-  const southwest = bounds.getSouthWest()
-  const northeast = bounds.getNorthEast()
   const round = (value: number) => Number(value.toFixed(4))
-  let west = round(Math.max(-180, southwest.lng()))
-  let east = round(Math.min(180, northeast.lng()))
-  const south = round(Math.max(-90, southwest.lat()))
-  const north = round(Math.min(90, northeast.lat()))
+  let west = round(bounds.west)
+  let east = round(bounds.east)
+  const south = round(bounds.south)
+  const north = round(bounds.north)
   if (west >= east) {
     west = -180
     east = 180
   }
   if (south >= north) return
-  const zoom = Math.max(0, Math.min(22, Math.floor(map.getZoom?.() ?? 4)))
+  const zoom = Math.max(0, Math.min(22, Math.floor(map.getZoom())))
   const cached = mapViewport.value
   if (
     cached?.zoom === zoom &&
@@ -560,11 +523,7 @@ function refreshClusterViewport() {
 }
 
 function flyTo(target: { lat: number; lng: number }, endZoom = 12) {
-  const map = getStationMap()
-  if (!map) return
-  map.panTo(target)
-  map.setZoom(endZoom)
-  mapCenter.value = target
+  getStationMap()?.easeTo({ center: target, zoom: endZoom })
 }
 
 function focusStation(station: WeightStation) {
@@ -583,8 +542,10 @@ function focusStationCluster(cluster: WeightStationCluster) {
   if (cluster.count > 1) {
     const map = getStationMap()
     if (!map) return
-    map.panTo({ lat: cluster.latitude, lng: cluster.longitude })
-    map.setZoom(Math.min((map.getZoom?.() ?? mapViewport.value?.zoom ?? 4) + 2, 18))
+    map.easeTo({
+      center: { lat: cluster.latitude, lng: cluster.longitude },
+      zoom: Math.min(map.getZoom() + 2, 18),
+    })
     return
   }
 

@@ -3,11 +3,7 @@
     class="pointer-events-none absolute left-4 right-4 top-4 z-10 grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3"
   >
     <div class="pointer-events-auto">
-      <CMapTypeControl
-        :model-value="mapType"
-        :get-map="getMap"
-        @update:model-value="emit('update:mapType', $event)"
-      />
+      <CMapTypeControl />
     </div>
     <div
       class="pointer-events-auto max-w-full justify-self-center overflow-x-auto rounded-md border border-border bg-card p-1 shadow-md"
@@ -54,7 +50,7 @@
 <script setup lang="ts">
 import { Maximize, Minimize } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import CMapTypeControl, { type MapType } from '@/components/custom/CMapTypeControl.vue'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 
 export interface MapFilterOption {
   id: string
@@ -63,19 +59,13 @@ export interface MapFilterOption {
   colorClass?: string
 }
 
-withDefaults(
-  defineProps<{
-    mapType: MapType
-    filterOptions: MapFilterOption[]
-    currentFilter: string
-    isFullscreen: boolean
-    getMap?: () => any
-  }>(),
-  { getMap: () => null }
-)
+defineProps<{
+  filterOptions: MapFilterOption[]
+  currentFilter: string
+  isFullscreen: boolean
+}>()
 
 const emit = defineEmits<{
-  'update:mapType': [value: MapType]
   'update:currentFilter': [value: string]
   'toggle-fullscreen': []
 }>()

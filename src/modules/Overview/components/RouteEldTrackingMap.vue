@@ -6,74 +6,29 @@
       isFullscreen && 'fixed inset-0 z-[100] min-h-screen',
     ]"
   >
-    <div
-      v-if="!apiKey"
-      class="flex h-full items-center justify-center text-sm text-muted-foreground"
-    >
-      Google Maps API key is not configured.
-    </div>
-    <GoogleMap
-      v-else
-      ref="mapRef"
-      :api-key="apiKey"
-      :center="mapCenter"
-      :zoom="5"
-      :map-type-id="mapTypeId"
-      :styles="mapStyles"
-      :disable-default-ui="true"
-      :zoom-control="true"
-      style="height: 100%; width: 100%"
-      @dragstart="handleManualMapInteraction"
-      @ready="onReady"
-    >
-      <Polyline
-        v-if="committedPath.length > 1"
-        :options="{
-          path: committedPath,
-          strokeColor: '#ffffff',
-          strokeOpacity: 0.9,
-          strokeWeight: 8,
-          clickable: false,
-          zIndex: 5,
-        }"
+    <CMap ref="mapRef" :center="mapCenter" :zoom="5" @ready="onReady">
+      <CMapLine
+        :path="committedPath"
+        color="#2563EB"
+        :width="5"
+        :opacity="0.95"
+        casing-color="#ffffff"
+        :casing-width="8"
+        :casing-opacity="0.9"
       />
-      <Polyline
-        v-if="committedPath.length > 1"
-        :options="{
-          path: committedPath,
-          strokeColor: '#2563EB',
-          strokeOpacity: 0.95,
-          strokeWeight: 5,
-          clickable: false,
-          zIndex: 6,
-        }"
+      <CMapLine
+        :path="activeTrailPath"
+        color="#2563EB"
+        :width="5"
+        :opacity="0.95"
+        casing-color="#ffffff"
+        :casing-width="8"
+        :casing-opacity="0.9"
       />
-      <Polyline
-        v-if="activeTrailPath.length > 1"
-        :options="{
-          path: activeTrailPath,
-          strokeColor: '#ffffff',
-          strokeOpacity: 0.9,
-          strokeWeight: 8,
-          clickable: false,
-          zIndex: 7,
-        }"
-      />
-      <Polyline
-        v-if="activeTrailPath.length > 1"
-        :options="{
-          path: activeTrailPath,
-          strokeColor: '#2563EB',
-          strokeOpacity: 0.95,
-          strokeWeight: 5,
-          clickable: false,
-          zIndex: 8,
-        }"
-      />
-      <CustomMarker
+      <CMapMarker
         v-for="point in filteredTransitionPoints"
         :key="point.id"
-        :options="{ position: position(point), anchorPoint: 'CENTER' }"
+        :position="position(point)"
       >
         <button
           type="button"
@@ -86,11 +41,8 @@
         >
           {{ markerNumber(point) }}
         </button>
-      </CustomMarker>
-      <CustomMarker
-        v-if="animatedPosition"
-        :options="{ position: animatedPosition, anchorPoint: 'CENTER' }"
-      >
+      </CMapMarker>
+      <CMapMarker v-if="animatedPosition" :position="animatedPosition" :z-index="1">
         <div class="relative flex flex-col items-center">
           <div
             v-if="vehicleName"
@@ -111,8 +63,8 @@
             />
           </button>
         </div>
-      </CustomMarker>
-    </GoogleMap>
+      </CMapMarker>
+    </CMap>
 
     <div
       class="absolute left-3 top-3 z-10 rounded-md bg-white/95 px-3 py-2 shadow-md backdrop-blur dark:bg-card/95"
@@ -155,7 +107,7 @@
       </div>
     </div>
 
-    <div v-if="apiKey" class="absolute right-3 top-3 z-10 flex items-center gap-2">
+    <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
       <Button
         variant="outline"
         size="icon"
@@ -168,7 +120,7 @@
       >
         <LocateFixed class="h-5 w-5" />
       </Button>
-      <CMapTypeControl v-model="mapTypeId" :get-map="getMap" />
+      <CMapTypeControl />
       <Button
         variant="outline"
         size="icon"
@@ -204,10 +156,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { LocateFixed, Maximize, Minimize, Navigation, X } from 'lucide-vue-next'
-import { CustomMarker, GoogleMap, Polyline } from 'vue3-google-map'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Button } from '@/components/ui/button'
+import CMap from '@/components/custom/CMap.vue'
+import CMapLine from '@/components/custom/CMapLine.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
-import { mapStyles } from '@/utils/maps'
+import { positionsBounds } from '@/utils/maps'
+import { fetchMapRoute, MAP_ROUTE_MAX_POINTS } from '@/services/mapRouteService'
 import type { RouteEldLiveTrackingPoint } from '../types'
 
 interface LatLng {
@@ -224,14 +180,11 @@ const props = defineProps<{
   vehicleName?: string | null
 }>()
 
-const MAX_DIRECTIONS_POINTS = 20
 const MAX_ROUTE_ANCHORS = 180
 const MIN_ROUTE_POINT_DISTANCE_METERS = 75
 const FOLLOW_PAN_DISTANCE_METERS = 800
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-const mapRef = ref<any>(null)
+const mapRef = ref<InstanceType<typeof CMap> | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
-const mapTypeId = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const isFullscreen = ref(false)
 const autoFollow = ref(true)
 const isMatchingRoute = ref(false)
@@ -244,7 +197,7 @@ const animationCumulativeDistances = ref<number[]>([])
 const animationSegmentIndex = ref(0)
 const bearing = ref(0)
 const visiblePointTimestamp = ref(Number.POSITIVE_INFINITY)
-const directionsCache = new Map<string, LatLng[]>()
+const roadPathCache = new Map<string, LatLng[]>()
 let animationStartedAt = 0
 let animationDuration = 0
 let animationFromTimestamp = 0
@@ -556,13 +509,11 @@ function validAnimationDuration(sourceInterval: number) {
 async function resolveRoadPath(rawPoints: LatLng[]) {
   const anchors = prepareRouteAnchors(rawPoints)
   if (anchors.length < 2) return anchors
-  const ready = await waitForDirectionsService()
-  if (!ready) return anchors
 
   const path: LatLng[] = []
-  for (let start = 0; start < anchors.length - 1; start += MAX_DIRECTIONS_POINTS - 1) {
-    const batch = anchors.slice(start, start + MAX_DIRECTIONS_POINTS)
-    const resolved = await resolveDirectionsBatch(batch)
+  for (let start = 0; start < anchors.length - 1; start += MAP_ROUTE_MAX_POINTS - 1) {
+    const batch = anchors.slice(start, start + MAP_ROUTE_MAX_POINTS)
+    const resolved = await resolveRoadBatch(batch)
     appendUniquePath(path, resolved)
   }
   return path.length >= 2 ? path : anchors
@@ -586,91 +537,64 @@ function prepareRouteAnchors(points: LatLng[]) {
   return sampled
 }
 
-async function waitForDirectionsService(maxWaitMilliseconds = 10_000) {
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < maxWaitMilliseconds) {
-    if ((window as any).google?.maps?.DirectionsService) return true
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  return false
-}
-
-async function resolveDirectionsBatch(points: LatLng[]) {
+async function resolveRoadBatch(points: LatLng[]) {
   if (points.length < 2) return points
   const key = points.map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`).join('|')
-  const cached = directionsCache.get(key)
+  const cached = roadPathCache.get(key)
   if (cached) return cached
-  const googleMaps = (window as any).google?.maps
-  if (!googleMaps?.DirectionsService) return points
 
   try {
-    const result = await new googleMaps.DirectionsService().route({
-      origin: points[0],
-      destination: points.at(-1)!,
-      waypoints: points.slice(1, -1).map((point) => ({
-        location: new googleMaps.LatLng(point.lat, point.lng),
-        stopover: false,
-      })),
-      optimizeWaypoints: false,
-      provideRouteAlternatives: false,
-      travelMode: googleMaps.TravelMode.DRIVING,
-    })
-    const route = result?.routes?.[0]
+    const route = await fetchMapRoute(
+      points.map((point) => ({ latitude: point.lat, longitude: point.lng })),
+      true
+    )
     const path: LatLng[] = []
-    for (const leg of route?.legs ?? []) {
-      for (const step of leg.steps ?? []) {
-        for (const point of step.path ?? [])
-          appendUniquePoint(path, { lat: point.lat(), lng: point.lng() })
-      }
-    }
-    if (path.length < 2) {
-      for (const point of route?.overview_path ?? [])
-        appendUniquePoint(path, { lat: point.lat(), lng: point.lng() })
+    for (const point of route.path ?? []) {
+      if (Number.isFinite(point.latitude) && Number.isFinite(point.longitude))
+        appendUniquePoint(path, { lat: point.latitude, lng: point.longitude })
     }
     const resolved = path.length >= 2 ? path : points
-    if (directionsCache.size >= 200) {
-      const oldestKey = directionsCache.keys().next().value
-      if (oldestKey) directionsCache.delete(oldestKey)
+    if (roadPathCache.size >= 200) {
+      const oldestKey = roadPathCache.keys().next().value
+      if (oldestKey) roadPathCache.delete(oldestKey)
     }
-    directionsCache.set(key, resolved)
+    roadPathCache.set(key, resolved)
     return resolved
   } catch {
     return points
   }
 }
 
-function onReady() {
-  void rebuildRoadPath(props.points)
+function onReady(map: MapLibreMap) {
+  map.on('dragstart', handleManualMapInteraction)
+  if (!isMatchingRoute.value) fitRoute()
 }
 
-function getMap() {
-  return mapRef.value?.map
+function getMap(): MapLibreMap | null {
+  return mapRef.value?.getMap() ?? null
 }
 
 function fitRoute() {
   const map = getMap()
-  const googleMaps = (window as any).google?.maps
   const path = [...committedPath.value]
   if (animationPath.value.length) appendUniquePath(path, animationPath.value)
   if (!path.length) appendUniquePath(path, props.points.map(position))
-  if (!map || !googleMaps || !path.length) return
+  if (!map || !path.length) return
   if (path.length === 1) {
-    map.setCenter(path[0])
-    map.setZoom(15)
+    map.jumpTo({ center: path[0], zoom: 15 })
     return
   }
-  const bounds = new googleMaps.LatLngBounds()
-  path.forEach((point) => bounds.extend(point))
-  map.fitBounds(bounds, 70)
+  const bounds = positionsBounds(path)
+  if (bounds) map.fitBounds(bounds, { padding: 70, duration: 0 })
   if (animatedPosition.value) lastPanPosition = animatedPosition.value
 }
 
 function toggleFollow() {
   autoFollow.value = !autoFollow.value
-  if (autoFollow.value && animatedPosition.value) {
-    getMap()?.panTo(animatedPosition.value)
+  const map = getMap()
+  if (autoFollow.value && animatedPosition.value && map) {
+    map.easeTo({ center: animatedPosition.value, zoom: Math.max(map.getZoom(), 15) })
     lastPanPosition = animatedPosition.value
-    if ((getMap()?.getZoom?.() ?? 0) < 15) getMap()?.setZoom(15)
   }
 }
 
@@ -690,17 +614,17 @@ function maybePanToVehicle(value: LatLng) {
 }
 
 async function toggleFullscreen() {
-  if (!containerRef.value) return
-  if (document.fullscreenElement === containerRef.value) await document.exitFullscreen()
-  else await containerRef.value.requestFullscreen()
+  const element = containerRef.value
+  if (!element) return
+  if (document.fullscreenElement === element) await document.exitFullscreen().catch(() => {})
+  else await element.requestFullscreen().catch(() => {})
 }
 
 function handleFullscreenChange() {
   isFullscreen.value = document.fullscreenElement === containerRef.value
   nextTick(() => {
     const map = getMap()
-    const googleMaps = (window as any).google?.maps
-    if (map && googleMaps?.event) googleMaps.event.trigger(map, 'resize')
+    map?.resize()
     if (autoFollow.value && animatedPosition.value) map?.panTo(animatedPosition.value)
     else fitRoute()
   })

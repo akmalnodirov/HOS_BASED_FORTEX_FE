@@ -430,6 +430,9 @@ export class ApiEndpoints {
   static readonly ALPR_CAMERA_CLUSTERS = `${this.BASE_URL}/cameras/clusters`
   static readonly ALPR_CAMERAS = `${this.BASE_URL}/cameras`
 
+  // Self-hosted map routing
+  static readonly MAPS_ROUTE = `${this.BASE_URL}/maps/route`
+
   // External APIs
   static readonly TELEGRAM_SEND_MESSAGE = 'https://dev-new.routeeld.uz/bot/send_message/'
   static readonly OPEN_METEO_GEOCODING = 'https://geocoding-api.open-meteo.com/v1/search'

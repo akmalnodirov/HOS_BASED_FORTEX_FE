@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { LoaderCircle, Navigation } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
+import { fetchMapRoute, isMapRouteNotFound } from '@/services/mapRouteService'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -127,18 +128,6 @@ function clearDestination() {
   routeError.value = ''
 }
 
-async function waitForDirectionsService() {
-  if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
-    throw new Error('Map routing is unavailable. Enter trip miles manually.')
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < 6_000) {
-    const maps = (window as any).google?.maps
-    if (maps?.DirectionsService) return maps
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  throw new Error('Map routing is unavailable. Enter trip miles manually.')
-}
-
 async function calculateRouteMiles() {
   const selected = destination.value
   const origin = props.origin
@@ -158,25 +147,27 @@ async function calculateRouteMiles() {
   routeOrigin.value = { ...origin }
   routeLoading.value = true
   try {
-    const maps = await waitForDirectionsService()
+    const route = await fetchMapRoute(
+      [
+        { latitude: origin.latitude, longitude: origin.longitude },
+        { latitude: selected.latitude, longitude: selected.longitude },
+      ],
+      false
+    )
     if (version !== routeVersion || !props.open) return
-    const result = await new maps.DirectionsService().route({
-      origin: { lat: origin.latitude, lng: origin.longitude },
-      destination: { lat: selected.latitude, lng: selected.longitude },
-      travelMode: maps.TravelMode.DRIVING,
-      provideRouteAlternatives: false,
-    })
-    if (version !== routeVersion || !props.open) return
-    const legs = result?.routes?.[0]?.legs
-    if (!legs?.length || legs.some((leg: any) => !Number.isFinite(leg.distance?.value)))
-      throw new Error('No driving route was found. Enter trip miles manually.')
-    const miles = Math.round(legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0) / 1609.344 * 10) / 10
+    if (!Number.isFinite(route?.distanceMeters)) {
+      routeError.value = 'No driving route was found. Enter trip miles manually.'
+      return
+    }
+    const miles = Math.round(route.distanceMeters / 1609.344 * 10) / 10
     routeMiles.value = miles
     tripMiles.value = miles
     distanceSource.value = 'route'
   } catch (error) {
     if (version === routeVersion && props.open)
-      routeError.value = error instanceof Error ? error.message : 'Road distance could not be calculated.'
+      routeError.value = isMapRouteNotFound(error)
+        ? 'No driving route was found. Enter trip miles manually.'
+        : 'Map routing is unavailable. Enter trip miles manually.'
   } finally {
     if (version === routeVersion) routeLoading.value = false
   }
