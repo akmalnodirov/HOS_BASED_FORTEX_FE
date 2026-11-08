@@ -108,12 +108,6 @@
               <p v-if="isCertificationSelected" class="mt-1 text-[10px] text-muted-foreground">
                 Certifications are saved without an origin, like in the Route ELD app.
               </p>
-              <p
-                v-else-if="isModifiedProviderEvent"
-                class="mt-1 text-[10px] text-muted-foreground"
-              >
-                Origin is Auto because this provider-generated event type was modified.
-              </p>
               <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
                 Origin follows the selected event type.
               </p>
@@ -618,13 +612,6 @@ watch(() => props.open, (open) => {
 onBeforeUnmount(cancelReverseGeocode)
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
-const isModifiedProviderEvent = computed(() =>
-  Boolean(
-    props.form.eventId &&
-    props.form.originalIsEditable === false &&
-    selectedEventKey.value !== props.form.originalEventCode
-  )
-)
 const dateWithinSession = computed(
   () =>
     (!props.fromDate || props.form.startDate >= props.fromDate) &&
@@ -743,33 +730,23 @@ const showRecordStatus = computed(
   () => !isStatuslessEvent.value && String(props.form.recordStatus || '').toUpperCase() !== 'NONE'
 )
 const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
-// Changing the status to driving (or adding a driving event) or changing a device event saves Auto (ELD); the save request uses the same rule.
 const originLockedToAuto = computed(
   () =>
     !isCertificationSelected.value &&
-    (isModifiedProviderEvent.value ||
-      drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined))
+    drivingOriginLocked(selectedEventKey.value, props.form.eventId ? props.form.originalEventCode : undefined)
 )
-// Driving and changed device events are Auto (ELD).
-const fixedOrigin = computed<number | null>(() =>
-  fixedOriginFor(selectedEventKey.value, { modifiedProviderEvent: isModifiedProviderEvent.value })
-)
+const fixedOrigin = computed<number | null>(() => fixedOriginFor(selectedEventKey.value))
 
 function onEventChange(key: unknown) {
   const ev = editableEvents.find((e) => e.id === String(key))
   if (!ev) return
   const certification = /^DR_CERT_\d+$/.test(ev.id)
   const statusless = certification || ev.id === 'DR_LOGIN' || ev.id === 'DR_LOGOUT'
-  const modifiedProviderEvent = Boolean(
-    props.form.eventId &&
-    props.form.originalIsEditable === false &&
-    ev.id !== props.form.originalEventCode
-  )
   patch({
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
     recordStatus: statusless ? 'NONE' : 'ACTIVE',
-    origin: originForEvent(ev.id, { modifiedProviderEvent }),
+    origin: originForEvent(ev.id),
   })
 }
 
