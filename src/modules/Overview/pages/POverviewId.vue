@@ -200,6 +200,8 @@
         class="shrink-0 border-b border-border"
         :style="{ height: speedChartHeight }"
         :points="tracking?.speedChart || []"
+        :loading="isLoading && !tracking"
+        :error="error"
         :from-timestamp="tracking?.fromTimestamp ?? selectedDayStart"
         :to-timestamp="tracking?.toTimestamp ?? selectedDayEnd"
       />

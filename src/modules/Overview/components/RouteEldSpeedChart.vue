@@ -2,10 +2,10 @@
   <section class="relative min-h-[145px] overflow-hidden bg-white dark:bg-card">
     <div ref="chartRef" class="h-full w-full" />
     <div
-      v-if="points.length === 0"
+      v-if="loading || error || points.length === 0"
       class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted-foreground"
     >
-      No speed data for this day
+      {{ loading ? 'Loading speed…' : error ? 'Speed data could not be loaded' : 'No speed data for this day' }}
     </div>
   </section>
 </template>
@@ -21,6 +21,8 @@ const props = defineProps<{
   points: RouteEldSpeedChartPoint[]
   fromTimestamp: number
   toTimestamp: number
+  loading?: boolean
+  error?: string | null
 }>()
 const { isDarkMode } = useDarkMode()
 const chartRef = ref<HTMLElement | null>(null)

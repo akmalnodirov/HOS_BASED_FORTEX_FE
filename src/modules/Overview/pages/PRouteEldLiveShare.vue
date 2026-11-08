@@ -92,6 +92,7 @@ import RouteEldTrackingMap from '../components/RouteEldTrackingMap.vue'
 import { getPublicRouteEldTracking } from '../composables/useRouteEldOverview'
 import type { RouteEldLiveShareTracking } from '../types'
 import { useDarkMode } from '@/composables/useDarkMode.ts'
+import { Button } from '@/components/ui/button'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))

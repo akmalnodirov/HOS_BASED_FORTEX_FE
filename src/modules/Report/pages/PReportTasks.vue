@@ -343,6 +343,7 @@ function selectDraftCompany(value: string) {
   if (!driversForCompany(value).some((driver) => driver.id === draftDriverId.value)) draftDriverId.value = ''
 }
 const users = ref<ReportOperationUser[]>([])
+const companyUsers = ref<ReportOperationUser[] | null>(null)
 const loading = ref(false)
 const initialLoad = ref(true)
 const ready = ref(false)
@@ -361,7 +362,7 @@ const range = ref<DateRange>({
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let requestVersion = 0
 
-const logBookers = computed(() => users.value)
+const logBookers = computed(() => companyUsers.value ?? users.value)
 const uniqueTasks = computed(() => {
   const tasks = new Map<string, ReportTaskState['routeTask']>()
   rows.value.forEach((entry) => tasks.set(entry.routeTask.id, entry.routeTask))
@@ -521,6 +522,7 @@ async function refresh() {
     }), operations.getTaskStatistics(filters)])
     if (version === requestVersion) {
       if (tasksResult.status === 'fulfilled') rows.value = tasksResult.value
+      else toast.error('Could not load tasks.')
       taskStatistics.value = tasksResult.status === 'fulfilled' && statisticsResult.status === 'fulfilled'
         ? statisticsResult.value
         : undefined
@@ -537,18 +539,40 @@ watch(companyId, () => {
   if (!filteredDrivers.value.some((driver) => driver.id === driverId.value)) driverId.value = 'all'
 })
 
+let companyUsersRequest = 0
+watch(companyId, async (value) => {
+  const request = ++companyUsersRequest
+  logBookerId.value = 'all'
+  if (value === 'all') {
+    companyUsers.value = null
+    return
+  }
+  companyUsers.value = []
+  try {
+    const employees = await operations.getUsersForCompany(value)
+    if (request === companyUsersRequest) companyUsers.value = employees
+  } catch {
+    if (request === companyUsersRequest) toast.error('Could not load company employees')
+  }
+})
+
 watch([driverId, companyId, logBookerId, status], queueRefresh)
 
 watch(taskVersion, queueRefresh)
 watch(tablePage, async () => { await nextTick(); tableScroll.value?.scrollTo({ top: 0 }) })
 
 onMounted(async () => {
-  const lookups = await operations.getLookups()
-  companies.value = lookups.companies
-  drivers.value = lookups.drivers
-  users.value = lookups.users
   ready.value = true
-  await refresh()
+  const tasksRequest = refresh()
+  try {
+    const lookups = await operations.getLookups()
+    companies.value = lookups.companies
+    drivers.value = lookups.drivers
+    users.value = lookups.users
+  } catch {
+    toast.error('Could not load task filters.')
+  }
+  await tasksRequest
   await nextTick()
   tableScroll.value?.scrollTo({ top: tableScroll.value.scrollHeight })
 })

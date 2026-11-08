@@ -51,6 +51,7 @@ export function useEventSessions() {
   const isLoading = ref(false)
   const isRefreshing = ref(false)
   const rollingBackId = ref<string | null>(null)
+  const deletingId = ref<string | null>(null)
   const error = ref<string | null>(null)
   let requestVersion = 0
 
@@ -123,14 +124,29 @@ export function useEventSessions() {
     }
   }
 
+  async function deleteSession(sessionId: string) {
+    deletingId.value = sessionId
+    try {
+      await api.delete(ApiEndpoints.ROUTE_ELD_EVENT_SESSION(sessionId), {
+        _skipErrorHandling: true,
+      })
+    } catch (exception) {
+      throw new Error(errorMessage(exception, 'The session could not be deleted'))
+    } finally {
+      deletingId.value = null
+    }
+  }
+
   return {
     page,
     isLoading,
     isRefreshing,
     rollingBackId,
+    deletingId,
     error,
     fetchSessions,
     fetchFilterOptions,
     rollbackSession,
+    deleteSession,
   }
 }

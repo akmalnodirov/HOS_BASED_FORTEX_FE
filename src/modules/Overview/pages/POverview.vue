@@ -144,7 +144,12 @@
               :title="driver.driverName"
               @click="openDriver(driver.driverId)"
             >
-              <Navigation class="h-4 w-4" />
+              <Navigation
+                class="h-4 w-4"
+                :style="{
+                  transform: `rotate(${markerRotation(driver.latestPoint?.bearing)}deg)`,
+                }"
+              />
             </button>
           </div>
         </CustomMarker>
@@ -178,10 +183,10 @@ const rawMap = ref<any>(null)
 const isFullscreen = ref(false)
 const { drivers, isLoading, isRefreshing, error, load } = useRouteEldOverviewDrivers()
 
-const distinctTruckDrivers = computed(() => {
+function distinctByTruck(list: typeof drivers.value) {
   const latestByTruck = new Map<string, (typeof drivers.value)[number]>()
 
-  for (const driver of drivers.value) {
+  for (const driver of list) {
     const key = truckKey(driver)
     const current = latestByTruck.get(key)
     if (!current || driverUpdatedAt(driver) > driverUpdatedAt(current)) {
@@ -190,10 +195,10 @@ const distinctTruckDrivers = computed(() => {
   }
 
   return [...latestByTruck.values()]
-})
+}
 
 const activityDrivers = computed(() =>
-  distinctTruckDrivers.value.filter((driver) =>
+  drivers.value.filter((driver) =>
     activityFilter.value === 'all' || driver.isActive === (activityFilter.value === 'active')
   )
 )
@@ -242,7 +247,9 @@ onMounted(() => document.addEventListener('fullscreenchange', handleFullscreenCh
 
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', handleFullscreenChange))
 
-const locatedDrivers = computed(() => filteredDrivers.value.filter((driver) => driver.latestPoint))
+const locatedDrivers = computed(() =>
+  distinctByTruck(filteredDrivers.value).filter((driver) => driver.latestPoint)
+)
 
 function openDriver(driverId: string) {
   void router.push({ name: 'OverviewDetail', params: { id: driverId } })
@@ -288,6 +295,11 @@ function handleFullscreenChange() {
     const googleMaps = (window as any).google?.maps
     if (rawMap.value && googleMaps?.event) googleMaps.event.trigger(rawMap.value, 'resize')
   })
+}
+
+function markerRotation(value: number | null | undefined) {
+  const bearing = value != null && Number.isFinite(value) ? value : 0
+  return bearing - 45
 }
 
 function statusLabel(value: string) {

@@ -5,6 +5,7 @@
       :tabs="tabs"
       :selected-tab="selectedTab"
       :session-status="session?.status"
+      :is-audit="!!session && (session.name?.startsWith('Audit:') || route.query.auditSessionId === session.id)"
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
       :rollback-blocked="Boolean(session?.isRollbackBlocked)"
@@ -99,6 +100,7 @@
         :to-date="session?.toDate ?? ''"
         :time-zone="workspaceTimeZone"
         :session-created-at="session?.createdAt"
+        :is-audit="session?.name?.startsWith('Audit:')"
         :selected-event-id="selectedEventId"
         :boost-selected-ids="rangeBoostSelectedIds"
         :free-times="displayedFreeTimes"
@@ -317,14 +319,9 @@
       :target-duration-ms="rangeBoostTargetDurationMs"
       :affected-count="rangeBoostAffectedCount"
       :selection-error="rangeBoostSelectionError"
-      :external-error="rangeBoostFailureReason"
       :time-zone="workspaceTimeZone"
       :loading="store.isMutating"
-      @reset-error="rangeBoostFailureReason = ''"
-      @switch="
-        rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0;
-        rangeBoostFailureReason = ''
-      "
+      @switch="rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0"
       @submit="confirmRangeBoost"
     />
     <CBoostReassignModal
@@ -899,11 +896,12 @@ const runCameraCheckQueue = () => {
           const controller = new AbortController()
           activeCameraCheck = { sessionId: batch.sessionId, tabId: batch.tabId, controller }
           try {
-            const response = await api.post<
-              RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
-            >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
-              { eventIds: batch.sources.map((source) => source.eventId) },
-              { params: { radiusMetres: 97 }, signal: controller.signal })
+            // const response = await api.post<
+            //   RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
+            // >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
+            //   { eventIds: batch.sources.map((source) => source.eventId) },
+            //   { params: { radiusMetres: 97 }, signal: controller.signal })
+            const response = null
             const results = 'successResult' in response.data
               ? response.data.successResult : response.data
             cameraCheckErrorShown = false
@@ -927,7 +925,7 @@ const runCameraCheckQueue = () => {
             }
             if (!controller.signal.aborted && !cameraCheckErrorShown) {
               cameraCheckErrorShown = true
-              toast.error(getApiErrorMessage(error, 'Camera analysis could not be loaded'))
+              // toast.error(getApiErrorMessage(error, 'Camera analysis could not be loaded'))
             }
           } finally {
             if (activeCameraCheck?.controller === controller) activeCameraCheck = null
@@ -993,7 +991,6 @@ const selectedSourceEvents = computed(() =>
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
 const rangeBoostModalOpen = ref(false)
-const rangeBoostFailureReason = ref('')
 const rangeBoostSelectedEvents = computed(() =>
   rangeBoostSelectedIds.value
     .map((id) => graphEvents.value.find((event) => event.id === id))
@@ -1514,19 +1511,16 @@ const onGraphBoostSelect = (eventId: string) => {
     return
   }
   if (rangeBoostSelectedIds.value.includes(eventId)) {
-    rangeBoostFailureReason.value = ''
     rangeBoostSelectedIds.value = rangeBoostSelectedIds.value.filter((id) => id !== eventId)
     return
   }
   const next = [...rangeBoostSelectedIds.value, eventId]
   if (next.length > 2) next.shift()
-  rangeBoostFailureReason.value = ''
   rangeBoostSelectedIds.value = next
 }
 const clearRangeBoost = () => {
   rangeBoostSelectedIds.value = []
   rangeBoostSourceIndex.value = 0
-  rangeBoostFailureReason.value = ''
 }
 watch([() => session.value?.id, () => store.activeTabId], clearRangeBoost)
 const openRangeBoostModal = () => {
@@ -1540,7 +1534,6 @@ const openRangeBoostModal = () => {
   rangeBoostSourceIndex.value = rangeBoostChronologicalEvents.value.findIndex(
     (event) => event.id === firstClickedId
   )
-  rangeBoostFailureReason.value = ''
   rangeBoostModalOpen.value = true
 }
 const confirmRangeBoost = async (seconds: number) => {
@@ -1553,18 +1546,13 @@ const confirmRangeBoost = async (seconds: number) => {
     return
   }
   try {
-    rangeBoostFailureReason.value = ''
     const deltaSeconds = source.id === left.id ? -seconds : seconds
     await store.boostEvents([left.id, right.id], deltaSeconds)
     rangeBoostModalOpen.value = false
     clearRangeBoost()
     toast.success('Time boost saved to the active Boost tab')
   } catch (error: any) {
-    rangeBoostFailureReason.value = getApiErrorMessage(
-      error,
-      'The time transfer could not be applied'
-    )
-    toast.error(rangeBoostFailureReason.value)
+    toast.error(getApiErrorMessage(error, 'The time transfer could not be applied'))
   }
 }
 const formatGraphEventTime = (timestamp: number) =>

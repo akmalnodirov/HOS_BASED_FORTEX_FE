@@ -100,6 +100,8 @@ export interface RouteEldLiveTrackingPoint {
   location: string | null
   driverId: string | null
   driverName: string | null
+  dutyStatus: string | null
+  bearing: number | null
 }
 
 export interface RouteEldLiveDriver {

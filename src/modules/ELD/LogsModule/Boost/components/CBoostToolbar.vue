@@ -15,7 +15,7 @@
             "
             @click="$emit('select-tab', tab)"
           >
-            <span>{{ tab.name }}</span>
+            <span>{{ isAudit && i === 1 && tab.name === 'Changed' ? 'Audit' : tab.name }}</span>
             <span
               v-if="canManageTabs && tab.type === 1 && i === tabs.length - 1 && tabs.length > 1"
               class="ml-0.5 rounded p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
@@ -34,6 +34,9 @@
             <Plus class="w-3.5 h-3.5" />
           </button>
         </div>
+        <span v-if="isAudit" class="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+          Audit generated
+        </span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -118,6 +121,7 @@ const props = withDefaults(
     submitLoading?: boolean
     actionsPending?: boolean
     sessionStatus?: string
+    isAudit?: boolean
     pendingSubmissionCount?: number
     pendingRollbackCount?: number
     rollbackBlocked?: boolean
@@ -138,6 +142,7 @@ const props = withDefaults(
     submitLoading: false,
     actionsPending: false,
     sessionStatus: 'DRAFT',
+    isAudit: false,
     pendingSubmissionCount: 0,
     pendingRollbackCount: 0,
     rollbackBlocked: false,
