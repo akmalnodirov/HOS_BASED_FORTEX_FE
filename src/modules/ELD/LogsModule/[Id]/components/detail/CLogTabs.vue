@@ -465,13 +465,37 @@ watch(
       const items = await boostStore.fetchSessions(normalizedDriverId)
       const requested = querySessionId ? String(querySessionId) : ''
       if (requested) {
-        const selected = items.find((item) => item.id === requested)
-        if (selected && boostStore.session?.id !== selected.id) {
+        if (boostStore.session?.id !== requested) {
           const workspace = await boostStore.loadSession(
-            selected.id,
+            requested,
             String(route.query.tabId || '')
           )
-          if (workspace) await applyBoostWorkspaceRoute(workspace)
+          if (workspace) {
+            if (workspace.session.driverId.toLowerCase() !== normalizedDriverId.toLowerCase()) {
+              boostStore.clear()
+              throw new Error('This session belongs to a different driver.')
+            }
+            await applyBoostWorkspaceRoute(workspace)
+          }
+        }
+        const current = boostStore.session
+        if (current?.id === requested && !sessions.value.some((item) => item.id === requested)) {
+          sessions.value = [{
+            id: current.id,
+            driverId: current.driverId,
+            driverName: current.driverName,
+            companyName: current.companyName,
+            name: current.name,
+            fromDate: current.fromDate,
+            toDate: current.toDate,
+            status: current.status,
+            tabCount: current.tabs.length,
+            changedEventCount: current.changes.length,
+            createdAt: current.createdAt,
+            submittedAt: current.submittedAt,
+            rolledBackAt: current.rolledBackAt,
+            isRollbackBlocked: current.isRollbackBlocked,
+          }, ...sessions.value]
         }
         return
       }
