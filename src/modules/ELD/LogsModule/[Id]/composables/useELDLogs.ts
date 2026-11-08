@@ -270,6 +270,7 @@ export function useELDLogs() {
   onMounted(() => fetchLogs())
 
   return {
+    driverLogs,
     loading,
     error,
     summary,

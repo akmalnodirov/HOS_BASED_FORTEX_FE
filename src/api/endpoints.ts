@@ -195,12 +195,6 @@ export class ApiEndpoints {
   // Audit endpoints
   private static readonly AUDIT_URL = `${this.BASE_URL}/audit`
   static readonly AUDIT = this.AUDIT_URL
-  static readonly AUDIT_EVENTS = `${this.AUDIT_URL}/events`
-  static readonly AUDIT_SUMMARY = `${this.AUDIT_URL}/summary`
-  static readonly AUDIT_GRAPH = `${this.AUDIT_URL}/graph`
-  static readonly AUDIT_VIOLATIONS = `${this.AUDIT_URL}/violations`
-  static readonly AUDIT_WEIGHT_STATIONS = `${this.AUDIT_URL}/weight-stations`
-  static readonly AUDIT_TRACKING = `${this.AUDIT_URL}/tracking`
 
   // Portal Users endpoints
   private static readonly PORTAL_USERS_URL = `${this.BASE_URL}/portal-users`
@@ -305,6 +299,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
   static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
@@ -319,6 +315,11 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR = (
+    sessionId: string,
+    tabId: string,
+    repairId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}`
   static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
     sessionId: string,
     tabId: string,

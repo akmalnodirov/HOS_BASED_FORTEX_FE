@@ -150,7 +150,7 @@
               </tr>
               <tr v-if="canCreate" class="border-b border-border bg-primary/5">
                 <td class="px-4 py-3 text-muted-foreground">New</td>
-                <td class="px-4 py-3"><Select v-model="draftEmployeeId"><SelectTrigger class="h-8 min-w-36"><SelectValue placeholder="Select employee" /></SelectTrigger><SelectContent><SelectItem v-for="user in users" :key="user.id" :value="user.id">{{ operationUserName(user) }}</SelectItem></SelectContent></Select></td>
+                <td class="px-4 py-3"><Select v-model="draftEmployeeId"><SelectTrigger class="h-8 min-w-36"><SelectValue placeholder="Select employee" /></SelectTrigger><SelectContent><SelectItem v-for="user in draftEmployeeOptions" :key="user.id" :value="user.id">{{ operationUserName(user) }}</SelectItem></SelectContent></Select></td>
                 <td class="px-4 py-3">{{ currentCheckerName }}</td>
                 <td class="px-4 py-3"><CReportStatusMenu :model-value="draftStatus" :options="checkerStatuses" :loading="draftSaving" @update:model-value="saveDraft" /></td>
                 <td colspan="2" class="px-4 py-3 text-muted-foreground">Assigned when saved</td>
@@ -336,6 +336,9 @@ function isCheckerLocked(status: number): boolean {
 const companies = ref<ReportOperationCompany[]>([])
 const drivers = ref<ReportOperationDriver[]>([])
 const users = ref<ReportOperationUser[]>([])
+const filterUsers = ref<ReportOperationUser[] | null>(null)
+const companyEmployees = ref<ReportOperationUser[] | null>(null)
+const draftEmployeeOptions = computed(() => companyEmployees.value ?? users.value)
 const loading = ref(false)
 const initialLoad = ref(true)
 const ready = ref(false)
@@ -352,8 +355,8 @@ const range = ref<DateRange>({
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let requestVersion = 0
 
-const targetUsers = computed(() => users.value)
-const checkers = computed(() => users.value)
+const targetUsers = computed(() => filterUsers.value ?? users.value)
+const checkers = computed(() => filterUsers.value ?? users.value)
 const currentCheckerName = computed(() => {
   const user = authStore.user
   return user ? `${user.firstName} ${user.lastName}`.trim() || user.userName : 'Current user'
@@ -418,6 +421,41 @@ async function refresh() {
 }
 
 watch([targetId, checkerId, companyId, status], queueRefresh)
+
+let filterUsersRequest = 0
+watch(companyId, async (value) => {
+  const request = ++filterUsersRequest
+  targetId.value = 'all'
+  checkerId.value = 'all'
+  if (value === 'all') {
+    filterUsers.value = null
+    return
+  }
+  filterUsers.value = []
+  try {
+    const employees = await operations.getUsersForCompany(value)
+    if (request === filterUsersRequest) filterUsers.value = employees
+  } catch {
+    if (request === filterUsersRequest) toast.error('Could not load company employees')
+  }
+})
+
+let companyEmployeeRequest = 0
+watch(draftCompanyId, async (value) => {
+  const request = ++companyEmployeeRequest
+  draftEmployeeId.value = ''
+  if (!value) {
+    companyEmployees.value = null
+    return
+  }
+  companyEmployees.value = []
+  try {
+    const employees = await operations.getUsersForCompany(value)
+    if (request === companyEmployeeRequest) companyEmployees.value = employees
+  } catch {
+    if (request === companyEmployeeRequest) toast.error('Could not load company employees')
+  }
+})
 
 watch(checkerVersion, queueRefresh)
 watch(tablePage, async () => { await nextTick(); tableScroll.value?.scrollTo({ top: 0 }) })

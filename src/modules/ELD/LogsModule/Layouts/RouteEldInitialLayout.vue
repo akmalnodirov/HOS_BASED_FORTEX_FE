@@ -73,7 +73,8 @@ import type { RouteEldLogDetail } from '../[Id]/types/routeEldDetail'
 const logDetail = useRouteEldLogDetail()
 const route = useRoute()
 const isTrackingPage = computed(() => route.name === 'ELDTracking')
-const isBoostPage = computed(() => route.name === 'ELDBoost')
+// The AI tab shows the Boost workspace's header values for the same draft.
+const isBoostPage = computed(() => route.name === 'ELDBoost' || route.name === 'ELDAi')
 const boostWorkspaceStore = useBoostWorkspaceStore()
 const api = useApi()
 const timeZoneHelper = useTimeZoneHelper()
