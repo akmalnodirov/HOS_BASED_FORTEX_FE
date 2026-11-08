@@ -98,7 +98,7 @@
           @click="selectedPoint = latestPoint"
         >
           <Navigation
-            class="h-5 w-5 transition-transform duration-100"
+            class="h-5 w-5"
             :style="{ transform: `rotate(${markerRotation(bearing)}deg)` }"
           />
         </button>

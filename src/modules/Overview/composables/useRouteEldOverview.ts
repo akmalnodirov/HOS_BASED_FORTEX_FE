@@ -173,11 +173,7 @@ function bearingBetween(
   to: RouteEldLiveDriver['latestPoint']
 ) {
   if (!from || !to) return null
-  if (
-    Math.abs(from.latitude - to.latitude) < 0.0000001 &&
-    Math.abs(from.longitude - to.longitude) < 0.0000001
-  )
-    return null
+  if (distanceMeters(from, to) < MIN_MOVEMENT_METERS) return null
   const fromLatitude = (from.latitude * Math.PI) / 180
   const toLatitude = (to.latitude * Math.PI) / 180
   const longitudeDelta = ((to.longitude - from.longitude) * Math.PI) / 180
@@ -186,6 +182,18 @@ function bearingBetween(
     Math.cos(fromLatitude) * Math.sin(toLatitude) -
     Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta)
   return normalizeBearing((Math.atan2(y, x) * 180) / Math.PI)
+}
+
+const MIN_MOVEMENT_METERS = 25
+
+function distanceMeters(
+  from: NonNullable<RouteEldLiveDriver['latestPoint']>,
+  to: NonNullable<RouteEldLiveDriver['latestPoint']>
+) {
+  const latitude = (((from.latitude + to.latitude) / 2) * Math.PI) / 180
+  const x = (((to.longitude - from.longitude) * Math.PI) / 180) * Math.cos(latitude)
+  const y = ((to.latitude - from.latitude) * Math.PI) / 180
+  return Math.sqrt(x * x + y * y) * 6371000
 }
 
 function normalizeBearing(value: number | null | undefined) {

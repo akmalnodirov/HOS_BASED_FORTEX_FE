@@ -137,7 +137,7 @@
             @click="openDriver(driver.driverId)"
           >
             <Navigation
-              class="h-4 w-4 transition-transform duration-100"
+              class="h-4 w-4"
               :style="{
                 transform: `rotate(${markerRotation(driver.latestPoint?.bearing)}deg)`,
               }"
