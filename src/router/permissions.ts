@@ -40,6 +40,7 @@ const pagePermissions: { pattern: RegExp; any: string[] }[] = [
   { pattern: /^\/users\/roles(?:\/|$)/, any: ['roles.manage'] },
   { pattern: /^\/users\/permissions(?:\/|$)/, any: ['permissions.manage'] },
   { pattern: /^\/users(?:\/|$)/, any: ['portal_users.manage'] },
+  { pattern: /^\/tools\/audit(?:\/|$)/, any: ['audit.manage'] },
   { pattern: /^\/tools\/monitoring(?:\/|$)/, any: ['monitoring.manage'] },
   { pattern: /^\/tools\/dot-inspection(?:\/|$)/, any: ['route_eld.dot_inspections'] },
   { pattern: /^\/tools\/statistic-admin(?:\/|$)/, any: ['statistic_admin.manage'] },

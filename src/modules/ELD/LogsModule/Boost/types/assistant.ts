@@ -78,7 +78,7 @@ export interface RouteEldAssistantStartTurnRequest {
 
 export interface RouteEldAssistantCorrectionOperation {
   order: number
-  type: 'ShiftTimestamp' | 'DeleteEvent' | 'ChangeToOffDuty'
+  type: 'ShiftTimestamp' | 'DeleteEvent' | 'ChangeToOffDuty' | 'InsertDutyStatus'
   eventId: string
   beforeTimestamp: number | null
   afterTimestamp: number | null
@@ -88,6 +88,7 @@ export interface RouteEldAssistantCorrectionOperation {
 }
 
 export interface RouteEldAssistantCorrectionPreview {
+  isNewStatus?: boolean
   repairId: string
   optionId: string
   sessionId: string
