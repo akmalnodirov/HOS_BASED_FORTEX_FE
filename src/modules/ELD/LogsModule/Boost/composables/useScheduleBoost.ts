@@ -1022,7 +1022,6 @@ export function useScheduleBoost() {
       event: { eventType, eventCode },
       eventCodeId: event.eventCode,
       originalEventCode: event.eventCode,
-      originalIsEditable: event.isEditable,
       origin: editableOrigin(event.recordOrigin),
       recordStatus: event.recordStatus,
       vehicleId: event.vehicleId ?? null,
@@ -1081,11 +1080,7 @@ export function useScheduleBoost() {
         : timestampFromRouteEldZonedLocal(localDateTime, event?.timeZone ?? workspaceTimeZone.value),
       logDate: form.startDate.replaceAll('-', '/'),
       eventCode,
-      recordOrigin: /^DR_CERT_/i.test(eventCode)
-        ? null
-        : event && !event.isEditable && eventCode !== event.eventCode && form.origin === 1
-          ? 'OTHER_USER'
-          : requestedRecordOrigin,
+      recordOrigin: /^DR_CERT_/i.test(eventCode) ? null : requestedRecordOrigin,
       recordStatus: form.recordStatus,
       vehicleId: form.vehicleId,
       odometerMiles: form.odometer,
