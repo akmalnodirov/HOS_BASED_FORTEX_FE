@@ -261,7 +261,7 @@
                     size="icon"
                     class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     :disabled="deletingId !== null || rollingBackId !== null"
-                    title="Permanently delete session"
+                    title="Delete session"
                     @click.stop="openDeleteDialog(session)"
                   >
                     <LoaderCircle
@@ -385,17 +385,24 @@
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {{ deleteStep === 1 ? 'Delete this event session?' : 'Confirm permanent deletion' }}
+            {{ deleteStep === 1 ? 'Delete this event session?' : 'Confirm deletion' }}
           </DialogTitle>
           <DialogDescription v-if="deleteStep === 1">
-            This permanently removes the session and all of its tabs, events, profile forms,
-            histories, repairs, normalization records, ALPR routes and assistant records.
+            The session is removed from the list and can no longer be opened. Its records are kept
+            for audit.
           </DialogDescription>
           <DialogDescription v-else>
-            This action cannot be undone. Type <span class="font-semibold text-foreground">DELETE</span>
-            to provide the second confirmation.
+            This cannot be undone from the app. Type
+            <span class="font-semibold text-foreground">DELETE</span> to confirm.
           </DialogDescription>
         </DialogHeader>
+        <div
+          v-if="deleteTarget?.status === 'SUBMITTED'"
+          class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          Changes from this session were submitted to Route ELD and stay there. After deleting,
+          they can no longer be rolled back from here.
+        </div>
         <div v-if="deleteTarget" class="rounded-md border border-border bg-muted/30 p-3 text-sm">
           <div class="font-medium">{{ deleteTarget.name }}</div>
           <div class="mt-1 text-muted-foreground">
@@ -430,7 +437,7 @@
           >
             <LoaderCircle v-if="deletingId !== null" class="mr-2 h-4 w-4 animate-spin" />
             <Trash2 v-else class="mr-2 h-4 w-4" />
-            Permanently delete
+            Delete
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -717,9 +724,11 @@ async function confirmDelete() {
     await deleteSession(session.id)
     closeDeleteDialog()
     await fetchSessions(filters.value, true)
-    toast.success('The event session and all related records were permanently deleted')
+    toast.success('The event session was deleted')
   } catch (exception) {
     toast.error(exception instanceof Error ? exception.message : 'The session could not be deleted')
+    closeDeleteDialog()
+    await fetchSessions(filters.value, true)
   }
 }
 
