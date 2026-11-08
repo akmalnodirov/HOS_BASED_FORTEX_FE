@@ -122,12 +122,6 @@
               <p v-if="isCertificationSelected" class="mt-1 text-[10px] text-muted-foreground">
                 Certifications are saved without an origin, like in the Route ELD app.
               </p>
-              <p
-                v-else-if="requiresOtherUserOrigin"
-                class="mt-1 text-[10px] text-amber-700 dark:text-amber-400"
-              >
-                Origin changed to Other user because this provider-generated event type was modified.
-              </p>
               <p v-else-if="fixedOrigin !== null && !readonly" class="mt-1 text-[10px] text-muted-foreground">
                 Origin follows the selected event type.
               </p>
@@ -629,13 +623,6 @@ watch(() => props.open, (open) => {
 onBeforeUnmount(cancelReverseGeocode)
 
 const isCertifiedVisible = computed(() => props.form.event.eventType === 4)
-const requiresOtherUserOrigin = computed(() =>
-  Boolean(
-    props.form.eventId &&
-    props.form.originalIsEditable === false &&
-    selectedEventKey.value !== props.form.originalEventCode
-  )
-)
 const dateWithinSession = computed(
   () =>
     (!props.fromDate || props.form.startDate >= props.fromDate) &&
@@ -755,7 +742,6 @@ const showRecordStatus = computed(
 )
 const isCertificationSelected = computed(() => /^DR_CERT_\d+$/.test(selectedEventKey.value))
 const fixedOrigin = computed<number | null>(() => {
-  if (requiresOtherUserOrigin.value) return 3
   if (
     ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
       selectedEventKey.value
@@ -778,16 +764,11 @@ function onEventChange(key: unknown) {
   const driverOrigin = ['DS_OFF', 'DS_WT', 'DS_SB', 'DS_ON', 'DR_IND_PC', 'DR_IND_YM'].includes(
     ev.id
   )
-  const modifiedProviderEvent = Boolean(
-    props.form.eventId &&
-    props.form.originalIsEditable === false &&
-    ev.id !== props.form.originalEventCode
-  )
   patch({
     event: { eventType: ev.eventType, eventCode: ev.eventCode },
     eventCodeId: ev.id,
     recordStatus: statusless ? 'NONE' : 'ACTIVE',
-    origin: certification ? null : modifiedProviderEvent ? 3 : driverOrigin ? 2 : 1,
+    origin: certification ? null : driverOrigin ? 2 : 1,
   })
 }
 
@@ -828,7 +809,7 @@ const eventClock = computed({
 })
 function onOriginChange(v: unknown) {
   const origin = Number(v)
-  patch({ origin: requiresOtherUserOrigin.value && origin === 1 ? 3 : origin })
+  patch({ origin })
 }
 function onRecordStatusChange(v: unknown) {
   patch({ recordStatus: String(v) })
