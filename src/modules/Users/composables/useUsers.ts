@@ -112,7 +112,7 @@ export function usePortalUsers() {
         ),
       ])
       if (rolesResponse.status === 'fulfilled')
-        roles.value = unwrap(rolesResponse.value.data).filter((role) => role.permissions.length > 0)
+        roles.value = unwrap(rolesResponse.value.data)
       else toast.error(errorMessage(rolesResponse.reason, 'Failed to load roles'))
       if (companiesResponse.status === 'fulfilled')
         companies.value = unwrap(companiesResponse.value.data)
