@@ -75,21 +75,32 @@
                     class="absolute -left-3 top-0 bottom-0 w-[1px] bg-[#dbdbdb] dark:bg-sidebar-border"
                   ></div>
 
-                  <button
-                    v-for="subItem in item.children"
-                    :key="subItem.id"
-                    @click="navigateTo(subItem.path)"
-                    class="cursor-pointer relative"
-                    :class="[
-                      'w-full flex items-center gap-3 px-3 ml-1 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive(subItem.path, subItem.relatedPaths)
-                        ? 'bg-[#e6e6e6] dark:bg-sidebar-accent text-gray-900 dark:text-sidebar-accent-foreground'
-                        : 'text-gray-700 dark:text-sidebar-foreground/80 hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
-                      item.uppercase && 'uppercase',
-                    ]"
-                  >
-                    {{ subItem.label }}
-                  </button>
+                  <div v-for="subItem in item.children" :key="subItem.id">
+                    <button
+                      @click="subItem.children ? toggleMenu(subItem.id) : navigateTo(subItem.path)"
+                      class="cursor-pointer relative w-full flex items-center gap-3 px-3 ml-1 py-2 rounded-lg text-sm font-medium transition-colors"
+                      :class="[
+                        isActive(subItem.path, subItem.relatedPaths) || hasActiveChild(subItem)
+                          ? 'bg-[#e6e6e6] dark:bg-sidebar-accent text-gray-900 dark:text-sidebar-accent-foreground'
+                          : 'text-gray-700 dark:text-sidebar-foreground/80 hover:bg-[#e6e6e6] dark:hover:bg-sidebar-accent/50',
+                        item.uppercase && 'uppercase',
+                      ]"
+                    >
+                      <img v-if="typeof subItem.icon === 'string'" :src="subItem.icon" alt="" class="h-4 w-4 shrink-0 sidebar-icon" />
+                      <component :is="subItem.icon" v-else-if="subItem.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span class="flex-1 text-left">{{ subItem.label }}</span>
+                      <ChevronDown v-if="subItem.children" class="h-4 w-4 shrink-0 transition-transform" :class="isMenuExpanded(subItem.id) && 'rotate-180'" />
+                    </button>
+                    <div v-if="subItem.children" v-show="isMenuExpanded(subItem.id)" class="ml-4 border-l border-[#dbdbdb] pl-2 dark:border-sidebar-border">
+                      <button
+                        v-for="nestedItem in subItem.children"
+                        :key="nestedItem.id"
+                        class="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+                        :class="isActive(nestedItem.path) ? 'bg-[#e6e6e6] text-gray-900 dark:bg-sidebar-accent dark:text-sidebar-accent-foreground' : 'text-gray-700 hover:bg-[#e6e6e6] dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent/50'"
+                        @click="navigateTo(nestedItem.path)"
+                      >{{ nestedItem.label }}</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -140,12 +151,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Component } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { FileBarChart2, LogOut, ChevronDown, Scale } from 'lucide-vue-next'
+import { FileBarChart2, LogOut, ChevronDown, Scale,
+         ClipboardClock, BadgeDollarSign, ChartColumn,
+         ListPlus, ClipboardPenLine
+  } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
-import { canAccessPath } from '@/router/permissions'
+import { canAccessPath, readTokenPermissions } from '@/router/permissions'
+import { useApi } from '@/composables/useAxiosService'
 
 interface MenuItem {
   id: string
@@ -287,6 +302,7 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/users.svg',
         uppercase: true,
         children: [
+          { id: 'tools-audit', label: 'Audit', icon: null, path: '/tools/audit' },
           { id: 'tools-monitoring', label: 'Monitoring', icon: null, path: '/tools/monitoring' },
           {
             id: 'tools-dot-inspection',
@@ -314,7 +330,8 @@ const allMenuItems: MenuItem[] = [
         icon: '/icons/menu.svg',
         uppercase: true,
         children: [
-          { id: 'users', label: 'Users', icon: '/icons/user.svg', path: '/users' },
+          { id: 'users', label: 'Users', icon: null, path: '/users' },
+          { id: 'report-levels', label: 'Levels', icon: null, path: '/report/levels' },
           { id: 'users-roles', label: 'Roles', icon: null, path: '/users/roles' },
           { id: 'users-permissions', label: 'Permissions', icon: null, path: '/users/permissions' },
         ],
@@ -322,12 +339,46 @@ const allMenuItems: MenuItem[] = [
       {
         id: 'report',
         label: 'REPORT BOARD',
-        icon: '/icons/menu.svg',
+        icon: ClipboardClock,
         children: [
           { id: 'report-tasks', label: 'Tasks', icon: null, path: '/report/tasks' },
           { id: 'report-activity', label: 'Activity', icon: null, path: '/report/activity' },
           { id: 'report-checker', label: 'Checker', icon: null, path: '/report/checker' },
           { id: 'report-assistant', label: 'Assistant', icon: null, path: '/report/assistant' },
+          {
+            id: 'report-analytics', label: 'Analytics', icon: BadgeDollarSign,
+            children: [
+              { id: 'report-statistics', label: 'Companies & Drivers', icon: null, path: '/report/statistics' },
+              { id: 'report-attendance', label: 'Attendance', icon: null, path: '/report/attendance' },
+              { id: 'report-kpi', label: 'KPI details', icon: null, path: '/report/kpi' },
+            ],
+          },
+          {
+            id: 'report-operations', label: 'Operations', icon: ChartColumn,
+            children: [
+              { id: 'report-teams', label: 'Teams', icon: null, path: '/report/teams' },
+              { id: 'report-salary', label: 'Salary', icon: null, path: '/report/salary' },
+              { id: 'report-bonuses', label: 'Bonuses & Charges', icon: null, path: '/report/bonuses' },
+              { id: 'report-notes', label: 'Notes', icon: null, path: '/report/notes' },
+              { id: 'report-settings', label: 'Settings', icon: null, path: '/report/settings' },
+              { id: 'report-contracts', label: 'Contracts', icon: null, path: '/report/contracts' },
+              { id: 'report-statement', label: 'Statement', icon: null, path: '/report/statement' },
+            ],
+          },
+          {
+            id: 'report-inspection', label: 'Inspection', icon: ClipboardPenLine,
+            children: [
+              { id: 'report-violation', label: 'Violation', icon: null, path: '/report/inspection/violation' },
+              { id: 'report-no-violation', label: 'No Violation', icon: null, path: '/report/inspection/no-violation' },
+            ],
+          },
+          {
+            id: 'report-manage', label: 'Manage', icon: ListPlus,
+            children: [
+              { id: 'report-drivers', label: 'Drivers', icon: null, path: '/report/manage/drivers' },
+              { id: 'report-companies', label: 'Companies', icon: null, path: '/report/manage/companies' },
+            ],
+          },
         ],
       },
     ],
@@ -368,6 +419,18 @@ const hasActiveChild = (item: MenuItem): boolean => {
   )
 }
 
+watch(() => route.path, () => {
+  const expandActive = (items: MenuItem[]) => {
+    for (const item of items) {
+      if (item.children && hasActiveChild(item)) {
+        if (!expandedMenus.value.includes(item.id)) expandedMenus.value.push(item.id)
+        expandActive(item.children)
+      }
+    }
+  }
+  expandActive(allMenuItems)
+}, { immediate: true })
+
 const navigateTo = (path?: string) => {
   if (path) {
     router.push(path)
@@ -375,13 +438,44 @@ const navigateTo = (path?: string) => {
 }
 
 const authStore = useAuthStore()
+const api = useApi()
+const reportFeatures = ref<Record<string, boolean>>({})
+const reportFeaturePaths: Record<string, string> = {
+  '/report/statistics': 'statistics',
+  '/report/attendance': 'attendance',
+  '/report/teams': 'teams',
+  '/report/kpi': 'kpi',
+  '/report/my-kpi': 'kpi',
+  '/report/salary': 'salaries',
+  '/report/bonuses': 'bonuses',
+  '/report/notes': 'notes',
+  '/report/contracts': 'contracts',
+  '/report/statement': 'statement',
+}
+
+async function loadReportFeatures() {
+  const permissions = readTokenPermissions(authStore.token)
+  if (!permissions.systemAdmin && ![...permissions.codes].some(code => code.startsWith('report.'))) return
+  try {
+    const response = await api.get<{ successResult: Record<string, boolean> }>('/report/api/features')
+    reportFeatures.value = response.data.successResult ?? {}
+  } catch {
+    reportFeatures.value = {}
+  }
+}
+
+watch(() => authStore.token, loadReportFeatures, { immediate: true })
+onMounted(() => window.addEventListener('report-features-updated', loadReportFeatures))
+onUnmounted(() => window.removeEventListener('report-features-updated', loadReportFeatures))
 
 const visibleMenuItem = (item: MenuItem): MenuItem | null => {
   if (item.children) {
     const children = item.children.map(visibleMenuItem).filter((child): child is MenuItem => child !== null)
     return children.length ? { ...item, children } : null
   }
-  return item.path && canAccessPath(item.path, authStore.token) ? item : null
+  if (!item.path || !canAccessPath(item.path, authStore.token)) return null
+  const feature = reportFeaturePaths[item.path]
+  return feature && reportFeatures.value[feature] === false ? null : item
 }
 
 const menuItems = computed(() => allMenuItems.map(visibleMenuItem).filter((item): item is MenuItem => item !== null))

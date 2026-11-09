@@ -33,7 +33,7 @@ export function useRouteEldOverviewDrivers() {
         params: { companyId },
       })
       .then((response) => {
-        drivers.value = response.data
+        drivers.value = preserveLiveBearings(response.data, drivers.value)
       })
       .catch((exception: any) => {
         error.value =
@@ -61,7 +61,11 @@ export function useRouteEldOverviewDrivers() {
   return { drivers, isLoading, isRefreshing, error, load }
 }
 
-export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: Ref<string>) {
+export function useRouteEldDriverTracking(
+  driverId: Ref<string>,
+  selectedDate: Ref<string>,
+  includeSpeedChart: Ref<boolean>
+) {
   const api = useApi()
   const tracking = ref<RouteEldDriverTracking | null>(null)
   const isLoading = ref(false)
@@ -98,7 +102,9 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
             }
           : range.value
       const response = await api.get<RouteEldDriverTracking>(
-        ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS(driverId.value),
+        includeSpeedChart.value
+          ? ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS_WITH_SPEED_CHART(driverId.value)
+          : ApiEndpoints.ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS(driverId.value),
         { params: { companyId, ...requestRange } }
       )
       if (sequence === requestSequence) {
@@ -106,6 +112,7 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
           tracking.value = {
             ...response.data,
             points: deduplicateTrackingPoints(response.data.points),
+            speedChart: deduplicateSpeedChartPoints(response.data.speedChart ?? []),
           }
         } else {
           tracking.value = {
@@ -113,6 +120,10 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
             driver: response.data.driver,
             toTimestamp: response.data.toTimestamp,
             points: deduplicateTrackingPoints([...tracking.value.points, ...response.data.points]),
+            speedChart: deduplicateSpeedChartPoints([
+              ...(tracking.value.speedChart ?? []),
+              ...(response.data.speedChart ?? []),
+            ]),
           }
         }
       }
@@ -138,7 +149,7 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
   }
 
   watch(
-    [driverId, selectedDate],
+    [driverId, selectedDate, includeSpeedChart],
     () => {
       tracking.value = null
       void load(true)
@@ -155,8 +166,59 @@ export function useRouteEldDriverTracking(driverId: Ref<string>, selectedDate: R
   return { tracking, isLoading, isRefreshing, isToday, error, load }
 }
 
+function preserveLiveBearings(next: RouteEldLiveDriver[], previous: RouteEldLiveDriver[]) {
+  const previousById = new Map(previous.map((driver) => [driver.driverId, driver]))
+  return next.map((driver) => {
+    const point = driver.latestPoint
+    if (!point) return driver
+    const previousPoint = previousById.get(driver.driverId)?.latestPoint
+    const providerBearing = normalizeBearing(point.bearing)
+    const movementBearing = previousPoint ? bearingBetween(previousPoint, point) : null
+    const bearing = movementBearing ?? providerBearing ?? normalizeBearing(previousPoint?.bearing)
+    return bearing == null ? driver : { ...driver, latestPoint: { ...point, bearing } }
+  })
+}
+
+function bearingBetween(
+  from: RouteEldLiveDriver['latestPoint'],
+  to: RouteEldLiveDriver['latestPoint']
+) {
+  if (!from || !to) return null
+  if (distanceMeters(from, to) < MIN_MOVEMENT_METERS) return null
+  const fromLatitude = (from.latitude * Math.PI) / 180
+  const toLatitude = (to.latitude * Math.PI) / 180
+  const longitudeDelta = ((to.longitude - from.longitude) * Math.PI) / 180
+  const y = Math.sin(longitudeDelta) * Math.cos(toLatitude)
+  const x =
+    Math.cos(fromLatitude) * Math.sin(toLatitude) -
+    Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta)
+  return normalizeBearing((Math.atan2(y, x) * 180) / Math.PI)
+}
+
+const MIN_MOVEMENT_METERS = 25
+
+function distanceMeters(
+  from: NonNullable<RouteEldLiveDriver['latestPoint']>,
+  to: NonNullable<RouteEldLiveDriver['latestPoint']>
+) {
+  const latitude = (((from.latitude + to.latitude) / 2) * Math.PI) / 180
+  const x = (((to.longitude - from.longitude) * Math.PI) / 180) * Math.cos(latitude)
+  const y = ((to.latitude - from.latitude) * Math.PI) / 180
+  return Math.sqrt(x * x + y * y) * 6371000
+}
+
+function normalizeBearing(value: number | null | undefined) {
+  return value != null && Number.isFinite(value) ? ((value % 360) + 360) % 360 : null
+}
+
 function deduplicateTrackingPoints(points: RouteEldDriverTracking['points']) {
   return [...new Map(points.map((point) => [point.id, point])).values()].sort(
+    (left, right) => left.timestamp - right.timestamp
+  )
+}
+
+function deduplicateSpeedChartPoints(points: NonNullable<RouteEldDriverTracking['speedChart']>) {
+  return [...new Map(points.map((point) => [point.timestamp, point])).values()].sort(
     (left, right) => left.timestamp - right.timestamp
   )
 }

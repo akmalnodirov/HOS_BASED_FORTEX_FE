@@ -14,31 +14,42 @@
           <div class="text-xs text-muted-foreground">View-only Route ELD location</div>
         </div>
       </div>
-      <div v-if="share" class="text-right">
-        <div class="text-xs font-medium">Expires {{ formatDate(share.expiresAt) }}</div>
-        <div class="mt-0.5 flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-          <span
-            :class="[
-              'h-2 w-2 rounded-full',
-              expired ? 'bg-red-500' : 'animate-pulse bg-emerald-500',
-            ]"
-          />
-          {{ expired ? 'Expired' : 'Live' }}
+      <div class="flex gap-4">
+        <Button
+          @click="toggleDarkMode"
+          variant="ghost"
+          size="icon"
+          class="h-10 w-10 flex items-center justify-center cursor-pointer shrink-0 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 text-gray-900 dark:text-gray-100 shadow-sm"
+        >
+          <Sun v-if="!isDarkMode" class="w-[18px] h-[18px]" />
+          <Moon v-else class="w-[18px] h-[18px]" />
+        </Button>
+        <div v-if="share" class="text-right">
+          <div class="text-xs font-medium">Expires {{ formatDate(share.expiresAt) }}</div>
+          <div class="mt-0.5 flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+            <span
+              :class="[
+                'h-2 w-2 rounded-full',
+                expired ? 'bg-red-500' : 'animate-pulse bg-emerald-500',
+              ]"
+            />
+            {{ expired ? 'Expired' : 'Live' }}
+          </div>
         </div>
       </div>
     </header>
 
     <main class="relative min-h-0 flex-1">
-      <RouteEldTrackingMap v-if="share" :points="share.tracking.points" :is-live="!expired" />
+      <RouteEldTrackingMap v-if="share" :points="share.tracking.points" :is-live="!expired" :vehicle-name="share?.tracking?.vehicle?.name ?? '-'" />
       <div
         v-if="share"
         class="absolute bottom-4 left-4 z-10 max-w-[360px] rounded-md border border-border bg-white/95 p-4 shadow-lg dark:bg-card/95"
       >
         <div class="flex items-start justify-between gap-5">
           <div class="min-w-0">
-            <div class="truncate text-base font-semibold">{{ share.tracking.vehicle.name }}</div>
+            <div class="truncate text-base font-semibold">{{ share?.tracking?.vehicle?.name ?? '-' }}</div>
             <div class="mt-0.5 truncate text-xs text-muted-foreground">
-              {{ share.tracking.vehicle.driverName || 'Driver unavailable' }}
+              {{ share?.tracking?.vehicle?.driverName || 'Driver unavailable' }}
             </div>
           </div>
           <span :class="statusClass">{{ statusLabel }}</span>
@@ -76,10 +87,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CircleAlert, LoaderCircle } from 'lucide-vue-next'
+import { CircleAlert, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
 import RouteEldTrackingMap from '../components/RouteEldTrackingMap.vue'
 import { getPublicRouteEldTracking } from '../composables/useRouteEldOverview'
 import type { RouteEldLiveShareTracking } from '../types'
+import { useDarkMode } from '@/composables/useDarkMode.ts'
+import { Button } from '@/components/ui/button'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))
@@ -88,6 +101,8 @@ const isLoading = ref(true)
 const error = ref('')
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
+
+const { isDarkMode, toggleDarkMode } = useDarkMode()
 
 const expired = computed(
   () => !share.value || new Date(share.value.expiresAt).getTime() <= now.value

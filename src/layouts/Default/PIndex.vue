@@ -1,9 +1,7 @@
 <template>
   <div class="min-h-screen bg-[#F0F0F0] dark:bg-sidebar">
-    <!-- Sidebar -->
     <AppSidebar :is-open="isSidebarOpen" @update:is-open="isSidebarOpen = $event" />
 
-    <!-- Overlay for mobile -->
     <Transition
       enter-active-class="transition-opacity duration-300"
       leave-active-class="transition-opacity duration-300"
@@ -17,36 +15,35 @@
       />
     </Transition>
 
-    <!-- Toggle Button - floats above sidebar -->
     <CToggle :is-open="isSidebarOpen" @toggle="toggleSidebar" />
 
-    <!-- Header -->
     <AppHeader :is-sidebar-open="isSidebarOpen" @toggle-sidebar="toggleSidebar" />
 
-    <!-- Main Content -->
     <main
       class="pt-[65px] transition-all duration-300"
-      :class="[isSidebarOpen ? 'lg:pl-[248px]' : 'lg:pl-0']"
+      :class="[isSidebarOpen ? 'lg:pl-[248px]' : 'lg:pl-0', isViewportPage && 'h-dvh overflow-hidden']"
     >
-      <div>
+      <div :class="isAuditPage && 'h-full min-h-0'">
         <router-view />
       </div>
     </main>
   </div>
 </template>
-<!-- src/Layouts/MainLayout.vue -->
+
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/layouts/Default/components/AppSidebar.vue'
 import AppHeader from '@/layouts/Default/components/AppHeader.vue'
 import CToggle from '@/layouts/Default/components/CToggle.vue'
 
 const route = useRoute()
+const isBoardPage = computed(() => ['/report/tasks', '/report/activity', '/report/checker', '/report/assistant'].includes(route.path))
+const isAuditPage = computed(() => route.path === '/tools/audit' || route.path.startsWith('/tools/audit/'))
+const isViewportPage = computed(() => isBoardPage.value || isAuditPage.value)
 const isSidebarOpen = ref(true)
 const isMobile = ref(false)
 
-// Check if mobile
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 1024
   if (isMobile.value) {
@@ -54,7 +51,6 @@ const checkMobile = () => {
   }
 }
 
-// Load sidebar state from localStorage
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
@@ -65,14 +61,12 @@ onMounted(() => {
   }
 })
 
-// Save sidebar state to localStorage
 watch(isSidebarOpen, (newValue) => {
   if (!isMobile.value) {
     localStorage.setItem('sidebar-open', JSON.stringify(newValue))
   }
 })
 
-// Close sidebar on mobile when route changes
 watch(
   () => route.path,
   () => {

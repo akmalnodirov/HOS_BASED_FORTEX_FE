@@ -128,9 +128,19 @@
 }
 /* ─── Drag & Drop ─────────────────────────────────────────────────────────── */
 .dd-cell {
+  transition: background-color 0.15s;
+}
+
+.dd-handle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-muted-foreground);
   cursor: grab;
   user-select: none;
-  transition: background-color 0.15s;
+}
+
+.dd-handle:active {
+  cursor: grabbing;
 }
 
 .dd-cell:hover {

@@ -14,7 +14,7 @@
     </div>
     <div v-if="error" class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{{ error }}</div>
     <CRouteEldInsertInfoForm ref="formRef" :start-seconds="startSeconds"
-      :driver-external-id="detail?.externalDriverId ?? ''" :users="users" :vehicles="vehicles"
+      :vehicles="vehicles"
       :loading="saving || optionsLoading" @update:start-seconds="startSeconds = $event"
       @update:event-code="eventCode = $event" @save="save" />
   </div>
@@ -43,7 +43,6 @@ const eventCode = ref('DS_OFF')
 const saving = ref(false)
 const optionsLoading = ref(false)
 const error = ref<string | null>(null)
-const users = ref<InsertInfoOption[]>([])
 const vehicles = ref<InsertInfoOption[]>([])
 const formRef = ref<InstanceType<typeof CRouteEldInsertInfoForm> | null>(null)
 const zones: Record<string, string> = {
@@ -63,14 +62,12 @@ watch(driverId, async id => {
   optionsLoading.value = true
   error.value = null
   try {
-    const [optionsResponse, usersResponse] = await Promise.all([
-      api.get<ApiEnvelope<{ vehicles: InsertInfoOption[] }>>(ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS(id)),
-      api.get<ApiEnvelope<InsertInfoOption[]>>(ApiEndpoints.ROUTE_ELD_DRIVER_RESPONSIBLE_USERS(id)),
-    ])
+    const optionsResponse = await api.get<ApiEnvelope<{ vehicles: InsertInfoOption[] }>>(
+      ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_OPTIONS(id)
+    )
     vehicles.value = unwrap(optionsResponse.data)?.vehicles ?? []
-    users.value = unwrap(usersResponse.data) ?? []
   } catch (cause: any) {
-    error.value = cause?.response?.data?.message || 'Could not load Route ELD users and vehicles.'
+    error.value = cause?.response?.data?.message || 'Could not load Route ELD vehicles.'
   } finally { optionsLoading.value = false }
 }, { immediate: true })
 watch(headerDate, () => { startSeconds.value = 0 })

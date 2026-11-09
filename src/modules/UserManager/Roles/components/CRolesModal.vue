@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +43,16 @@ const formData = ref<RoleFormData>({
 
 const errors = ref<Partial<Record<keyof RoleFormData, string>>>({})
 const isSubmitting = ref(false)
+const permissionSearch = ref('')
+const filteredPermissions = computed(() => {
+  const term = permissionSearch.value.trim().toLowerCase()
+  return (props.permissions ?? []).filter(permission =>
+    `${permission.name} ${permission.code}`.toLowerCase().includes(term))
+})
+const allPermissionsSelected = computed(() =>
+  !!props.permissions?.length && props.permissions.every(permission =>
+    formData.value.permissions.includes(permission.id))
+)
 
 watch(
   () => props.role,
@@ -75,6 +86,7 @@ const resetForm = () => {
     permissions: [],
   }
   errors.value = {}
+  permissionSearch.value = ''
 }
 
 const validateForm = (): boolean => {
@@ -105,6 +117,15 @@ const togglePermission = (permissionId: string) => {
 
 const isPermissionSelected = (permissionId: string) => {
   return formData.value.permissions.includes(permissionId)
+}
+
+const toggleAllPermissions = () => {
+  const availableIds = new Set((props.permissions ?? []).map(permission => permission.id))
+  if (allPermissionsSelected.value) {
+    formData.value.permissions = formData.value.permissions.filter(id => !availableIds.has(id))
+  } else {
+    formData.value.permissions = [...new Set([...formData.value.permissions, ...availableIds])]
+  }
 }
 
 const handleSubmit = async () => {
@@ -191,10 +212,19 @@ const clearError = (field: keyof RoleFormData) => {
           </div>
 
           <div class="space-y-2">
-            <Label>Select permissions</Label>
+            <div class="flex items-center justify-between gap-3">
+              <Label>Select permissions</Label>
+              <button type="button" class="text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50" :disabled="isSubmitting || !permissions?.length" @click="toggleAllPermissions">
+                {{ allPermissionsSelected ? 'Deselect all' : 'Select all' }}
+              </button>
+            </div>
+            <div class="relative">
+              <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input v-model="permissionSearch" placeholder="Search permissions" class="pl-9" />
+            </div>
             <div class="border rounded-md p-4 max-h-60 overflow-y-auto space-y-4">
               <div
-                v-for="permission in permissions"
+                v-for="permission in filteredPermissions"
                 :key="permission.id"
                 class="flex items-center space-x-2 cursor-pointer"
                 @click="togglePermission(permission.id)"
@@ -207,8 +237,8 @@ const clearError = (field: keyof RoleFormData) => {
                   {{ permission.name }}
                 </span>
               </div>
-              <p v-if="!permissions || permissions.length === 0" class="text-sm text-gray-500">
-                No permissions available
+              <p v-if="!filteredPermissions.length" class="text-sm text-gray-500">
+                {{ permissionSearch.trim() ? 'No matching permissions' : 'No permissions available' }}
               </p>
             </div>
           </div>

@@ -20,6 +20,20 @@
           />
         </div>
 
+        <Select v-if="companyFilterEnabled" v-model="selectedCompanyId">
+          <SelectTrigger class="h-10 w-full sm:w-52" :disabled="companyOptionsLoading">
+            <SelectValue
+              :placeholder="companyOptionsLoading ? 'Loading companies...' : 'All companies'"
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All companies</SelectItem>
+            <SelectItem v-for="company in companyOptions" :key="company.id" :value="company.id">
+              {{ company.name }}{{ company.isActive ? '' : ' (inactive)' }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
         <Popover v-model:open="periodOpen">
           <PopoverTrigger as-child>
             <Button
@@ -241,6 +255,21 @@
                     />
                     <Undo2 v-else class="h-4 w-4" />
                   </Button>
+                  <Button
+                    v-if="canDeleteSession"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    :disabled="deletingId !== null || rollingBackId !== null"
+                    title="Delete session"
+                    @click.stop="openDeleteDialog(session)"
+                  >
+                    <LoaderCircle
+                      v-if="deletingId === session.id"
+                      class="h-4 w-4 animate-spin"
+                    />
+                    <Trash2 v-else class="h-4 w-4" />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -351,6 +380,68 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <Dialog :open="deleteTarget !== null" @update:open="handleDeleteDialog">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {{ deleteStep === 1 ? 'Delete this event session?' : 'Confirm deletion' }}
+          </DialogTitle>
+          <DialogDescription v-if="deleteStep === 1">
+            The session is removed from the list and can no longer be opened. Its records are kept
+            for audit.
+          </DialogDescription>
+          <DialogDescription v-else>
+            This cannot be undone from the app. Type
+            <span class="font-semibold text-foreground">DELETE</span> to confirm.
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          v-if="deleteTarget?.status === 'SUBMITTED'"
+          class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          Changes from this session were submitted to Route ELD and stay there. After deleting,
+          they can no longer be rolled back from here.
+        </div>
+        <div v-if="deleteTarget" class="rounded-md border border-border bg-muted/30 p-3 text-sm">
+          <div class="font-medium">{{ deleteTarget.name }}</div>
+          <div class="mt-1 text-muted-foreground">
+            {{ deleteTarget.driverName }} · {{ formatDay(deleteTarget.fromDate) }} –
+            {{ formatDay(deleteTarget.toDate) }} · {{ deleteTarget.tabCount }} tabs
+          </div>
+        </div>
+        <Input
+          v-if="deleteStep === 2"
+          v-model="deleteConfirmation"
+          autocomplete="off"
+          placeholder="Type DELETE"
+          @keyup.enter="deleteConfirmation === 'DELETE' && confirmDelete()"
+        />
+        <DialogFooter>
+          <Button variant="outline" :disabled="deletingId !== null" @click="closeDeleteDialog">
+            Cancel
+          </Button>
+          <Button
+            v-if="deleteStep === 1"
+            variant="destructive"
+            :disabled="deletingId !== null"
+            @click="deleteStep = 2"
+          >
+            Continue
+          </Button>
+          <Button
+            v-else
+            variant="destructive"
+            :disabled="deletingId !== null || deleteConfirmation !== 'DELETE'"
+            @click="confirmDelete"
+          >
+            <LoaderCircle v-if="deletingId !== null" class="mr-2 h-4 w-4 animate-spin" />
+            <Trash2 v-else class="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -368,6 +459,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
+  Trash2,
   Undo2,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -400,14 +492,21 @@ import {
 } from '@/components/ui/table'
 import { useDebounceSearch } from '@/composables/useDebounceSearch'
 import { useTimeZoneHelper } from '@/composables/useTimezone'
-import { getCompanyId } from '@/utils/company'
 import { useEventSessions } from '../composables/useEventSessions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
-import type { EventSessionFilters, EventSessionListItem, EventSessionStatus } from '../types'
+import type {
+  EventSessionCompanyOption,
+  EventSessionFilters,
+  EventSessionListItem,
+  EventSessionStatus,
+} from '../types'
 
 const authStore = useAuthStore()
 const canRollback = computed(() => hasPermission(authStore.token, 'route_eld.log_details.rollback'))
+const canDeleteSession = computed(() =>
+  hasPermission(authStore.token, 'route_eld.event_sessions.delete')
+)
 
 type SessionSortKey =
   | 'name'
@@ -426,15 +525,20 @@ const {
   isLoading,
   isRefreshing,
   rollingBackId,
+  deletingId,
   error,
   fetchSessions,
-  fetchSelectedCompanyExternalId,
+  fetchFilterOptions,
   rollbackSession,
+  deleteSession,
 } = useEventSessions()
 
 const today = localDate(new Date())
 const defaultCreatedFrom = localDate(new Date(Date.now() - 8 * 86_400_000))
-const selectedCompanyExternalId = ref<string | null>(null)
+const selectedCompanyId = ref('ALL')
+const companyOptions = ref<EventSessionCompanyOption[]>([])
+const companyFilterEnabled = ref(false)
+const companyOptionsLoading = ref(false)
 const companyContextReady = ref(false)
 const companyContextError = ref<string | null>(null)
 const statusFilter = ref<'ALL' | EventSessionStatus>('ALL')
@@ -456,10 +560,13 @@ const dateRange = computed<DateRange>({
 })
 const periodOpen = ref(false)
 const rollbackTarget = ref<EventSessionListItem | null>(null)
+const deleteTarget = ref<EventSessionListItem | null>(null)
+const deleteStep = ref<1 | 2>(1)
+const deleteConfirmation = ref('')
 
 const filters = computed<EventSessionFilters>(() => ({
   search: debouncedSearch.value.trim() || undefined,
-  companyId: selectedCompanyExternalId.value ?? undefined,
+  companyId: selectedCompanyId.value === 'ALL' ? undefined : selectedCompanyId.value,
   status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
   createdFrom: appliedRange.value.from,
   createdTo: appliedRange.value.to,
@@ -476,7 +583,9 @@ const submittedCount = computed(() => page.value.submittedCount)
 const rolledBackCount = computed(() => page.value.rolledBackCount)
 const sessionCount = computed(() => draftCount.value + submittedCount.value + rolledBackCount.value)
 const totalPages = computed(() => Math.max(1, page.value.pagination.totalPages))
-const pageError = computed(() => companyContextError.value ?? error.value)
+// Session errors come first: they are current and actionable, whereas companyContextError
+// describes a one-off filter-options failure that would otherwise hide every later one.
+const pageError = computed(() => error.value ?? companyContextError.value)
 const validDateRange = computed(() => {
   return pendingRange.value.from <= pendingRange.value.to && pendingRange.value.to <= today
 })
@@ -500,7 +609,7 @@ const pageNumbers = computed<(number | string)[]>(() => {
 })
 
 watch(
-  [debouncedSearch, statusFilter, pageSize],
+  [debouncedSearch, selectedCompanyId, statusFilter, pageSize],
   () => {
     pageNumber.value = 1
   },
@@ -517,7 +626,7 @@ watch(totalPages, (value) => {
   if (pageNumber.value > value) pageNumber.value = value
 })
 
-onMounted(loadSelectedCompany)
+onMounted(loadFilterOptions)
 onUnmounted(cleanup)
 
 function summaryCardClass(active: boolean) {
@@ -591,27 +700,64 @@ async function confirmRollback() {
   }
 }
 
-function refresh() {
-  if (companyContextReady.value) void fetchSessions(filters.value, true)
+function openDeleteDialog(session: EventSessionListItem) {
+  deleteTarget.value = session
+  deleteStep.value = 1
+  deleteConfirmation.value = ''
 }
 
-async function loadSelectedCompany() {
-  const companyId = getCompanyId()
-  if (!companyId) {
-    companyContextError.value = 'Select a company before opening event sessions.'
+function closeDeleteDialog() {
+  if (deletingId.value !== null) return
+  deleteTarget.value = null
+  deleteStep.value = 1
+  deleteConfirmation.value = ''
+}
+
+function handleDeleteDialog(open: boolean) {
+  if (!open) closeDeleteDialog()
+}
+
+async function confirmDelete() {
+  const session = deleteTarget.value
+  if (!session || deleteStep.value !== 2 || deleteConfirmation.value !== 'DELETE') return
+  try {
+    await deleteSession(session.id)
+    closeDeleteDialog()
+    await fetchSessions(filters.value, true)
+    toast.success('The event session was deleted')
+  } catch (exception) {
+    toast.error(exception instanceof Error ? exception.message : 'The session could not be deleted')
+    closeDeleteDialog()
+    await fetchSessions(filters.value, true)
+  }
+}
+
+function refresh() {
+  if (!companyContextReady.value) return
+  // loadFilterOptions is the only place companyContextError is cleared, and it otherwise runs
+  // just once from onMounted — so retry it here, or a single filter-options failure would keep
+  // the banner up for the rest of the session with no way to recover.
+  if (companyContextError.value) {
+    void loadFilterOptions()
     return
   }
+  void fetchSessions(filters.value, true)
+}
+
+async function loadFilterOptions() {
+  companyOptionsLoading.value = true
+  companyContextError.value = null
   try {
-    selectedCompanyExternalId.value = await fetchSelectedCompanyExternalId(companyId)
-    if (!selectedCompanyExternalId.value) {
-      companyContextError.value = 'The selected company could not be resolved.'
-      return
-    }
-    companyContextReady.value = true
-    await fetchSessions(filters.value)
+    const options = await fetchFilterOptions()
+    companyFilterEnabled.value = options.companyFilterEnabled
+    companyOptions.value = options.companies
   } catch (exception) {
     companyContextError.value =
-      exception instanceof Error ? exception.message : 'The selected company could not be loaded.'
+      exception instanceof Error ? exception.message : 'Company filters could not be loaded.'
+  } finally {
+    companyOptionsLoading.value = false
+    companyContextReady.value = true
+    await fetchSessions(filters.value)
   }
 }
 

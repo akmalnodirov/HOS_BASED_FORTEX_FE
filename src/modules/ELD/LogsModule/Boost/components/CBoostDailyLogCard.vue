@@ -38,7 +38,7 @@
             </SelectTrigger>
             <SelectContent :body-lock="false">
               <SelectItem v-for="form in displayForms" :key="form.logDate" :value="form.logDate">
-                {{ formatDate(form.logDate) }} · {{ timeZone || 'CT' }}
+                {{ formatDate(form.logDate) }} · {{ routeEldTimeZoneLabel(timeZone) }}
               </SelectItem>
             </SelectContent>
             </Select>
@@ -236,6 +236,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { RouteEldDailyLogDetail, RouteEldProfileForm } from '../types/boost'
+import { routeEldTimeZoneLabel } from '@/utils/routeEldTimeZone'
 
 const props = withDefaults(
   defineProps<{
