@@ -214,7 +214,7 @@ async function saveEmployeeDaysOff() {
     offDaySaving.value = false
   }
 }
-const features: { label: string; key: keyof ReportSettings }[] = [
+const features: { label: string; key: Exclude<keyof ReportSettings, 'ownerDisplayName'> }[] = [
   { label: 'Statistics', key: 'statisticsEnabled' },
   { label: 'Attendance', key: 'attendanceEnabled' },
   { label: 'Teams', key: 'teamsEnabled' },
