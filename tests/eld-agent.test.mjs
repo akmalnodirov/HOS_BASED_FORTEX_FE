@@ -19,15 +19,29 @@ const context = {
 }
 
 test('the token is only sent over wss, or plain ws to this machine', () => {
-  assert.equal(eldAgentUrl(' wss://agent.example.com '), 'wss://agent.example.com')
-  assert.equal(eldAgentUrl('ws://localhost:8765'), 'ws://localhost:8765')
-  assert.equal(eldAgentUrl('ws://127.0.0.1:8765'), 'ws://127.0.0.1:8765')
-  assert.equal(eldAgentUrl('ws://[::1]:8765'), 'ws://[::1]:8765')
+  assert.equal(eldAgentUrl(' wss://agent.example.com '), 'wss://agent.example.com/')
+  assert.equal(eldAgentUrl('ws://localhost:8765'), 'ws://localhost:8765/')
+  assert.equal(eldAgentUrl('ws://127.0.0.1:8765'), 'ws://127.0.0.1:8765/')
+  assert.equal(eldAgentUrl('ws://[::1]:8765'), 'ws://[::1]:8765/')
   assert.equal(eldAgentUrl('ws://agent.example.com'), null)
   assert.equal(eldAgentUrl('ws://localhost.example.com'), null)
   assert.equal(eldAgentUrl('https://agent.example.com'), null)
   assert.equal(eldAgentUrl('not a url'), null)
   assert.equal(eldAgentUrl(undefined), null)
+  assert.equal(eldAgentUrl('  '), null)
+})
+
+test('a same-origin path is served on the page host, over wss on an https page', () => {
+  assert.equal(
+    eldAgentUrl('/ai-agent/', 'https://vectorium.llorallc.com/eld/logs/1/ai?x=1'),
+    'wss://vectorium.llorallc.com/ai-agent/'
+  )
+  assert.equal(eldAgentUrl('/ai-agent/', 'http://localhost:5173/'), 'ws://localhost:5173/ai-agent/')
+  // A plain-http page on a real host would send the token in cleartext.
+  assert.equal(eldAgentUrl('/ai-agent/', 'http://cc.llorallc.com/'), null)
+  // A protocol-relative value is not a same-origin path.
+  assert.equal(eldAgentUrl('//evil.example.com/x', 'https://cc.llorallc.com/'), null)
+  assert.equal(eldAgentUrl('/ai-agent/', 'not a url'), null)
 })
 
 test('a message carries the draft, the token and the selected event in the agent shape', () => {
