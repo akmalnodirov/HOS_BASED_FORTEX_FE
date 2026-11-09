@@ -1,8 +1,8 @@
 name: Deploy HOS based FORTEX (Vue/Vite) for CC
-run-name: Deploy CC frontend from ${{ github.ref_name }} (by @${{ github.actor }})
+run-name: Deploy CC frontend from copy2cc-main (by @${{ github.actor }})
 
 # Deploys are manual. Merging no longer ships anything: start a run from the Actions tab,
-# pick this workflow for the project and the branch you want to deploy from.
+# it always deploys the copy2cc-main branch, whatever branch is picked in "Run workflow".
 on:
   workflow_dispatch:
 
@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: copy2cc-main
 
       - name: Setup node
         uses: actions/setup-node@v4
