@@ -100,6 +100,8 @@ export interface RouteEldLiveTrackingPoint {
   location: string | null
   driverId: string | null
   driverName: string | null
+  dutyStatus: string | null
+  bearing: number | null
 }
 
 export interface RouteEldLiveDriver {
@@ -119,11 +121,17 @@ export interface RouteEldLiveDriver {
   latestPoint: RouteEldLiveTrackingPoint | null
 }
 
+export interface RouteEldSpeedChartPoint {
+  timestamp: number
+  speed: number
+}
+
 export interface RouteEldDriverTracking {
   driver: RouteEldLiveDriver
   fromTimestamp: number
   toTimestamp: number
   points: RouteEldLiveTrackingPoint[]
+  speedChart?: RouteEldSpeedChartPoint[] | null
 }
 
 export interface RouteEldLiveShareResponse {

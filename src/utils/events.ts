@@ -359,9 +359,31 @@ export const getEventKey = (eventType: number, eventCode: number): string => {
 /**
  * Get event label from eventType and eventCode
  */
-export const getEventLabel = (eventType: number, eventCode: number): string => {
+export const getEventLabel = (
+  eventType: number,
+  eventCode: number,
+  dateToCertify: string | null = null
+): string => {
   const event = findEventByTypeAndCode(eventType, eventCode)
-  return event?.label || 'Unknown'
+  const label = event?.label ?? 'Unknown'
+  const certificationDate = formatCertificationDate(dateToCertify)
+  return eventType === EventType.DriverCertification && certificationDate
+    ? `${label} (${certificationDate})`
+    : label
+}
+
+/**
+ * dateToCertify is stored as YYYY/MM/DD (see submitEditEvent in useScheduleBoost, which
+ * writes CalendarDate.toString() with the dashes swapped for slashes). Render it US-style
+ * as MM/DD/YYYY, matching every other date in the app — reversing the parts produced
+ * DD/MM/YYYY, so Nov 1 read as Jan 11. A date-prefixed datetime is accepted too, since the
+ * leading YYYY-MM-DD is all this label needs.
+ */
+const formatCertificationDate = (value: string | null): string | null => {
+  const match = /^(\d{4})[/-](\d{2})[/-](\d{2})/.exec(value?.trim() ?? '')
+  if (!match) return null
+  const [, year, month, day] = match
+  return `${month}/${day}/${year}`
 }
 
 /**

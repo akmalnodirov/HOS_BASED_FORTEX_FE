@@ -8,6 +8,10 @@ dayjs.extend(timezone)
 
 const routeReportTimeZone = 'America/New_York'
 
+export function reportToday(): string {
+  return dayjs().tz(routeReportTimeZone).format('YYYY-MM-DD')
+}
+
 export const routeTaskStatuses = [
   { value: 0, label: 'Hold' },
   { value: 1, label: 'Working' },
@@ -33,16 +37,25 @@ export const activityStatuses = [
 ]
 
 const statusClasses = [
-  'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  'bg-orange-500/15 text-orange-700 dark:text-orange-300',
-  'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  'bg-teal-500/15 text-teal-700 dark:text-teal-300',
-  'bg-red-500/15 text-red-700 dark:text-red-300',
-  'bg-slate-500/15 text-slate-700 dark:text-slate-300',
-  'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300',
-  'bg-gray-500/15 text-gray-700 dark:text-gray-300',
+  'bg-[#9d0208] text-white',
+  'bg-[#3e5c76] text-white',
+  'bg-[#2c6e49] text-white',
+  'bg-[#F59E0B] text-white',
+  'bg-[#4F46E5] text-white',
+  'bg-[#10B981] text-white',
+]
+
+const activityStatusClasses = [
+  'bg-[#198754] text-white',
+  'bg-[#0D6EFD] text-white',
+  'bg-[#6C757D] text-white',
+  'bg-[#DC3545] text-white',
+  'bg-[#670D2F] text-white',
+  'bg-[#CB0404] text-white',
+  'bg-[#FE5D26] text-white',
+  'bg-[#FE5D26] text-white',
+  'bg-[#C99906] text-white',
+  'bg-red-600 text-white',
 ]
 
 export function operationUserName(user?: ReportOperationUser): string {
@@ -73,7 +86,8 @@ export function operationStatusLabel(value: number, checker = false): string {
   )
 }
 
-export function operationStatusClass(value?: number): string {
-  return statusClasses[value ?? statusClasses.length - 1] ?? statusClasses[statusClasses.length - 1]
+export function operationStatusClass(value?: number, activity = false): string {
+  const classes = activity ? activityStatusClasses : statusClasses
+  return classes[value ?? classes.length - 1] ?? classes[classes.length - 1]
 }
 

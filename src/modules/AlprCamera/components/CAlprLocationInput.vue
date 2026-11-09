@@ -34,7 +34,10 @@
         <MapPin class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="leading-5">{{ suggestion.label }}</span>
       </button>
-      <div v-if="suggestions.length === 0" class="px-3 py-3 text-sm text-muted-foreground">
+      <div v-if="searchError" class="px-3 py-3 text-sm text-destructive">
+        {{ searchError }}
+      </div>
+      <div v-else-if="suggestions.length === 0" class="px-3 py-3 text-sm text-muted-foreground">
         No addresses found
       </div>
     </div>
@@ -69,6 +72,7 @@ const suggestions = ref<AlprLocation[]>([])
 const loading = ref(false)
 const open = ref(false)
 const coordinateError = ref('')
+const searchError = ref('')
 const focused = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let requestVersion = 0
@@ -125,6 +129,7 @@ function cancelSearch() {
   }
   requestVersion++
   loading.value = false
+  searchError.value = ''
 }
 
 async function search(value: string) {
@@ -137,10 +142,12 @@ async function search(value: string) {
     })
     if (version !== requestVersion || query.value.trim() !== value) return
     suggestions.value = response.data
+    searchError.value = ''
     open.value = focused.value
-  } catch {
+  } catch (error) {
     if (version !== requestVersion || query.value.trim() !== value) return
     suggestions.value = []
+    searchError.value = searchErrorMessage(error)
     open.value = focused.value
   } finally {
     if (version === requestVersion) loading.value = false
@@ -185,6 +192,18 @@ function selectSuggestion(suggestion: AlprLocation) {
   emit('select', suggestion)
 }
 
+const SEARCH_UNAVAILABLE = 'Location search is unavailable right now. Please try again shortly.'
+
+// Show the server's JSON error message; otherwise (network failure, empty body, proxy HTML page)
+// show a fixed, readable message instead of raw transport text.
+function searchErrorMessage(error: unknown): string {
+  const data = (error as { response?: { data?: unknown } } | null)?.response?.data
+  if (!data || typeof data !== 'object') return SEARCH_UNAVAILABLE
+  const { detail, message } = data as { detail?: unknown; message?: unknown }
+  const text = typeof detail === 'string' ? detail : typeof message === 'string' ? message : ''
+  return text.trim() || SEARCH_UNAVAILABLE
+}
+
 function closeLater() {
   focused.value = false
   window.setTimeout(() => {
@@ -194,7 +213,7 @@ function closeLater() {
 
 function handleFocus() {
   focused.value = true
-  open.value = suggestions.value.length > 0 && query.value !== selectedLabel
+  open.value = (suggestions.value.length > 0 || !!searchError.value) && query.value !== selectedLabel
   emit('focus')
 }
 

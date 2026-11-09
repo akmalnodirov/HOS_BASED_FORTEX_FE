@@ -1,14 +1,7 @@
 <template>
   <div ref="mapContainerRef" class="relative h-full min-h-[320px] w-full overflow-hidden bg-muted">
-    <div
-      v-if="!apiKey"
-      class="absolute inset-0 z-20 flex items-center justify-center p-8 text-center text-sm text-muted-foreground"
-    >
-      Google Maps API Key required in .env file to render map.
-    </div>
-
     <div class="absolute right-4 top-4 z-30 flex flex-wrap items-center justify-end gap-2">
-      <CMapTypeControl v-model="mapTypeId" :get-map="getMap" />
+      <CMapTypeControl />
       <Button
         type="button"
         :title="
@@ -83,134 +76,128 @@
       </div>
     </div>
 
-    <GoogleMap
-      v-if="apiKey"
-      ref="mapRef"
-      :api-key="apiKey"
-      :styles="mapStyles"
-      :center="defaultCenter"
-      :zoom="4"
-      :map-type-id="mapTypeId"
-      :disable-default-ui="true"
-      :street-view-control="true"
-      :zoom-control="true"
-      gesture-handling="greedy"
-      style="width: 100%; height: 100%"
-      @click="handleMapClick"
-      @idle="scheduleClusterRefresh"
-      @zoom_changed="scheduleClusterRefresh"
-      @tilesloaded="ensureRouteCameraMarkers"
-      @ready="onReady"
-    >
-      <Polyline
-        v-for="(route, index) in routes"
-        :key="`${route.label}-${index}`"
-        ref="routePolylineRefs"
-        :options="polylineOptions(route, index)"
-        @click="emit('select-route', index)"
-      />
-
-      <Polyline
-        v-for="(connector, index) in waypointConnectors"
-        :key="`waypoint-connector-${index}`"
-        :options="connectorPolylineOptions(connector)"
-      />
-
-      <Marker v-if="origin" :options="endpointMarkerOptions(origin, 'A')" />
-      <Marker
-        v-for="(stop, index) in stops"
-        :key="`${stop.longitude}-${stop.latitude}-${index}`"
-        :options="endpointMarkerOptions(stop, String(index + 1))"
-      />
-      <Marker v-if="destination" :options="endpointMarkerOptions(destination, 'B')" />
-
-      <InfoWindow
-        v-if="selectedCamera"
-        :options="{
-          position: { lat: selectedCamera.latitude, lng: selectedCamera.longitude },
-          pixelOffset: infoWindowOffset,
-          headerDisabled: true,
-        }"
-        @closeclick="selectedCamera = null"
+    <CMap ref="mapRef" :center="defaultCenter" :zoom="4" @ready="onReady" @click="handleMapClick">
+      <CMapMarker
+        v-for="endpoint in endpointMarkers"
+        :key="endpoint.key"
+        :position="endpoint.position"
+        anchor="bottom"
+        :z-index="1"
       >
-        <div class="min-w-[220px] p-1 text-sm text-gray-900">
-          <div class="mb-2 flex items-center justify-between gap-3">
-            <div class="font-semibold">ALPR camera</div>
-            <button
-              type="button"
-              aria-label="Close camera information"
-              class="-mr-1 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
-              @click="selectedCamera = null"
-            >
-              <X class="h-4 w-4" />
-            </button>
-          </div>
-          <div class="space-y-1 text-xs">
-            <div class="flex justify-between gap-4">
-              <span class="text-gray-500">Name</span>
-              <span class="max-w-[145px] text-right">{{ cameraName(selectedCamera) }}</span>
-            </div>
-            <div v-if="isRouteCamera(selectedCamera)" class="flex justify-between gap-4">
-              <span class="text-gray-500">Route position</span>
-              <span>{{ formatMiles(selectedCamera.chainageMetres) }} mi</span>
-            </div>
-            <div
-              v-if="isMapCamera(selectedCamera) && selectedCamera.brand"
-              class="flex justify-between gap-4"
-            >
-              <span class="text-gray-500">Brand</span>
-              <span>{{ selectedCamera.brand }}</span>
-            </div>
-            <div v-if="selectedCamera.bearings.length" class="flex justify-between gap-4">
-              <span class="text-gray-500">Bearing</span>
-              <span>{{ selectedCamera.bearings.map(formatBearing).join(', ') }}</span>
-            </div>
-            <div v-if="selectedCamera.bearingConfidence" class="flex justify-between gap-4">
-              <span class="text-gray-500">Confidence</span>
-              <span>{{ selectedCamera.bearingConfidence }}</span>
-            </div>
-            <div v-if="selectedCamera.operator" class="flex justify-between gap-4">
-              <span class="text-gray-500">Operator</span>
-              <span>{{ selectedCamera.operator }}</span>
-            </div>
-            <div
-              v-if="isMapCamera(selectedCamera) && selectedCamera.zone"
-              class="flex justify-between gap-4"
-            >
-              <span class="text-gray-500">Zone</span>
-              <span>{{ selectedCamera.zone }}</span>
-            </div>
-            <div
-              v-if="isMapCamera(selectedCamera) && selectedCamera.mount"
-              class="flex justify-between gap-4"
-            >
-              <span class="text-gray-500">Mount</span>
-              <span>{{ selectedCamera.mount }}</span>
-            </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-gray-500">Coordinates</span>
-              <span>
-                {{ selectedCamera.latitude.toFixed(5) }},
-                {{ selectedCamera.longitude.toFixed(5) }}
-              </span>
-            </div>
-          </div>
+        <div class="relative h-[41px] w-[27px] drop-shadow" :title="endpoint.title">
+          <svg viewBox="0 0 27 41" class="absolute inset-0 h-full w-full">
+            <path
+              d="M13.5 0.5C6.3 0.5 0.5 6.3 0.5 13.5c0 9.7 13 27 13 27s13-17.3 13-27C26.5 6.3 20.7 0.5 13.5 0.5z"
+              fill="#EA4335"
+              stroke="#B31412"
+            />
+          </svg>
+          <span
+            class="absolute inset-x-0 top-[7px] text-center text-xs font-bold leading-none text-white"
+          >
+            {{ endpoint.label }}
+          </span>
         </div>
-      </InfoWindow>
-    </GoogleMap>
+      </CMapMarker>
+
+      <CMapMarker
+        v-if="selectedCamera"
+        :position="{ lat: selectedCamera.latitude, lng: selectedCamera.longitude }"
+        anchor="bottom"
+        :offset="[0, -8]"
+        :z-index="2"
+      >
+        <div class="relative pb-2">
+          <div class="min-w-[220px] rounded-lg bg-white p-3 text-sm text-gray-900 shadow-xl">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <div class="font-semibold">ALPR camera</div>
+              <button
+                type="button"
+                aria-label="Close camera information"
+                class="-mr-1 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                @click="selectedCamera = null"
+              >
+                <X class="h-4 w-4" />
+              </button>
+            </div>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between gap-4">
+                <span class="text-gray-500">Name</span>
+                <span class="max-w-[145px] text-right">{{ cameraName(selectedCamera) }}</span>
+              </div>
+              <div v-if="isRouteCamera(selectedCamera)" class="flex justify-between gap-4">
+                <span class="text-gray-500">Route position</span>
+                <span>{{ formatMiles(selectedCamera.chainageMetres) }} mi</span>
+              </div>
+              <div
+                v-if="isMapCamera(selectedCamera) && selectedCamera.brand"
+                class="flex justify-between gap-4"
+              >
+                <span class="text-gray-500">Brand</span>
+                <span>{{ selectedCamera.brand }}</span>
+              </div>
+              <div v-if="selectedCamera.bearings.length" class="flex justify-between gap-4">
+                <span class="text-gray-500">Bearing</span>
+                <span>{{ selectedCamera.bearings.map(formatBearing).join(', ') }}</span>
+              </div>
+              <div v-if="selectedCamera.bearingConfidence" class="flex justify-between gap-4">
+                <span class="text-gray-500">Confidence</span>
+                <span>{{ selectedCamera.bearingConfidence }}</span>
+              </div>
+              <div v-if="selectedCamera.operator" class="flex justify-between gap-4">
+                <span class="text-gray-500">Operator</span>
+                <span>{{ selectedCamera.operator }}</span>
+              </div>
+              <div
+                v-if="isMapCamera(selectedCamera) && selectedCamera.zone"
+                class="flex justify-between gap-4"
+              >
+                <span class="text-gray-500">Zone</span>
+                <span>{{ selectedCamera.zone }}</span>
+              </div>
+              <div
+                v-if="isMapCamera(selectedCamera) && selectedCamera.mount"
+                class="flex justify-between gap-4"
+              >
+                <span class="text-gray-500">Mount</span>
+                <span>{{ selectedCamera.mount }}</span>
+              </div>
+              <div class="flex justify-between gap-4">
+                <span class="text-gray-500">Coordinates</span>
+                <span>
+                  {{ selectedCamera.latitude.toFixed(5) }},
+                  {{ selectedCamera.longitude.toFixed(5) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div
+            class="absolute bottom-0 left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-white"
+          />
+        </div>
+      </CMapMarker>
+    </CMap>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { Camera, LocateFixed, Maximize, Minimize, X } from 'lucide-vue-next'
-import { GoogleMap, InfoWindow, Marker, Polyline } from 'vue3-google-map'
+import type {
+  GeoJSONSource,
+  Map as MapLibreMap,
+  MapGeoJSONFeature,
+  MapMouseEvent,
+  PointLike,
+} from 'maplibre-gl'
+import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import { ApiEndpoints } from '@/api/endpoints'
 import { Button } from '@/components/ui/button'
+import CMap from '@/components/custom/CMap.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
-import type { MapType } from '@/components/custom/CMapTypeControl.vue'
 import { useApi } from '@/composables/useAxiosService'
-import { mapStyles } from '@/utils/maps'
+import { mapViewport, svgToMapImage, type MapPosition } from '@/utils/maps'
 import type {
   AlprCameraCluster,
   AlprCameraClusterCollection,
@@ -233,44 +220,33 @@ const emit = defineEmits<{
   (event: 'select-location', location: { longitude: number; latitude: number }): void
 }>()
 
+type RouteCameraHalo = 'none' | 'halo' | 'halo-faint'
+
 const MAX_CLUSTER_MARKERS = 450
-const MARKERS_PER_FRAME = 24
+const ROUTE_SOURCE = 'alpr-routes'
+const CONNECTOR_SOURCE = 'alpr-waypoint-connectors'
+const CLUSTER_SOURCE = 'alpr-camera-clusters'
+const MAP_CAMERA_SOURCE = 'alpr-map-cameras'
+const ROUTE_CAMERA_BEARING_SOURCE = 'alpr-route-camera-bearings'
+const ROUTE_CAMERA_SOURCE = 'alpr-route-cameras'
+const INTERACTIVE_LAYERS = [ROUTE_SOURCE, CLUSTER_SOURCE, MAP_CAMERA_SOURCE, ROUTE_CAMERA_SOURCE]
 const api = useApi()
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const defaultCenter = { lat: 39.5, lng: -98.35 }
 const mapContainerRef = ref<HTMLElement | null>(null)
-const mapRef = ref<any>(null)
-const routePolylineRefs = ref<any[]>([])
-const rawMap = ref<any>(null)
-const mapTypeId = ref<MapType>('roadmap')
+const mapRef = ref<InstanceType<typeof CMap> | null>(null)
 const backgroundCamerasVisible = ref(false)
 const isFullscreen = ref(false)
 const selectedCamera = ref<AlprRouteCamera | AlprMapCamera | null>(null)
-const clusterMarkers: any[] = []
-const routeCameraMarkers: any[] = []
-const allRouteCameraMarkers = new Set<any>()
-const routePathCache = new WeakMap<number[][], Array<{ lat: number; lng: number }>>()
-const routePolylineOptionsCache = new WeakMap<AlprCameraRouteCandidate, Record<string, unknown>>()
 const routeBoundsCache = new WeakMap<
   number[][],
   { north: number; south: number; east: number; west: number }
 >()
-const routeCameraIconCache = new WeakMap<AlprRouteCamera, string>()
-let routeCameraMarkerCache = new WeakMap<AlprCameraRouteCandidate, any[]>()
+let mapCameras: AlprMapCamera[] = []
 let clusterAbort: AbortController | null = null
-let clusterRenderVersion = 0
-let routeRenderVersion = 0
 let lastClusterView = ''
 let clusterRefreshTimer: number | null = null
-let routeRenderTimer: number | null = null
-let renderingRoute: AlprCameraRouteCandidate | null = null
-let flyRaf = 0
-let fractionalZoomEnabled = false
+let disposed = false
 
-const infoWindowOffset = computed(() => {
-  const google = (window as any).google
-  return google?.maps?.Size ? new google.maps.Size(0, -8) : undefined
-})
 const selectedRoute = computed(() => props.routes[props.selectedIndex] ?? null)
 const waypointConnectors = computed(() => {
   const geometry = selectedRoute.value ? toRaw(selectedRoute.value.geometry) : []
@@ -288,118 +264,208 @@ const waypointConnectors = computed(() => {
       if (gapMetres < 12) return null
       return [{ lat: location.latitude, lng: location.longitude }, nearest]
     })
-    .filter((path): path is Array<{ lat: number; lng: number }> => path !== null)
+    .filter((path): path is MapPosition[] => path !== null)
+})
+const endpointMarkers = computed(() => {
+  const markers: { key: string; label: string; title: string; position: MapPosition }[] = []
+  const add = (location: AlprLocation | null | undefined, label: string, key: string) => {
+    if (!location) return
+    markers.push({
+      key,
+      label,
+      title: location.label,
+      position: { lat: location.latitude, lng: location.longitude },
+    })
+  }
+  add(props.origin, 'A', 'origin')
+  ;(props.stops ?? []).forEach((stop, index) =>
+    add(stop, String(index + 1), `${stop.longitude}-${stop.latitude}-${index}`)
+  )
+  add(props.destination, 'B', 'destination')
+  return markers
 })
 
-function onReady(instance: any) {
-  rawMap.value = instance
-  const map = getMap()
-  if (map && !fractionalZoomEnabled) {
-    map.setOptions?.({ isFractionalZoomEnabled: true })
-    fractionalZoomEnabled = true
-  }
+function onReady(map: MapLibreMap) {
+  map.setMissingStyleImageResolver((id) => resolveMapImage(map, id))
+  addOverlayLayers(map)
+  map.on('moveend', scheduleClusterRefresh)
+  INTERACTIVE_LAYERS.forEach((layer) => {
+    map.on('mouseenter', layer, () => {
+      map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', layer, () => {
+      map.getCanvas().style.cursor = ''
+    })
+  })
   backgroundCamerasVisible.value = !selectedRoute.value
   if (backgroundCamerasVisible.value) scheduleClusterRefresh()
-  void nextTick().then(() => {
-    void renderRouteCameras()
-    if (routeRenderTimer) clearTimeout(routeRenderTimer)
-    routeRenderTimer = window.setTimeout(ensureRouteCameraMarkers, 250)
-  })
+  renderRoutes()
+  renderWaypointConnectors()
+  renderRouteCameras()
   if (selectedRoute.value) void fitSelectedRoute()
 }
 
 function getMap() {
-  return mapRef.value?.map ?? rawMap.value ?? null
+  return mapRef.value?.getMap() ?? null
 }
 
-function polylineOptions(route: AlprCameraRouteCandidate, index: number) {
-  const routeKey = toRaw(route)
-  const cached = routePolylineOptionsCache.get(routeKey)
-  if (cached) return cached
-
-  const options = {
-    path: routePath(route),
-    ...routePolylineStyle(index),
-    clickable: true,
-  }
-  routePolylineOptionsCache.set(routeKey, options)
-  return options
+function emptyCollection(): FeatureCollection {
+  return { type: 'FeatureCollection', features: [] }
 }
 
-function routePolylineStyle(index: number) {
-  const selected = index === props.selectedIndex
+function setSourceData(id: string, features: Feature<Geometry>[]) {
+  getMap()?.getSource<GeoJSONSource>(id)?.setData({ type: 'FeatureCollection', features })
+}
+
+function pointFeature(
+  position: { longitude: number; latitude: number },
+  properties: Record<string, string | number | boolean>
+): Feature<Geometry> {
   return {
-    strokeColor: selected ? '#3C64D8' : '#7C8799',
-    strokeOpacity: selected ? 1 : 0.35,
-    strokeWeight: selected ? 6 : 4,
-    zIndex: selected ? 20 : 15,
+    type: 'Feature',
+    properties,
+    geometry: { type: 'Point', coordinates: [position.longitude, position.latitude] },
   }
 }
 
-async function applyRoutePolylineStyles() {
-  await nextTick()
-  routePolylineRefs.value.forEach((component, index) => {
-    const polyline = component?.polyline?.value ?? component?.polyline
-    polyline?.setOptions?.(routePolylineStyle(index))
+function addOverlayLayers(map: MapLibreMap) {
+  ;[
+    ROUTE_SOURCE,
+    CONNECTOR_SOURCE,
+    CLUSTER_SOURCE,
+    MAP_CAMERA_SOURCE,
+    ROUTE_CAMERA_BEARING_SOURCE,
+    ROUTE_CAMERA_SOURCE,
+  ].forEach((id) => map.addSource(id, { type: 'geojson', data: emptyCollection() }))
+  map.addLayer({
+    id: ROUTE_SOURCE,
+    type: 'line',
+    source: ROUTE_SOURCE,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+      'line-sort-key': ['case', ['get', 'selected'], 1, 0],
+    },
+    paint: {
+      'line-color': ['case', ['get', 'selected'], '#3C64D8', '#7C8799'],
+      'line-opacity': ['case', ['get', 'selected'], 1, 0.35],
+      'line-width': ['case', ['get', 'selected'], 6, 4],
+    },
+  })
+  map.addLayer({
+    id: CONNECTOR_SOURCE,
+    type: 'line',
+    source: CONNECTOR_SOURCE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#E5484D',
+      'line-opacity': 0.9,
+      'line-width': 3.4,
+      'line-dasharray': [0, 2.6],
+    },
+  })
+  map.addLayer({
+    id: CLUSTER_SOURCE,
+    type: 'symbol',
+    source: CLUSTER_SOURCE,
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'text-field': ['get', 'label'],
+      'text-font': ['Noto Sans Medium'],
+      'text-size': 12,
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: { 'text-color': '#FFFFFF' },
+  })
+  map.addLayer({
+    id: MAP_CAMERA_SOURCE,
+    type: 'symbol',
+    source: MAP_CAMERA_SOURCE,
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
+  })
+  map.addLayer({
+    id: ROUTE_CAMERA_BEARING_SOURCE,
+    type: 'symbol',
+    source: ROUTE_CAMERA_BEARING_SOURCE,
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'icon-rotate': ['get', 'bearing'],
+      'icon-rotation-alignment': 'map',
+    },
+  })
+  map.addLayer({
+    id: ROUTE_CAMERA_SOURCE,
+    type: 'symbol',
+    source: ROUTE_CAMERA_SOURCE,
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
   })
 }
 
-function routePath(route: AlprCameraRouteCandidate) {
-  const geometry = toRaw(route.geometry)
-  const cached = routePathCache.get(geometry)
-  if (cached) return cached
-
-  const path: Array<{ lat: number; lng: number }> = []
-  let north = Number.NEGATIVE_INFINITY
-  let south = Number.POSITIVE_INFINITY
-  let east = Number.NEGATIVE_INFINITY
-  let west = Number.POSITIVE_INFINITY
-  geometry.forEach((point) => {
-    if (point.length < 2) return
-    const lat = point[1]
-    const lng = point[0]
-    path.push({ lat, lng })
-    north = Math.max(north, lat)
-    south = Math.min(south, lat)
-    east = Math.max(east, lng)
-    west = Math.min(west, lng)
-  })
-  routePathCache.set(geometry, path)
-  if ([north, south, east, west].every(Number.isFinite)) {
-    routeBoundsCache.set(geometry, { north, south, east, west })
-  }
-  return path
+async function resolveMapImage(map: MapLibreMap, id: string) {
+  const definition = mapImageDefinition(id)
+  if (!definition) return
+  const image = await svgToMapImage(definition.svg, definition.size, definition.size)
+  if (image && !disposed && !map.hasImage(id)) map.addImage(id, image, { pixelRatio: 2 })
 }
 
-function endpointMarkerOptions(location: AlprLocation, label: string) {
-  return {
-    position: { lat: location.latitude, lng: location.longitude },
-    label: { text: label, color: '#FFFFFF', fontWeight: '700' },
-    title: location.label,
-    zIndex: 1000,
+function mapImageDefinition(id: string) {
+  if (id === 'alpr-camera') return { svg: cameraMarkerSvg(), size: 26 }
+  const cluster = /^alpr-cluster-(\d+)$/.exec(id)
+  if (cluster) {
+    const size = Number(cluster[1])
+    return { svg: clusterMarkerSvg(size), size }
   }
+  const wedge = /^alpr-wedge-(solid|faint)$/.exec(id)
+  if (wedge) return { svg: routeCameraWedgeSvg(wedge[1] === 'faint'), size: 40 }
+  const body = /^alpr-route-camera-(none|halo|halo-faint)-(ring|plain)-(active|idle)$/.exec(id)
+  if (body) {
+    return {
+      svg: routeCameraBodySvg(body[1] as RouteCameraHalo, body[2] === 'ring', body[3] === 'active'),
+      size: 40,
+    }
+  }
+  return null
 }
 
-function connectorPolylineOptions(path: Array<{ lat: number; lng: number }>) {
-  return {
-    path,
-    strokeOpacity: 0,
-    clickable: false,
-    zIndex: 45,
-    icons: [
-      {
-        icon: {
-          path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
-          fillColor: '#E5484D',
-          fillOpacity: 0.9,
-          strokeOpacity: 0,
-          scale: 1.7,
-        },
-        offset: '0',
-        repeat: '9px',
+function renderRoutes() {
+  setSourceData(
+    ROUTE_SOURCE,
+    props.routes.map((route, index) => ({
+      type: 'Feature',
+      properties: { index, selected: index === props.selectedIndex },
+      geometry: {
+        type: 'LineString',
+        coordinates: toRaw(route.geometry).filter((point) => point.length >= 2),
       },
-    ],
-  }
+    }))
+  )
+}
+
+function renderWaypointConnectors() {
+  setSourceData(
+    CONNECTOR_SOURCE,
+    waypointConnectors.value.map((path) => ({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: path.map((position) => [position.lng, position.lat]),
+      },
+    }))
+  )
 }
 
 function nearestRoutePoint(location: AlprLocation, geometry: number[][]) {
@@ -443,20 +509,11 @@ function nearestRoutePoint(location: AlprLocation, geometry: number[][]) {
 
 async function refreshCameraClusters() {
   const map = getMap()
-  const bounds = map?.getBounds?.()
-  if (!map || !bounds || !backgroundCamerasVisible.value) return
-
-  const northEast = bounds.getNorthEast()
-  const southWest = bounds.getSouthWest()
-  const viewport = {
-    west: southWest.lng(),
-    south: southWest.lat(),
-    east: northEast.lng(),
-    north: northEast.lat(),
-  }
+  const viewport = map ? mapViewport(map) : null
+  if (!map || !viewport || !backgroundCamerasVisible.value) return
   if (viewport.west >= viewport.east) return
 
-  const mapZoom = Math.max(0, Math.min(22, Math.floor(map.getZoom?.() ?? 4)))
+  const mapZoom = Math.max(0, Math.min(22, Math.floor(map.getZoom())))
   const viewKey = [
     mapZoom,
     viewport.west.toFixed(3),
@@ -514,7 +571,7 @@ async function refreshCameraClusters() {
 }
 
 function renderMapCameras(cameras: AlprMapCamera[]) {
-  clearMarkers(clusterMarkers)
+  clearBackgroundCameras()
   if (
     selectedCamera.value &&
     isMapCamera(selectedCamera.value) &&
@@ -522,187 +579,64 @@ function renderMapCameras(cameras: AlprMapCamera[]) {
   ) {
     selectedCamera.value = null
   }
-  const map = getMap()
-  const google = (window as any).google
-  if (!map || !google?.maps?.Marker || !backgroundCamerasVisible.value) return
-
-  const version = ++clusterRenderVersion
-  let index = 0
-  const renderBatch = () => {
-    if (version !== clusterRenderVersion || !backgroundCamerasVisible.value) return
-    const end = Math.min(index + MARKERS_PER_FRAME, cameras.length)
-    for (; index < end; index += 1) {
-      const camera = cameras[index]
-      const marker = new google.maps.Marker({
-        position: { lat: camera.latitude, lng: camera.longitude },
-        map,
-        title: camera.displayName,
-        icon: {
-          url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cameraMarkerSvg())}`,
-          anchor: new google.maps.Point(13, 13),
-          scaledSize: new google.maps.Size(26, 26),
-        },
-        optimized: true,
-        zIndex: 6,
-      })
-      marker.addListener('click', () => {
-        selectedCamera.value = camera
-      })
-      clusterMarkers.push(marker)
-    }
-    if (index < cameras.length) requestAnimationFrame(renderBatch)
-  }
-  requestAnimationFrame(renderBatch)
+  if (!backgroundCamerasVisible.value) return
+  mapCameras = cameras
+  setSourceData(
+    MAP_CAMERA_SOURCE,
+    cameras.map((camera, index) => pointFeature(camera, { index, icon: 'alpr-camera' }))
+  )
 }
 
 function renderClusterMarkers(clusters: AlprCameraCluster[]) {
-  clearMarkers(clusterMarkers)
+  clearBackgroundCameras()
   if (selectedCamera.value && isMapCamera(selectedCamera.value)) selectedCamera.value = null
-  const map = getMap()
-  const google = (window as any).google
-  if (!map || !google?.maps?.Marker || !backgroundCamerasVisible.value) return
-
-  const version = ++clusterRenderVersion
-  let index = 0
-  const renderBatch = () => {
-    if (version !== clusterRenderVersion || !backgroundCamerasVisible.value) return
-    const end = Math.min(index + MARKERS_PER_FRAME, clusters.length)
-    for (; index < end; index += 1) {
-      const cluster = clusters[index]
-      const size = clusterDiameter(cluster.count)
-      const marker = new google.maps.Marker({
-        position: { lat: cluster.latitude, lng: cluster.longitude },
-        map,
-        label: {
-          text: formatCount(cluster.count),
-          color: '#FFFFFF',
-          fontSize: '12px',
-          fontWeight: '700',
-        },
-        icon: {
-          url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(clusterMarkerSvg(size))}`,
-          anchor: new google.maps.Point(size / 2, size / 2),
-          scaledSize: new google.maps.Size(size, size),
-          labelOrigin: new google.maps.Point(size / 2, size / 2),
-        },
-        opacity: 1,
-        optimized: true,
-        zIndex: 5,
+  if (!backgroundCamerasVisible.value) return
+  setSourceData(
+    CLUSTER_SOURCE,
+    clusters.map((cluster) =>
+      pointFeature(cluster, {
+        label: formatCount(cluster.count),
+        icon: `alpr-cluster-${clusterDiameter(cluster.count)}`,
       })
-      marker.addListener('click', () => {
-        flyTo(
-          { lat: cluster.latitude, lng: cluster.longitude },
-          Math.min((map.getZoom?.() ?? 4) + 2, 16)
-        )
-      })
-      clusterMarkers.push(marker)
-    }
-    if (index < clusters.length) requestAnimationFrame(renderBatch)
-  }
-  requestAnimationFrame(renderBatch)
+    )
+  )
 }
 
 function renderRouteCameras() {
-  const version = ++routeRenderVersion
-  hideRouteCameraMarkers()
   selectedCamera.value = null
-  const route = selectedRoute.value
-  renderingRoute = route ? toRaw(route) : null
-  const cameras = route ? toRaw(route.cameras) : []
-  const map = getMap()
-  const google = (window as any).google
-  if (!route || !map || !google?.maps?.Marker) {
-    renderingRoute = null
-    return
-  }
-
-  const routeKey = toRaw(route)
-  const cachedMarkers = routeCameraMarkerCache.get(routeKey)
-  const createdMarkers: any[] = []
-  let index = 0
-  const renderBatch = () => {
-    if (version !== routeRenderVersion) {
-      createdMarkers.forEach((marker) => {
-        marker.setMap(null)
-        allRouteCameraMarkers.delete(marker)
-      })
-      return
-    }
-    if (cachedMarkers) {
-      const end = Math.min(index + MARKERS_PER_FRAME, cachedMarkers.length)
-      for (; index < end; index += 1) {
-        const marker = cachedMarkers[index]
-        marker.setMap(map)
-        routeCameraMarkers.push(marker)
-      }
-      if (index < cachedMarkers.length) requestAnimationFrame(renderBatch)
-      else renderingRoute = null
-      return
-    }
-
-    const end = Math.min(index + MARKERS_PER_FRAME, cameras.length)
-    for (; index < end; index += 1) {
-      const camera = cameras[index]
-      const marker = new google.maps.Marker({
-        position: { lat: camera.latitude, lng: camera.longitude },
-        map,
-        icon: routeCameraMarkerIcon(camera, google),
-        title: camera.name || `Camera ${camera.id}`,
-        optimized: true,
-        zIndex: 900,
-      })
-      marker.addListener('click', () => {
-        selectedCamera.value = camera
-      })
-      createdMarkers.push(marker)
-      allRouteCameraMarkers.add(marker)
-      routeCameraMarkers.push(marker)
-    }
-    if (index < cameras.length) requestAnimationFrame(renderBatch)
-    else {
-      routeCameraMarkerCache.set(routeKey, createdMarkers)
-      renderingRoute = null
-    }
-  }
-  requestAnimationFrame(renderBatch)
+  const cameras = selectedRoute.value ? toRaw(selectedRoute.value.cameras) : []
+  setSourceData(
+    ROUTE_CAMERA_BEARING_SOURCE,
+    cameras.flatMap((camera, index) =>
+      camera.bearings.map((bearing) =>
+        pointFeature(camera, {
+          index,
+          bearing,
+          icon: `alpr-wedge-${isFaintCamera(camera) ? 'faint' : 'solid'}`,
+        })
+      )
+    )
+  )
+  setSourceData(
+    ROUTE_CAMERA_SOURCE,
+    cameras.map((camera, index) => pointFeature(camera, { index, icon: routeCameraIcon(camera) }))
+  )
 }
 
-function ensureRouteCameraMarkers() {
-  const route = selectedRoute.value ? toRaw(selectedRoute.value) : null
-  const expected = route?.cameras.length ?? 0
-  if (expected > 0 && routeCameraMarkers.length === 0 && renderingRoute !== route) {
-    renderRouteCameras()
-  }
-}
-
-function hideRouteCameraMarkers() {
-  routeCameraMarkers.forEach((marker) => marker.setMap(null))
-  routeCameraMarkers.splice(0, routeCameraMarkers.length)
-}
-
-function clearAllRouteCameraMarkers() {
-  routeRenderVersion += 1
-  renderingRoute = null
-  allRouteCameraMarkers.forEach((marker) => marker.setMap(null))
-  allRouteCameraMarkers.clear()
-  routeCameraMarkers.splice(0, routeCameraMarkers.length)
-  routeCameraMarkerCache = new WeakMap<AlprCameraRouteCandidate, any[]>()
-}
-
-function clearMarkers(markers: any[]) {
-  markers.forEach((marker) => marker.setMap(null))
-  markers.splice(0, markers.length)
+function clearBackgroundCameras() {
+  mapCameras = []
+  setSourceData(MAP_CAMERA_SOURCE, [])
+  setSourceData(CLUSTER_SOURCE, [])
 }
 
 function toggleBackgroundCameras() {
   backgroundCamerasVisible.value = !backgroundCamerasVisible.value
-  clusterMarkers.forEach((marker) => marker.setVisible(backgroundCamerasVisible.value))
   if (backgroundCamerasVisible.value) {
     lastClusterView = ''
     scheduleClusterRefresh()
   } else {
     clusterAbort?.abort()
-    clusterRenderVersion += 1
+    clearBackgroundCameras()
   }
 }
 
@@ -715,13 +649,55 @@ function scheduleClusterRefresh() {
   }, 180)
 }
 
-function handleMapClick(event: any) {
+function renderedFeature(
+  map: MapLibreMap,
+  geometry: PointLike | [PointLike, PointLike],
+  layer: string
+): MapGeoJSONFeature | undefined {
+  return map.queryRenderedFeatures(geometry, { layers: [layer] })[0]
+}
+
+function handleMapClick(event: MapMouseEvent) {
   selectedCamera.value = null
-  const latLng = event?.latLng
-  const latitude = typeof latLng?.lat === 'function' ? latLng.lat() : latLng?.lat
-  const longitude = typeof latLng?.lng === 'function' ? latLng.lng() : latLng?.lng
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
-  emit('select-location', { longitude, latitude })
+  const map = getMap()
+  if (!map) return
+
+  const routeCamera = renderedFeature(map, event.point, ROUTE_CAMERA_SOURCE)
+  const routeCameraIndex = Number(routeCamera?.properties.index)
+  if (routeCamera && selectedRoute.value?.cameras[routeCameraIndex]) {
+    selectedCamera.value = selectedRoute.value.cameras[routeCameraIndex]
+    return
+  }
+
+  const mapCamera = renderedFeature(map, event.point, MAP_CAMERA_SOURCE)
+  const mapCameraIndex = Number(mapCamera?.properties.index)
+  if (mapCamera && mapCameras[mapCameraIndex]) {
+    selectedCamera.value = mapCameras[mapCameraIndex]
+    return
+  }
+
+  const cluster = renderedFeature(map, event.point, CLUSTER_SOURCE)
+  if (cluster?.geometry.type === 'Point') {
+    const [lng, lat] = cluster.geometry.coordinates
+    flyTo({ lat, lng }, Math.min(map.getZoom() + 2, 16))
+    return
+  }
+
+  const { x, y } = event.point
+  const routes = map.queryRenderedFeatures(
+    [
+      [x - 4, y - 4],
+      [x + 4, y + 4],
+    ],
+    { layers: [ROUTE_SOURCE] }
+  )
+  const route = routes.find((feature) => feature.properties.selected) ?? routes[0]
+  if (route) {
+    emit('select-route', Number(route.properties.index))
+    return
+  }
+
+  emit('select-location', { longitude: event.lngLat.lng, latitude: event.lngLat.lat })
 }
 
 async function fitSelectedRoute() {
@@ -729,8 +705,7 @@ async function fitSelectedRoute() {
   await nextTick()
   const route = selectedRoute.value
   const map = getMap()
-  const google = (window as any).google
-  if (!route?.geometry.length || !map || !google?.maps?.LatLngBounds) return
+  if (!route?.geometry.length || !map) return
 
   const geometry = toRaw(route.geometry)
   let bounds = routeBoundsCache.get(geometry)
@@ -750,7 +725,13 @@ async function fitSelectedRoute() {
     bounds = { north, south, east, west }
     routeBoundsCache.set(geometry, bounds)
   }
-  map.fitBounds(bounds, 48)
+  map.fitBounds(
+    [
+      [bounds.west, bounds.south],
+      [bounds.east, bounds.north],
+    ],
+    { padding: 48, duration: 0 }
+  )
 }
 
 function focusMap() {
@@ -772,57 +753,8 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   return 2 * radius * Math.asin(Math.sqrt(value))
 }
 
-function flyTo(target: { lat: number; lng: number }, endZoom = 13) {
-  const map = getMap()
-  if (!map) return
-  if (flyRaf) cancelAnimationFrame(flyRaf)
-
-  if (!fractionalZoomEnabled) {
-    map.setOptions?.({ isFractionalZoomEnabled: true })
-    fractionalZoomEnabled = true
-  }
-
-  const startCenter = map.getCenter?.()
-  const startZoom = map.getZoom?.() ?? endZoom
-  const move = (center: { lat: number; lng: number }, zoom: number) => {
-    if (typeof map.moveCamera === 'function') map.moveCamera({ center, zoom })
-    else {
-      map.setCenter(center)
-      map.setZoom(zoom)
-    }
-  }
-
-  if (!startCenter) {
-    move(target, endZoom)
-    return
-  }
-
-  const startLat = startCenter.lat()
-  const startLng = startCenter.lng()
-  const latitudeDelta = target.lat - startLat
-  const longitudeDelta = target.lng - startLng
-  const distance = haversineKm(startLat, startLng, target.lat, target.lng)
-  const minZoom = Math.min(startZoom, endZoom)
-  const dip = Math.min(Math.max(0, Math.log2(Math.max(distance, 1) / 40)), Math.max(0, minZoom - 2))
-  const duration = Math.min(1800, 850 + dip * 190 + Math.min(500, distance / 5))
-  const startedAt = performance.now()
-  const ease = (progress: number) =>
-    progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2
-
-  const step = (now: number) => {
-    const progress = Math.min(1, (now - startedAt) / duration)
-    const eased = ease(progress)
-    move(
-      {
-        lat: startLat + latitudeDelta * eased,
-        lng: startLng + longitudeDelta * eased,
-      },
-      startZoom + (endZoom - startZoom) * eased - dip * Math.sin(Math.PI * progress)
-    )
-    if (progress < 1) flyRaf = requestAnimationFrame(step)
-    else flyRaf = 0
-  }
-  flyRaf = requestAnimationFrame(step)
+function flyTo(target: MapPosition, endZoom = 13) {
+  getMap()?.flyTo({ center: target, zoom: endZoom, essential: true })
 }
 
 async function toggleFullscreen() {
@@ -835,9 +767,7 @@ async function toggleFullscreen() {
 function syncFullscreen() {
   isFullscreen.value = document.fullscreenElement === mapContainerRef.value
   void nextTick().then(() => {
-    const map = getMap()
-    const google = (window as any).google
-    if (map && google?.maps?.event) google.maps.event.trigger(map, 'resize')
+    getMap()?.resize()
     if (selectedRoute.value) void fitSelectedRoute()
   })
 }
@@ -866,45 +796,45 @@ function cameraMarkerSvg() {
   )
 }
 
-function routeCameraMarkerIcon(camera: AlprRouteCamera, google: any) {
-  const size = 40
-  const cameraKey = toRaw(camera)
-  let url = routeCameraIconCache.get(cameraKey)
-  if (!url) {
-    url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(routeCameraMarkerSvg(camera))}`
-    routeCameraIconCache.set(cameraKey, url)
-  }
-  return {
-    url,
-    anchor: new google.maps.Point(size / 2, size / 2),
-    scaledSize: new google.maps.Size(size, size),
-  }
+function isFaintCamera(camera: AlprRouteCamera) {
+  return camera.bearingConfidence === 'Low' || camera.bearingConfidence === 'None'
 }
 
-function routeCameraMarkerSvg(camera: AlprRouteCamera) {
+function routeCameraIcon(camera: AlprRouteCamera) {
+  const hasDirection = camera.bearings.length > 0 || Boolean(camera.bearingConfidence)
+  const halo: RouteCameraHalo =
+    hasDirection && camera.bearings.length === 0
+      ? isFaintCamera(camera)
+        ? 'halo-faint'
+        : 'halo'
+      : 'none'
+  const ring = hasDirection ? 'ring' : 'plain'
+  const core = camera.attempted === false ? 'idle' : 'active'
+  return `alpr-route-camera-${halo}-${ring}-${core}`
+}
+
+function routeCameraBodySvg(halo: RouteCameraHalo, ring: boolean, active: boolean) {
   const size = 40
   const center = size / 2
-  const wedgeRadius = 18
-  const confidence = camera.bearingConfidence
-  const hasDirection = camera.bearings.length > 0 || Boolean(confidence)
-  const faint = confidence === 'Low' || confidence === 'None'
+  const faint = halo === 'halo-faint'
   const facingOpacity = faint ? 0.18 : 0.32
   const dash = faint ? ' stroke-dasharray="2 2"' : ''
-  const coreColor = camera.attempted === false ? '#9CA3AF' : '#E5484D'
-
-  let facing = ''
-  if (hasDirection && camera.bearings.length === 0) {
-    facing = `<circle cx="${center}" cy="${center}" r="${wedgeRadius}" fill="#F59E0B" fill-opacity="${facingOpacity * 0.6}" stroke="#F59E0B" stroke-opacity="0.5"${dash}/>`
-  } else if (camera.bearings.length > 0) {
-    facing = camera.bearings
-      .map((bearing) => bearingWedgePath(center, wedgeRadius, bearing, facingOpacity, dash))
-      .join('')
-  }
-
-  const ring = hasDirection
+  const coreColor = active ? '#E5484D' : '#9CA3AF'
+  const facing =
+    halo === 'none'
+      ? ''
+      : `<circle cx="${center}" cy="${center}" r="18" fill="#F59E0B" fill-opacity="${facingOpacity * 0.6}" stroke="#F59E0B" stroke-opacity="0.5"${dash}/>`
+  const ringSvg = ring
     ? `<circle cx="${center}" cy="${center}" r="6.5" fill="none" stroke="#F59E0B" stroke-width="2.5"/>`
     : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${facing}${ring}<circle cx="${center}" cy="${center}" r="4.5" fill="${coreColor}" stroke="#ffffff" stroke-width="1.5"/></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${facing}${ringSvg}<circle cx="${center}" cy="${center}" r="4.5" fill="${coreColor}" stroke="#ffffff" stroke-width="1.5"/></svg>`
+}
+
+function routeCameraWedgeSvg(faint: boolean) {
+  const size = 40
+  const opacity = faint ? 0.18 : 0.32
+  const dash = faint ? ' stroke-dasharray="2 2"' : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${bearingWedgePath(size / 2, 18, 0, opacity, dash)}</svg>`
 }
 
 function bearingWedgePath(
@@ -961,22 +891,22 @@ function cameraName(camera: AlprRouteCamera | AlprMapCamera) {
 }
 
 watch(
-  () => props.routes,
-  () => clearAllRouteCameraMarkers()
+  () => [props.routes, props.selectedIndex] as const,
+  () => renderRoutes()
 )
+
+watch(waypointConnectors, () => renderWaypointConnectors())
 
 watch(selectedRoute, async (route, previousRoute) => {
   if (route && !previousRoute) {
     backgroundCamerasVisible.value = false
     clusterAbort?.abort()
-    clusterRenderVersion += 1
-    clearMarkers(clusterMarkers)
+    clearBackgroundCameras()
   } else if (!route && previousRoute) {
     backgroundCamerasVisible.value = true
     lastClusterView = ''
     scheduleClusterRefresh()
   }
-  await applyRoutePolylineStyles()
   renderRouteCameras()
   if (route) await fitSelectedRoute()
 })
@@ -989,13 +919,9 @@ defineExpose({
 onMounted(() => document.addEventListener('fullscreenchange', syncFullscreen))
 
 onBeforeUnmount(() => {
+  disposed = true
   document.removeEventListener('fullscreenchange', syncFullscreen)
   clusterAbort?.abort()
   if (clusterRefreshTimer) clearTimeout(clusterRefreshTimer)
-  if (routeRenderTimer) clearTimeout(routeRenderTimer)
-  if (flyRaf) cancelAnimationFrame(flyRaf)
-  clusterRenderVersion += 1
-  clearMarkers(clusterMarkers)
-  clearAllRouteCameraMarkers()
 })
 </script>

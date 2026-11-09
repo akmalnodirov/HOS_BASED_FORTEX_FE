@@ -44,6 +44,10 @@
               <User class="w-4 h-4 mr-3 text-gray-600 dark:text-gray-400" />
               <span class="text-gray-900 dark:text-gray-100">{{ userInfo.id }}</span>
             </DropdownMenuItem>
+            <DropdownMenuItem class="cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800" @click="router.push('/profile#password')">
+              <KeyRound class="w-4 h-4 mr-3 text-gray-600 dark:text-gray-400" />
+              <span class="text-gray-900 dark:text-gray-100">Change password</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               @click="handleLogout"
@@ -63,7 +67,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { User, LogOut, ChevronDown } from 'lucide-vue-next'
+import { User, LogOut, ChevronDown, KeyRound } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CThemeToggle from '@/components/custom/CThemeToggle.vue'
 import {

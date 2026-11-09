@@ -32,6 +32,18 @@ export interface EventSessionPage {
   rolledBackCount: number
 }
 
+export interface EventSessionCompanyOption {
+  id: string
+  name: string
+  dotNumber: string | null
+  isActive: boolean
+}
+
+export interface EventSessionFilterOptions {
+  companyFilterEnabled: boolean
+  companies: EventSessionCompanyOption[]
+}
+
 export interface EventSessionFilters {
   search?: string
   companyId?: string
