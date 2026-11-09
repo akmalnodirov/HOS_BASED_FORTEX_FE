@@ -410,8 +410,6 @@ export function useRouteEldLogDetail() {
     trackingCollapse,
     mapCenter,
     zoomMap,
-    directionsSegments: computed(() => []),
-    renderRouteOnMap: undefined,
     getChartWidth,
     getSelectedEvent,
     updateHeaderDate,

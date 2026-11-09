@@ -195,12 +195,6 @@ export class ApiEndpoints {
   // Audit endpoints
   private static readonly AUDIT_URL = `${this.BASE_URL}/audit`
   static readonly AUDIT = this.AUDIT_URL
-  static readonly AUDIT_EVENTS = `${this.AUDIT_URL}/events`
-  static readonly AUDIT_SUMMARY = `${this.AUDIT_URL}/summary`
-  static readonly AUDIT_GRAPH = `${this.AUDIT_URL}/graph`
-  static readonly AUDIT_VIOLATIONS = `${this.AUDIT_URL}/violations`
-  static readonly AUDIT_WEIGHT_STATIONS = `${this.AUDIT_URL}/weight-stations`
-  static readonly AUDIT_TRACKING = `${this.AUDIT_URL}/tracking`
 
   // Portal Users endpoints
   private static readonly PORTAL_USERS_URL = `${this.BASE_URL}/portal-users`
@@ -378,6 +372,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS = (driverId: string) =>
     `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points`
+  static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS_WITH_SPEED_CHART = (driverId: string) =>
+    `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points-with-speed-chart`
   static readonly ROUTE_ELD_LIVE_SHARE = `${this.BASE_URL}/route-eld/live-share`
   static readonly ROUTE_ELD_LIVE_SHARE_TRACKING = (token: string) =>
     `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
@@ -433,6 +429,9 @@ export class ApiEndpoints {
   static readonly ALPR_GEOCODE_REVERSE = `${this.BASE_URL}/geocode/reverse`
   static readonly ALPR_CAMERA_CLUSTERS = `${this.BASE_URL}/cameras/clusters`
   static readonly ALPR_CAMERAS = `${this.BASE_URL}/cameras`
+
+  // Self-hosted map routing
+  static readonly MAPS_ROUTE = `${this.BASE_URL}/maps/route`
 
   // External APIs
   static readonly TELEGRAM_SEND_MESSAGE = 'https://dev-new.routeeld.uz/bot/send_message/'

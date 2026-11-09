@@ -14,16 +14,8 @@ import type {
   TrackingResponse,
 } from '@/types/tracking'
 import type { DriverLogsDailyEventsRequest } from '@/types/tracking'
-import { useDirection } from '@/modules/Overview/composables/useDirection.ts'
 
 export function useTracking() {
-  // Direction composable for route drawing
-  const {
-    testDirectionsAPI,
-    renderDirections,
-    cleanUpRenderers,
-  } = useDirection()
-
   // State
   const dailyTrackings: Ref<DailyTrackingResponse | null> = ref(null)
   const everyTrackings: Ref<EveryTrackingResponse[]> = ref([])
@@ -32,13 +24,9 @@ export function useTracking() {
   const trackingTooltips: Ref<Record<string, boolean>> = ref({})
   const trackingCollapse = ref(true)
 
-  // Direction segments for route drawing
-  const directionsSegments = ref<any[]>([])
-
   // Map state
   const mapCenter = ref<{ lat: number; lng: number }>({ lat: 42.775572, lng: -95.968509 })
   const zoomMap = ref<number>(8)
-  const mapInstance = ref<any>(null)
 
   /**
    * Computed: Selected tracking events for drive events
@@ -122,46 +110,7 @@ export function useTracking() {
   }
 
   /**
-   * Generate route directions from tracking points
-   */
-  const generateRouteDirections = async () => {
-    try {
-      // Filter valid tracking points
-      const validPoints = everyTrackings.value.filter(
-        (tracking) => tracking && tracking.latitude && tracking.longitude
-      )
-
-      if (validPoints.length < 2) {
-        directionsSegments.value = []
-        return
-      }
-
-      const segments = await testDirectionsAPI(validPoints)
-
-      if (segments && segments.length > 0) {
-        directionsSegments.value = segments
-      } else {
-        directionsSegments.value = []
-      }
-    } catch (error) {
-      console.error('Error generating route:', error)
-      directionsSegments.value = []
-    }
-  }
-
-  /**
-   * Render route on map
-   * @param mapWrapper - Object containing the map instance (e.g., { map: googleMapInstance })
-   */
-  const renderRouteOnMap = async (mapWrapper: any) => {
-    if (!mapWrapper || directionsSegments.value.length === 0) {
-      return
-    }
-    await renderDirections(mapWrapper, directionsSegments.value)
-  }
-
-  /**
-   * Fetch both daily and every trackings and generate routes
+   * Fetch both daily and every trackings
    */
   const fetchTrackings = async (
     model: DriverLogsDailyEventsRequest,
@@ -171,9 +120,6 @@ export function useTracking() {
       fetchDailyTrackings(model, signal),
       fetchEveryTrackings(model, signal),
     ])
-
-    // Generate route directions after fetching trackings
-    await generateRouteDirections()
 
     // Calculate map center
     calculateMapCenter()
@@ -274,8 +220,6 @@ export function useTracking() {
     trackingCollapse,
     mapCenter,
     zoomMap,
-    mapInstance,
-    directionsSegments,
 
     // Computed
     selectedTrackingEvents,
@@ -287,8 +231,5 @@ export function useTracking() {
     selectEvent,
     calculateMapCenter,
     toggleTrackingCollapse,
-    generateRouteDirections,
-    renderRouteOnMap,
-    cleanUpRenderers,
   }
 }

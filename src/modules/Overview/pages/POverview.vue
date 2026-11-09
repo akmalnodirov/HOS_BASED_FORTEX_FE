@@ -96,78 +96,82 @@
       ]"
     >
       <CMapControls
-        v-model:map-type="mapType"
         v-model:current-filter="statusFilter"
         :filter-options="driverStatuses"
         :is-fullscreen="isFullscreen"
-        :get-map="getMap"
         @toggle-fullscreen="toggleFullscreen"
       />
-      <div
-        v-if="!apiKey"
-        class="flex h-full items-center justify-center text-sm text-muted-foreground"
-      >
-        Google Maps API key is not configured.
-      </div>
-      <GoogleMap
-        v-else
-        :api-key="apiKey"
-        :center="mapCenter"
-        :zoom="4"
-        :styles="mapStyles"
-        :map-type-id="mapType"
-        :disable-default-ui="true"
-        :zoom-control="true"
-        style="height: 100%; width: 100%"
-        @ready="handleMapReady"
-      >
-        <CustomMarker
+      <CMap :center="mapCenter" :zoom="4">
+        <CMapMarker
           v-for="driver in locatedDrivers"
           :key="driver.driverId"
-          :options="{
-            position: { lat: driver.latestPoint!.latitude, lng: driver.latestPoint!.longitude },
-            anchorPoint: 'CENTER',
-          }"
+          :position="{ lat: driver.latestPoint!.latitude, lng: driver.latestPoint!.longitude }"
         >
-          <button
-            type="button"
-            class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white text-white shadow-lg"
-            :style="{ backgroundColor: statusColor(driver.currentStatus) }"
-            :title="driver.driverName"
-            @click="openDriver(driver.driverId)"
-          >
-            <Navigation class="h-4 w-4" />
-          </button>
-        </CustomMarker>
-      </GoogleMap>
+          <div class="relative flex flex-col items-center">
+            <div
+              v-if="driver.vehicleName"
+              class="absolute bottom-full mb-1 max-w-28 truncate rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-900 shadow"
+              :title="driver.vehicleName"
+            >
+              {{ driver.vehicleName }}
+            </div>
+            <button
+              type="button"
+              class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white text-white shadow-lg"
+              :style="{ backgroundColor: statusColor(driver.currentStatus) }"
+              :title="driver.driverName"
+              @click="openDriver(driver.driverId)"
+            >
+              <Navigation
+                class="h-4 w-4"
+                :style="{
+                  transform: `rotate(${markerRotation(driver.latestPoint?.bearing)}deg)`,
+                }"
+              />
+            </button>
+          </div>
+        </CMapMarker>
+      </CMap>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CustomMarker, GoogleMap } from 'vue3-google-map'
 import { Navigation, RefreshCw, Search, Wifi } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import CMap from '@/components/custom/CMap.vue'
 import CMapControls from '@/components/custom/CMapControls.vue'
-import { mapStyles } from '@/utils/maps'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import { useRouteEldOverviewDrivers } from '../composables/useRouteEldOverview'
 
 const router = useRouter()
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const search = ref('')
 const activityFilter = ref<'active' | 'inactive' | 'all'>('active')
 const statusFilter = ref('all')
-const mapType = ref<'roadmap' | 'terrain' | 'hybrid'>('roadmap')
 const mapCenter = { lat: 39.8283, lng: -98.5795 }
 const mapContainer = ref<HTMLElement | null>(null)
-const rawMap = ref<any>(null)
 const isFullscreen = ref(false)
 const { drivers, isLoading, isRefreshing, error, load } = useRouteEldOverviewDrivers()
+
+function distinctByTruck(list: typeof drivers.value) {
+  const latestByTruck = new Map<string, (typeof drivers.value)[number]>()
+
+  for (const driver of list) {
+    const key = truckKey(driver)
+    const current = latestByTruck.get(key)
+    if (!current || driverUpdatedAt(driver) > driverUpdatedAt(current)) {
+      latestByTruck.set(key, driver)
+    }
+  }
+
+  return [...latestByTruck.values()]
+}
+
 const activityDrivers = computed(() =>
   drivers.value.filter((driver) =>
     activityFilter.value === 'all' || driver.isActive === (activityFilter.value === 'active')
@@ -218,38 +222,50 @@ onMounted(() => document.addEventListener('fullscreenchange', handleFullscreenCh
 
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', handleFullscreenChange))
 
-const locatedDrivers = computed(() => filteredDrivers.value.filter((driver) => driver.latestPoint))
+const locatedDrivers = computed(() =>
+  distinctByTruck(filteredDrivers.value).filter((driver) => driver.latestPoint)
+)
 
 function openDriver(driverId: string) {
   void router.push({ name: 'OverviewDetail', params: { id: driverId } })
+}
+
+function truckKey(driver: (typeof drivers.value)[number]) {
+  const vehicleId = driver.vehicleId?.trim().toLowerCase()
+  if (vehicleId) return `vehicle:${vehicleId}`
+
+  const vehicleVin = driver.vehicleVin?.trim().toLowerCase()
+  if (vehicleVin) return `vin:${vehicleVin}`
+
+  return `driver:${driver.driverId}`
+}
+
+function driverUpdatedAt(driver: (typeof drivers.value)[number]) {
+  return driver.latestPoint?.timestamp ?? Number.NEGATIVE_INFINITY
 }
 
 function dutyStatus(value: string) {
   const status = value.replace(/[\s_-]/g, '').toUpperCase()
   if (status.includes('SLEEP') || status === 'SB') return 'sleeper'
   if (status.includes('DRIV') || status === 'D') return 'driving'
-  if (status.includes('ONDUTY') || status === 'ON') return 'onDuty'
+  if (status.includes('ONDUTY') || status.includes('YARD') || status === 'ON') return 'onDuty'
   return 'offDuty'
 }
 
-function handleMapReady(instance: any) {
-  rawMap.value = instance?.map ?? instance
-}
-
-const getMap = () => rawMap.value
-
 async function toggleFullscreen() {
-  if (!mapContainer.value) return
-  if (document.fullscreenElement === mapContainer.value) await document.exitFullscreen()
-  else await mapContainer.value.requestFullscreen()
+  const element = mapContainer.value
+  if (!element) return
+  if (document.fullscreenElement === element) await document.exitFullscreen().catch(() => {})
+  else await element.requestFullscreen().catch(() => {})
 }
 
 function handleFullscreenChange() {
   isFullscreen.value = document.fullscreenElement === mapContainer.value
-  nextTick(() => {
-    const googleMaps = (window as any).google?.maps
-    if (rawMap.value && googleMaps?.event) googleMaps.event.trigger(rawMap.value, 'resize')
-  })
+}
+
+function markerRotation(value: number | null | undefined) {
+  const bearing = value != null && Number.isFinite(value) ? value : 0
+  return bearing - 45
 }
 
 function statusLabel(value: string) {
@@ -261,7 +277,7 @@ function statusColor(value: string) {
   const normalized = value.toUpperCase()
   if (normalized.includes('DRIVING')) return '#589e67'
   if (normalized.includes('SLEEP')) return '#954baf'
-  if (normalized.includes('ON')) return '#6082e0'
+  if (normalized.includes('ON') || normalized.includes('YARD')) return '#6082e0'
   if (normalized.includes('PERSONAL')) return '#d28e3d'
   return '#af4b4b'
 }

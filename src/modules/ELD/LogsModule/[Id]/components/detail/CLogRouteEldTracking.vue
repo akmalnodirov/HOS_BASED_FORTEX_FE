@@ -97,6 +97,8 @@ const mapPoints = computed<RouteEldLiveTrackingPoint[]>(() =>
       motionStatus: normalizeMotionStatus(point.motionStatus),
       location: null,
       driverName: null,
+      dutyStatus: null,
+      bearing: null,
     }))
 )
 
