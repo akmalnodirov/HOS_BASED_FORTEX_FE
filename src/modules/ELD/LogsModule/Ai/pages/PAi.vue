@@ -11,9 +11,18 @@
         :violations="calculations?.violations ?? []"
         :event-issues="calculations?.eventIssues ?? []"
         :is-graph-loading="store.isLoading"
+        :selected-event-id="chatMode === 'agent' ? (agentEvent?.id ?? null) : null"
+        @selected-event="selectAgentEvent"
       />
     </section>
 
+    <p
+      v-if="request && ready && chatMode === 'agent'"
+      role="status"
+      class="bg-background px-4 py-2 text-sm"
+    >
+      Your request will be sent to the Assistant when you switch back to it.
+    </p>
     <p v-if="waitingRequest" role="status" class="bg-background px-4 py-2 text-sm">
       Your request is saved. Open or create a draft for {{ waitingRequest.fromDate }} – {{ waitingRequest.toDate }} to send it.
     </p>
@@ -40,21 +49,55 @@
           />
         </div>
       </section>
-      <CAiChatPanel
-        v-if="tabId"
-        ref="chatRef"
-        class="max-h-[720px]"
-        :session-id="session.id"
-        :tab-id="tabId"
-        :can-apply="canBoost"
-        @applied="onApplied"
-      />
+      <div v-if="tabId" class="flex max-h-[720px] min-h-0 flex-col bg-background">
+        <div v-if="agentUrl" class="flex gap-1 border-b border-border px-4 py-2" role="tablist">
+          <Button
+            v-for="mode in CHAT_MODES"
+            :key="mode.value"
+            size="sm"
+            role="tab"
+            :aria-selected="chatMode === mode.value"
+            :variant="chatMode === mode.value ? 'secondary' : 'ghost'"
+            class="h-8 text-xs"
+            :disabled="agentBusy && chatMode !== mode.value"
+            :title="agentBusy && chatMode !== mode.value ? 'Wait for the dispatcher agent to finish' : undefined"
+            @click="chatMode = mode.value"
+          >
+            {{ mode.label }}
+          </Button>
+        </div>
+        <CAiAgentChatPanel
+          v-if="agentUrl && chatMode === 'agent'"
+          class="min-h-0 flex-1"
+          :url="agentUrl"
+          :session-id="session.id"
+          :tab-id="tabId"
+          :token="authStore.token ?? ''"
+          :from-date="session.fromDate"
+          :to-date="session.toDate"
+          :time-zone="timeZone"
+          :selected-event="agentEvent"
+          @changed="onApplied"
+          @clear-event="agentEvent = null"
+          @busy="agentBusy = $event"
+        />
+        <CAiChatPanel
+          v-else
+          ref="chatRef"
+          class="min-h-0 flex-1"
+          :session-id="session.id"
+          :tab-id="tabId"
+          :can-apply="canBoost"
+          @applied="onApplied"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { hasPermission } from '@/router/permissions'
@@ -62,7 +105,10 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 import CBoostGraph from '@/modules/ELD/LogsModule/Boost/components/CBoostGraph.vue'
 import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
+import { Button } from '@/components/ui/button'
+import CAiAgentChatPanel from '../components/CAiAgentChatPanel.vue'
 import CAiChatPanel from '../components/CAiChatPanel.vue'
+import { eldAgentUrl, type EldAgentSelectedEvent } from '../utils/eldAgent'
 import CAiDraftTabs from '../components/CAiDraftTabs.vue'
 import CAiOptionsPanel from '../components/CAiOptionsPanel.vue'
 import { deliverHandoff, handoffReady, useAiHandoffStore } from '../store/aiHandoff'
@@ -91,9 +137,46 @@ const timeZone = computed(() => workspace.value?.events[0]?.event.timeZone ?? 'C
 const refreshAfterApplied = useAssistantWorkspaceRefresh()
 
 // A card never applies by itself: it asks the AI, which shows the usual attested confirmation.
+// Option cards go to the assistant, also from agent mode, since applying one needs its attested confirmation.
 async function useOption(message: string) {
+  if (chatMode.value !== 'assistant') {
+    if (agentBusy.value) {
+      toast.info('Wait for the dispatcher agent to finish before using an option.')
+      return
+    }
+    chatMode.value = 'assistant'
+    await nextTick()
+  }
   await chatRef.value?.send(message)
 }
+
+// The dispatcher agent (eld-logistic-agent) is offered next to the assistant only when it is configured.
+const agentUrl = eldAgentUrl(import.meta.env.VITE_APP_AI_AGENT_WS_URL)
+const CHAT_MODES = [
+  { value: 'assistant', label: 'Assistant' },
+  { value: 'agent', label: 'Dispatcher agent' },
+] as const
+const chatMode = ref<'assistant' | 'agent'>('assistant')
+const agentEvent = ref<EldAgentSelectedEvent | null>(null)
+const agentBusy = ref(false)
+
+function selectAgentEvent(eventId: string) {
+  if (chatMode.value !== 'agent') return
+  const selected = graphEvents.value.find((event) => event.id === eventId)
+  agentEvent.value =
+    selected && agentEvent.value?.id !== eventId
+      ? { id: selected.id, timestamp: selected.timestamp }
+      : null
+}
+
+// A selection belongs to one draft tab, and is dropped when a reload no longer has that event.
+watch([() => session.value?.id, tabId], () => {
+  agentEvent.value = null
+})
+watch(graphEvents, (events) => {
+  const selected = agentEvent.value
+  if (selected && !events.some((event) => event.id === selected.id)) agentEvent.value = null
+})
 
 async function onApplied(applied: { sessionId: string; tabId: string }) {
   await refreshAfterApplied(applied)
