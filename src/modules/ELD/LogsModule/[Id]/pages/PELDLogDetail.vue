@@ -280,12 +280,11 @@ watch(() => `${route.params.id}:${headerDate.value.format('YYYY-MM-DD')}:${camer
     for (let index = 0; index < missing.length && !controller.signal.aborted; index += 200) {
       const batch = missing.slice(index, index + 200)
       try {
-        // const response = await api.post<RouteEldEventCameraPresence[] | { successResult: RouteEldEventCameraPresence[] }>(
-        //   ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERA_PRESENCE(driverId),
-        //   { eventIds: batch.map(({ event }) => event.id) },
-        //   { params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
-        //     toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 97 }, signal: controller.signal })
-        const response = null
+        const response = await api.post<RouteEldEventCameraPresence[] | { successResult: RouteEldEventCameraPresence[] }>(
+          ApiEndpoints.ROUTE_ELD_DRIVER_SCHEDULE_CAMERA_PRESENCE(driverId),
+          { eventIds: batch.map(({ event }) => event.id) },
+          { params: { fromDate: day.subtract(1, 'day').format('YYYY-MM-DD'),
+            toDate: day.add(1, 'day').format('YYYY-MM-DD'), radiusMetres: 97 }, signal: controller.signal })
         if (controller.signal.aborted) return
         const results = 'successResult' in response.data ? response.data.successResult : response.data
         const found = new Map(results.map((result) => [result.eventId, result.hasCamera]))
@@ -298,7 +297,7 @@ watch(() => `${route.params.id}:${headerDate.value.format('YYYY-MM-DD')}:${camer
         }
       } catch {
         if (controller.signal.aborted) return
-        // toast.error('Camera checks could not be loaded')
+        toast.error('Camera checks could not be loaded')
         break
       }
     }
