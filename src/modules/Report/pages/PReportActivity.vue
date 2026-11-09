@@ -1,9 +1,10 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
+  <div class="h-[calc(100dvh-65px)] min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-background">
     <CReportToolbar
       title="Activity"
       subtitle="Driver activity status by day"
       default-period="week"
+      rolling-week
       full-periods
       @change="onRange"
     >
@@ -16,67 +17,60 @@
       </template>
     </CReportToolbar>
 
-    <div class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-4 overflow-hidden">
-      <CReportMetricCards :items="summaryCards" />
-      <div
-        class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2"
-      >
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Company</span>
-          <Select v-model="companyId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All companies" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All companies</SelectItem>
-              <SelectItem v-for="company in companies" :key="company.id" :value="company.id">
-                {{ company.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+    <div class="flex-1 min-h-0 p-1 sm:p-1 flex flex-col gap-1 overflow-hidden">
+      <CReportOverviewCurtain>
+        <CReportMetricCards :items="summaryCards" />
+        <div
+          class="shrink-0 bg-white dark:bg-card border border-border rounded-xl p-4 grid gap-3"
+        >
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-muted-foreground">Driver</span>
+            <CReportSearchSelect v-model="driverId" :options="filteredDrivers" empty-label="All drivers" empty-value="all" />
+          </div>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs text-muted-foreground">Driver</span>
-          <Select v-model="driverId">
-            <SelectTrigger class="h-10"><SelectValue placeholder="All drivers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All drivers</SelectItem>
-              <SelectItem v-for="driver in filteredDrivers" :key="driver.id" :value="driver.id">
-                {{ driver.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      </CReportOverviewCurtain>
 
       <div
         class="flex-1 min-h-0 bg-white dark:bg-card border border-border rounded-xl overflow-hidden flex flex-col"
       >
-        <div class="flex-1 min-h-0 overflow-auto">
+        <div class="relative flex-1 min-h-0">
+          <div ref="tableScroll" class="h-full overflow-auto overscroll-contain" @scroll="onTableScroll">
           <table
             class="w-full text-sm"
-            :style="{ minWidth: `${Math.max(760, 312 + columns.length * 125)}px` }"
+            :style="{ minWidth: `${Math.max(760, 312 + columns.length * 104)}px` }"
           >
-            <thead class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
-              <tr class="h-11 border-b border-border text-left">
+            <thead ref="tableHeader" class="sticky top-0 z-30 bg-muted text-muted-foreground shadow-sm">
+              <tr class="h-10 border-b border-border text-left">
                 <th
+                  :rowspan="shiftBased ? 2 : 1"
                   class="sticky left-0 z-40 w-14 min-w-14 max-w-14 bg-muted px-4 py-3 font-medium"
                 >
                   #
                 </th>
                 <th
+                  :rowspan="shiftBased ? 2 : 1"
                   class="sticky left-14 z-40 w-64 min-w-64 max-w-64 border-r border-border bg-muted px-4 py-3 font-medium shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]"
                 >
-                  Company / Driver
+                  <span class="block mb-1">Company / Driver</span>
+                  <CReportSearchSelect v-model="companyId" :options="companies" empty-label="All companies" empty-value="all" size="sm" @click.stop />
                 </th>
                 <th
-                  v-for="column in columns"
-                  :key="column.date"
-                  class="px-3 py-3 font-medium text-center min-w-28"
+                  v-for="date in columnDates"
+                  :key="date"
+                  :colspan="shiftBased ? 3 : 1"
+                  class="border-l border-border px-3 py-2 font-medium text-center"
                 >
-                  {{ formatActivityDay(column.date) }}
+                  {{ formatActivityDay(date) }}
+                </th>
+              </tr>
+              <tr v-if="shiftBased" class="h-10 border-b border-border">
+                <th v-for="column in columns" :key="`${column.date}-${column.colNumber}`" class="min-w-[104px] border-l border-border px-1 py-2 text-center font-medium">
+                  {{ periodLabel(column.colNumber) }}
                 </th>
               </tr>
             </thead>
             <tbody>
+              <tr v-if="virtualTop" aria-hidden="true"><td :colspan="columns.length + 2" :style="{ height: `${virtualTop}px` }" class="p-0"></td></tr>
               <tr v-if="loading">
                 <td
                   :colspan="columns.length + 2"
@@ -88,27 +82,31 @@
               <template v-for="row in displayRows" v-else :key="row.key">
                 <tr
                   v-if="row.isCompany"
-                  class="bg-slate-900 text-white dark:bg-slate-700 border-y border-slate-700"
+                  class="h-14 bg-slate-900 text-white dark:bg-slate-700 border-y border-slate-700"
                 >
                   <td
-                    class="sticky top-11 left-0 z-20 w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
+                    class="sticky left-0 z-[25] w-14 min-w-14 max-w-14 bg-slate-900 px-4 py-2.5 dark:bg-slate-700"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                   <td
-                    class="sticky top-11 left-14 z-20 w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
+                    class="sticky left-14 z-[25] w-64 min-w-64 max-w-64 border-r border-slate-700 bg-slate-900 px-4 py-2.5 font-semibold shadow-[4px_0_8px_-6px_rgba(15,23,42,0.75)] dark:bg-slate-700"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   >
                     <span
                       class="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide mr-2"
                     >
                       Company
                     </span>
-                    {{ row.companyName }}
+                    <span class="inline-block max-w-48 truncate align-bottom">{{ row.companyName }}</span>
                   </td>
                   <td
                     :colspan="columns.length"
-                    class="sticky top-11 z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
+                    class="z-20 bg-slate-900 shadow-sm dark:bg-slate-700"
+                    :class="virtualized ? '' : 'sticky'"
+                    :style="virtualized ? undefined : { top: `${headerHeight}px` }"
                   ></td>
                 </tr>
-                <tr v-else class="group border-b border-border/60 hover:bg-muted/30">
+                <tr v-else class="group h-14 border-b border-border/60 hover:bg-muted/30">
                   <td
                     class="sticky left-0 z-10 w-14 min-w-14 max-w-14 bg-white px-4 py-3 text-muted-foreground group-hover:bg-muted dark:bg-card"
                   >
@@ -117,39 +115,65 @@
                   <td
                     class="sticky left-14 z-10 w-64 min-w-64 max-w-64 border-l-4 border-r border-l-primary/35 border-r-border bg-white px-4 py-3 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] group-hover:bg-muted dark:bg-card"
                   >
-                    <div class="font-medium">{{ row.driverName || '—' }}</div>
-                    <div v-if="row.companyName" class="text-xs text-muted-foreground">
+                    <div class="truncate font-medium">{{ row.driverName || '—' }}</div>
+                    <div v-if="row.companyName" class="truncate text-xs text-muted-foreground">
                       {{ row.companyName }}
                     </div>
                   </td>
                   <td
                     v-for="column in columns"
-                    :key="column.date"
-                    class="px-2 py-3 text-center"
-                    :class="canManage ? 'cursor-pointer hover:bg-primary/10' : ''"
-                    @click="canManage && (editingCell = cellKey(row, column.date))"
+                    :key="`${column.date}-${column.colNumber}`"
+                    class="px-1 py-2 text-center"
                   >
-                    <Select
-                      v-if="canManage && editingCell === cellKey(row, column.date)"
+                    <Popover
+                      v-if="canChangeCell(row, column) && editingCell === cellKey(row, column)"
                       :open="true"
-                      :model-value="String(activityFor(row, column.date)?.status ?? 9)"
                       @update:open="open => { if (!open) editingCell = null }"
-                      @update:model-value="value => upsertActivityCell(row, column, Number(value))"
                     >
-                      <SelectTrigger class="h-8 min-w-28" @click.stop><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem v-for="(label, value) in activityStatuses" :key="value" :value="String(value)">{{ label }}</SelectItem></SelectContent>
-                    </Select>
-                    <span v-else-if="hasKnownActivity(row, column.date)"
-                      class="inline-flex min-w-20 justify-center rounded-full px-2 py-1 text-xs font-semibold"
-                      :class="operationStatusClass(activityFor(row, column.date)?.status)"
-                      :title="operationUserName(activityFor(row, column.date)?.logBooker)"
+                      <PopoverTrigger as-child>
+                        <button
+                          type="button"
+                          class="inline-flex min-h-8 w-[88px] items-center justify-center truncate rounded-md px-1 py-1 text-[11px] font-semibold hover:ring-2 hover:ring-primary/30"
+                          :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'border border-border text-muted-foreground hover:bg-primary/10'"
+                          :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
+                          :disabled="savingCell === cellKey(row, column)"
+                        >{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : 'Select status' }}</button>
+                      </PopoverTrigger>
+                      <PopoverContent class="w-40 p-1" align="start">
+                        <button
+                          v-for="(label, value) in activityStatuses"
+                          :key="value"
+                          type="button"
+                          class="mb-1 flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs font-semibold last:mb-0 hover:opacity-80"
+                          :class="operationStatusClass(Number(value), true)"
+                          @click="upsertActivityCell(row, column, Number(value))"
+                        >{{ label }}</button>
+                      </PopoverContent>
+                    </Popover>
+                    <button
+                      v-else-if="canChangeCell(row, column)"
+                      type="button"
+                      class="inline-flex min-h-8 w-[88px] items-center justify-center truncate rounded-md px-1 py-1 text-[11px] font-semibold hover:ring-2 hover:ring-primary/30"
+                      :class="hasKnownActivity(row, column) ? operationStatusClass(activityFor(row, column)?.status, true) : 'border border-border text-muted-foreground hover:bg-primary/10'"
+                      :title="hasKnownActivity(row, column) ? operationUserName(activityFor(row, column)?.logBooker) : 'Set status'"
+                      :disabled="savingCell === cellKey(row, column)"
+                      @click="editingCell = cellKey(row, column)"
                     >
-                      {{ activityLabel(activityFor(row, column.date)?.status) }}
+                      <Loader2 v-if="savingCell === cellKey(row, column)" class="h-4 w-4 animate-spin" />
+                      <template v-else>{{ hasKnownActivity(row, column) ? activityLabel(activityFor(row, column)?.status) : 'Select status' }}</template>
+                    </button>
+                    <span v-else-if="hasKnownActivity(row, column)"
+                      class="inline-flex w-[88px] justify-center truncate rounded-full px-1 py-1 text-[11px] font-semibold"
+                      :class="operationStatusClass(activityFor(row, column)?.status, true)"
+                      :title="operationUserName(activityFor(row, column)?.logBooker)"
+                    >
+                      {{ activityLabel(activityFor(row, column)?.status) }}
                     </span>
                     <span v-else class="text-muted-foreground">—</span>
                   </td>
                 </tr>
               </template>
+              <tr v-if="virtualBottom" aria-hidden="true"><td :colspan="columns.length + 2" :style="{ height: `${virtualBottom}px` }" class="p-0"></td></tr>
               <tr v-if="!loading && loadError">
                 <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-destructive">
                   {{ loadError }}
@@ -165,12 +189,22 @@
               </tr>
             </tbody>
           </table>
+          </div>
+          <div v-if="pinnedVirtualCompany" class="pointer-events-none absolute inset-x-0 z-40 flex h-14 items-center bg-slate-900 text-white dark:bg-slate-700" :style="{ top: `${headerHeight}px` }">
+            <span class="w-14 min-w-14 max-w-14"></span>
+            <span class="flex h-full w-64 min-w-64 max-w-64 items-center border-r border-slate-700 px-4 font-semibold">
+              <span class="mr-2 rounded-md bg-white/10 px-2 py-1 text-[11px] uppercase tracking-wide">Company</span>
+              <span class="truncate">{{ pinnedVirtualCompany }}</span>
+            </span>
+          </div>
         </div>
         <div
           class="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-t border-border text-sm text-muted-foreground"
         >
           <span>{{ result?.totalCount ?? driverRows.length }} drivers</span>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-2">
+            <CReportPageSize v-model="pageSizeSelection" />
+            <template v-if="pageSizeSelection !== 'all'">
             <Button
               size="sm"
               variant="outline"
@@ -179,6 +213,7 @@
             >
               Previous
             </Button>
+            <span class="text-xs">{{ page }} / {{ Math.max(1, Math.ceil((result?.totalCount ?? 0) / Number(pageSizeSelection))) }}</span>
             <Button
               size="sm"
               variant="outline"
@@ -187,6 +222,7 @@
             >
               Next
             </Button>
+            </template>
           </div>
         </div>
       </div>
@@ -195,20 +231,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
 import { Loader2, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { getApiErrorMessage } from '@/composables/useAxiosService'
+import { useApi } from '@/composables/useAxiosService'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import CReportMetricCards from '@/modules/Report/components/CReportMetricCards.vue'
+import CReportOverviewCurtain from '@/modules/Report/components/CReportOverviewCurtain.vue'
 import CReportToolbar from '@/modules/Report/components/CReportToolbar.vue'
+import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportPageSize from '@/modules/Report/components/CReportPageSize.vue'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useReportSocket } from '@/modules/Report/composables/useReportSocket'
@@ -226,18 +261,23 @@ import {
   operationRangeStart,
   operationStatusClass,
   operationUserName,
+  reportToday,
 } from '@/modules/Report/utils/operations'
 
 type ActivityRow = ReportDriverActivityTable['rows'][number]
 
 const operations = useReportOperations()
+const api = useApi()
+const shiftBased = ref(true)
 async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number], status: number) {
-  if (!row.driverId) return
+  if (!row.driverId || savingCell.value || activityDateKey(column.date) > reportToday()) return
+  const key = cellKey(row, column)
   editingCell.value = null
-  const existing = activityFor(row, column.date)
+  savingCell.value = key
+  const existing = activityFor(row, column)
   const body = {
     driverId: row.driverId,
-    date: `${column.date}T00:00:00Z`,
+    date: operationRangeStart(column.date),
     status,
     colNumber: existing?.colNumber ?? column.colNumber,
   }
@@ -248,14 +288,45 @@ async function upsertActivityCell(row: ActivityRow, column: ReportDriverActivity
       await operations.createActivity(body)
     }
     await refresh(page.value)
-  } catch {
-    toast.error('Could not update activity')
+  } catch (error) {
+    if (getApiErrorMessage(error, '').includes('already recorded for this period')) {
+      try {
+        const current = await operations.getActivity({
+          driverId: row.driverId,
+          startTime: operationRangeStart(column.date),
+          endTime: operationRangeEnd(column.date),
+          pageNumber: 1,
+          pageSize: 1,
+        })
+        const currentRow = current.rows.find(item => item.driverId === row.driverId)
+        const currentId = currentRow ? activityFor(currentRow, column)?.id : undefined
+        if (currentId && currentId !== '00000000-0000-0000-0000-000000000000' && canEdit.value) {
+          await operations.updateActivity(currentId, body)
+          await refresh(page.value)
+          return
+        }
+        await refresh(page.value)
+        toast.info('This period was updated by another user')
+      } catch {
+        toast.error('Could not update activity')
+      }
+    } else {
+      toast.error(getApiErrorMessage(error, 'Could not update activity'))
+    }
+  } finally {
+    savingCell.value = null
   }
 }
 const authStore = useAuthStore()
-const canManage = computed(() => hasPermission(authStore.getTokens(), 'report.manage'))
+const canCreate = computed(() => hasPermission(authStore.getTokens(), 'report.activity.create'))
+const canEdit = computed(() => hasPermission(authStore.getTokens(), 'report.activity.edit'))
 const { activityVersion } = useReportSocket()
 const editingCell = ref<string | null>(null)
+const savingCell = ref<string | null>(null)
+const tableScroll = ref<HTMLElement | null>(null)
+const tableHeader = ref<HTMLTableSectionElement | null>(null)
+const headerHeight = ref(0)
+const currentReportDay = ref(reportToday())
 const result = shallowRef<ReportDriverActivityTable>()
 const companies = shallowRef<ReportOperationCompany[]>([])
 const drivers = shallowRef<ReportOperationDriver[]>([])
@@ -266,30 +337,44 @@ const ready = ref(false)
 const companyId = ref('all')
 const driverId = ref('all')
 const page = ref(1)
+const pageSizeSelection = ref('all')
+const virtualStart = ref(0)
+const currentScrollIndex = ref(0)
+const virtualViewportHeight = ref(600)
 const range = ref<DateRange>({
-  startTime: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
-  endTime: dayjs().format('YYYY-MM-DD'),
+  startTime: dayjs(reportToday()).subtract(6, 'day').format('YYYY-MM-DD'),
+  endTime: reportToday(),
 })
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let dayTimer: ReturnType<typeof setInterval> | undefined
+let headerResizeObserver: ResizeObserver | undefined
 let requestVersion = 0
-const activityCache = new WeakMap<ActivityRow, Map<string, ReportDriverActivity>>()
-
+let scrollToEndOnNextResult = false
 const columns = computed<ReportDriverActivityTable['columns']>(() => {
+  if (result.value?.columns?.length) return result.value.columns
+    .filter(column => shiftBased.value || column.colNumber === 0)
+    .map(column => ({
+    date: activityDateKey(column.date),
+    colNumber: column.colNumber,
+  }))
   const start = dayjs(range.value.startTime).startOf('day')
   const end = dayjs(range.value.endTime).startOf('day')
   if (!start.isValid() || !end.isValid() || end.isBefore(start)) return []
 
-  return Array.from({ length: end.diff(start, 'day') + 1 }, (_, index) => ({
-    date: start.add(index, 'day').format('YYYY-MM-DD'),
-    colNumber: index + 1,
-  }))
+  return Array.from({ length: end.diff(start, 'day') + 1 }, (_, index) =>
+    (shiftBased.value ? [0, 1, 2] : [0]).map(period => ({
+      date: start.add(index, 'day').format('YYYY-MM-DD'),
+      colNumber: period,
+    }))
+  ).flat()
 })
-const pageSize = computed(() =>
+const columnDates = computed(() => [...new Set(columns.value.map(column => column.date))])
+const fetchBatchSize = computed(() =>
   Math.max(5, Math.min(50, Math.floor(2000 / Math.max(columns.value.length, 1))))
 )
 const rows = computed(() => result.value?.rows ?? [])
 const driverRows = computed(() => rows.value.filter((row) => !!row.driverId))
-const displayRows = computed(() => {
+const allDisplayRows = computed(() => {
   let rowNumber = 0
   return rows.value.map((row, index) => {
     const isCompany = !!row.companyName && !row.driverId
@@ -301,6 +386,36 @@ const displayRows = computed(() => {
     }
   })
 })
+const virtualized = computed(() => allDisplayRows.value.length * columns.value.length > 8000)
+const virtualRowHeight = 56
+const virtualRowCount = computed(() => Math.ceil(virtualViewportHeight.value / virtualRowHeight) + 16)
+const visibleStart = computed(() => virtualized.value ? Math.min(virtualStart.value, Math.max(0, allDisplayRows.value.length - virtualRowCount.value)) : 0)
+const visibleEnd = computed(() => virtualized.value ? Math.min(allDisplayRows.value.length, visibleStart.value + virtualRowCount.value) : allDisplayRows.value.length)
+const displayRows = computed(() => allDisplayRows.value.slice(visibleStart.value, visibleEnd.value))
+const virtualTop = computed(() => virtualized.value ? visibleStart.value * virtualRowHeight : 0)
+const virtualBottom = computed(() => virtualized.value ? Math.max(0, allDisplayRows.value.length - visibleEnd.value) * virtualRowHeight : 0)
+const currentVirtualCompany = computed(() => {
+  for (let index = Math.min(currentScrollIndex.value, allDisplayRows.value.length - 1); index >= 0; index--) {
+    const row = allDisplayRows.value[index]
+    if (row?.isCompany) return { name: row.companyName, index }
+  }
+  return null
+})
+const pinnedVirtualCompany = computed(() =>
+  virtualized.value && currentVirtualCompany.value && currentScrollIndex.value > currentVirtualCompany.value.index
+    ? currentVirtualCompany.value.name
+    : null
+)
+
+function onTableScroll() {
+  const element = tableScroll.value
+  if (!element) return
+  virtualViewportHeight.value = element.clientHeight
+  if (virtualized.value) {
+    currentScrollIndex.value = Math.max(0, Math.floor(element.scrollTop / virtualRowHeight))
+    virtualStart.value = Math.max(0, currentScrollIndex.value - 8)
+  }
+}
 const filteredDrivers = computed(() =>
   companyId.value === 'all'
     ? drivers.value
@@ -308,9 +423,9 @@ const filteredDrivers = computed(() =>
 )
 const activityEntries = computed(() =>
   driverRows.value.flatMap((row) =>
-    Object.values(row.dateStatuses ?? {}).filter(
-      (activity) => activity.status != null && activity.status !== 9
-    )
+    columns.value
+      .map(column => activityFor(row, column))
+      .filter((activity): activity is ReportDriverActivity => activity?.status != null && activity.status !== 9)
   )
 )
 const companyCount = computed(
@@ -348,6 +463,16 @@ function queueRefresh() {
 
 function onRange(value: DateRange) {
   range.value = value
+  requestVersion += 1
+  result.value = undefined
+  loading.value = true
+  initialLoad.value = true
+  loadError.value = ''
+  page.value = 1
+  virtualStart.value = 0
+  currentScrollIndex.value = 0
+  scrollToEndOnNextResult = true
+  if (tableScroll.value) tableScroll.value.scrollTop = 0
   queueRefresh()
 }
 
@@ -360,29 +485,38 @@ function formatActivityDay(value: string): string {
   return dayjs(value).format('MM/DD/YYYY')
 }
 
-function cellKey(row: ActivityRow, date: string): string {
-  return `${row.driverId}-${activityDateKey(date)}`
+function periodLabel(colNumber: number): string {
+  return ['Morning', 'Afternoon', 'Night'][colNumber] ?? '—'
 }
 
-function activityFor(row: ActivityRow, date: string): ReportDriverActivity | undefined {
-  let activities = activityCache.get(row)
-  if (!activities) {
-    activities = new Map<string, ReportDriverActivity>()
-    for (const activity of Object.values(row.dateStatuses ?? {})) {
-      const key = activityDateKey(activity.date)
-      if (!activities.has(key)) activities.set(key, activity)
-    }
-    activityCache.set(row, activities)
+function cellKey(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): string {
+  return `${row.driverId}-${activityDateKey(column.date)}-${column.colNumber}`
+}
+
+function activityFor(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): ReportDriverActivity | undefined {
+  const date = activityDateKey(column.date)
+  if (!shiftBased.value) {
+    return [2, 1, 0]
+      .map(period => row.dateStatuses?.[`${date}#${period}`])
+      .find(activity => activity?.status != null && activity.status !== 9)
+      ?? row.dateStatuses?.[`${date}#0`]
   }
-  return activities.get(activityDateKey(date))
+  return row.dateStatuses?.[`${date}#${column.colNumber}`]
+}
+
+function canChangeCell(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): boolean {
+  if (activityDateKey(column.date) > currentReportDay.value) return false
+  if (savingCell.value && savingCell.value !== cellKey(row, column)) return false
+  const id = activityFor(row, column)?.id
+  return id && id !== '00000000-0000-0000-0000-000000000000' ? canEdit.value : canCreate.value
 }
 
 function activityLabel(status?: number): string {
   return status == null ? '—' : (activityStatuses[status] ?? 'Unknown')
 }
 
-function hasKnownActivity(row: ActivityRow, date: string): boolean {
-  const status = activityFor(row, date)?.status
+function hasKnownActivity(row: ActivityRow, column: ReportDriverActivityTable['columns'][number]): boolean {
+  const status = activityFor(row, column)?.status
   return status != null && status !== 9
 }
 
@@ -390,17 +524,39 @@ async function refresh(nextPage = page.value) {
   const version = ++requestVersion
   if (initialLoad.value) loading.value = true
   loadError.value = ''
-  page.value = Math.max(1, nextPage)
+  page.value = pageSizeSelection.value === 'all' ? 1 : Math.max(1, nextPage)
   try {
-    const response = await operations.getActivity({
+    const filters = {
       companyId: companyId.value === 'all' ? null : companyId.value,
       driverId: driverId.value === 'all' ? null : driverId.value,
       startTime: operationRangeStart(range.value.startTime),
       endTime: operationRangeEnd(range.value.endTime),
-      pageNumber: page.value,
-      pageSize: pageSize.value,
-    })
-    if (version === requestVersion) result.value = response
+    }
+    const batchSize = pageSizeSelection.value === 'all' ? fetchBatchSize.value : Number(pageSizeSelection.value)
+    const response = await operations.getActivity({ ...filters, pageNumber: page.value, pageSize: batchSize })
+    if (version !== requestVersion) return
+    if (pageSizeSelection.value === 'all') {
+      const mergedRows = [...response.rows]
+      let lastCompanyId = mergedRows.filter(row => row.companyId && !row.driverId).at(-1)?.companyId
+      const pageCount = Math.ceil(response.totalCount / batchSize)
+      for (let next = 2; next <= pageCount; next += 4) {
+        const pageNumbers = Array.from({ length: Math.min(4, pageCount - next + 1) }, (_, index) => next + index)
+        const pages = await Promise.all(pageNumbers.map(pageNumber => operations.getActivity({ ...filters, pageNumber, pageSize: batchSize })))
+        if (version !== requestVersion) return
+        for (const batch of pages) {
+          for (const row of batch.rows) {
+            if (row.companyId && !row.driverId) {
+              if (row.companyId === lastCompanyId) continue
+              lastCompanyId = row.companyId
+            }
+            mergedRows.push(row)
+          }
+        }
+      }
+      result.value = { ...response, rows: mergedRows, pageNumber: 1, pageSize: response.totalCount, isFirst: true, isLast: true }
+    } else {
+      result.value = response
+    }
   } catch {
     if (version === requestVersion) loadError.value = 'Could not load activity. Please try again.'
   } finally {
@@ -412,22 +568,50 @@ async function refresh(nextPage = page.value) {
 }
 
 watch([companyId, driverId], queueRefresh)
+watch(pageSizeSelection, () => { page.value = 1; queueRefresh() })
+watch(result, async (value) => {
+  await nextTick()
+  onTableScroll()
+  if (value && scrollToEndOnNextResult && tableScroll.value) {
+    tableScroll.value.scrollLeft = tableScroll.value.scrollWidth - tableScroll.value.clientWidth
+    scrollToEndOnNextResult = false
+  }
+})
 
 watch(activityVersion, queueRefresh)
 
-onMounted(() => {
+onMounted(async () => {
+  if (tableHeader.value) {
+    headerResizeObserver = new ResizeObserver(() => {
+      headerHeight.value = tableHeader.value?.getBoundingClientRect().height ?? 0
+    })
+    headerResizeObserver.observe(tableHeader.value)
+    headerHeight.value = tableHeader.value.getBoundingClientRect().height
+  }
+  try {
+    const response = await api.get<{ successResult: { activityShiftBased: boolean } }>('/report/api/features')
+    shiftBased.value = response.data.successResult.activityShiftBased ?? true
+  } catch {
+    shiftBased.value = true
+  }
   ready.value = true
-  void refresh(1)
+  dayTimer = setInterval(() => { currentReportDay.value = reportToday() }, 60_000)
+  const initialRefresh = refresh(1)
   void operations.getLookups().then((lookups) => {
     companies.value = lookups.companies
     drivers.value = lookups.drivers
   }).catch(() => {
     loadError.value = 'Could not load activity filters. Please try again.'
   })
+  await initialRefresh
+  await nextTick()
+  if (tableScroll.value) tableScroll.value.scrollLeft = tableScroll.value.scrollWidth - tableScroll.value.clientWidth
 })
 
 onBeforeUnmount(() => {
+  headerResizeObserver?.disconnect()
   if (refreshTimer) clearTimeout(refreshTimer)
+  if (dayTimer) clearInterval(dayTimer)
   requestVersion += 1
 })
 </script>

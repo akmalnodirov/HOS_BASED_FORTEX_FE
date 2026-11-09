@@ -169,7 +169,7 @@ export function useRoles() {
   })
 
   const roleTypes = computed(() => {
-    const userRoleType = user.value?.roles?.[0]?.type ?? 1
+    const userRoleType = Math.min(...(user.value?.roles?.map((role) => role.type) ?? [1]))
     return getRoleTypes(userRoleType)
   })
 

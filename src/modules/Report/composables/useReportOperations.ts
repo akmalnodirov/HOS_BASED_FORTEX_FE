@@ -18,6 +18,8 @@ export function useReportOperations() {
     (await api.get<ReportResponse<ReportCheckerTask[]>>(ApiEndpoints.REPORT_CHECKER, { params: query })).data.successResult
   const getAssistant = async (query: Query) =>
     (await api.get<ReportResponse<ReportTaskState[]>>(ApiEndpoints.REPORT_ASSISTANT, { params: query })).data.successResult
+  const getUsersForCompany = async (companyId: string) =>
+    (await api.get<ReportResponse<ReportOperationUser[]>>(ApiEndpoints.REPORT_USERS, { params: { companyId } })).data.successResult
 
   const getLookups = async () => {
     const [companies, drivers, users] = await Promise.all([
@@ -40,10 +42,10 @@ export function useReportOperations() {
   const createCheckerTask = (body: Record<string, unknown>) => api.post(ApiEndpoints.REPORT_CHECKER_TASKS, body)
   const updateCheckerTask = (id: string, body: Record<string, unknown>) => api.put(ApiEndpoints.REPORT_CHECKER_TASK(id), body)
   const deleteCheckerTask = (id: string) => api.delete(ApiEndpoints.REPORT_CHECKER_TASK(id))
-  const createActivity = (body: Record<string, unknown>) => api.post(ApiEndpoints.REPORT_DRIVER_ACTIVITIES, body)
-  const updateActivity = (id: string, body: Record<string, unknown>) => api.put(ApiEndpoints.REPORT_DRIVER_ACTIVITY(id), body)
+  const createActivity = (body: Record<string, unknown>) => api.post(ApiEndpoints.REPORT_DRIVER_ACTIVITIES, body, { _skipErrorToast: true })
+  const updateActivity = (id: string, body: Record<string, unknown>) => api.put(ApiEndpoints.REPORT_DRIVER_ACTIVITY(id), body, { _skipErrorToast: true })
   const deleteActivity = (id: string) => api.delete(ApiEndpoints.REPORT_DRIVER_ACTIVITY(id))
 
-  return { getTasks, getTaskStatistics, getActivity, getChecker, getAssistant, getLookups, createTask, updateTask, deleteTask, createAssistantTask, updateAssistantTask, createCheckerTask, updateCheckerTask, deleteCheckerTask, createActivity, updateActivity, deleteActivity }
+  return { getTasks, getTaskStatistics, getActivity, getChecker, getAssistant, getUsersForCompany, getLookups, createTask, updateTask, deleteTask, createAssistantTask, updateAssistantTask, createCheckerTask, updateCheckerTask, deleteCheckerTask, createActivity, updateActivity, deleteActivity }
 }
 

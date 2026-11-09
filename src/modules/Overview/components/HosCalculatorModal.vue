@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { LoaderCircle } from 'lucide-vue-next'
+import { LoaderCircle, Navigation } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
+import { fetchMapRoute, isMapRouteNotFound } from '@/services/mapRouteService'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { getCompanyId } from '@/utils/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/custom/modal'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -126,18 +128,6 @@ function clearDestination() {
   routeError.value = ''
 }
 
-async function waitForDirectionsService() {
-  if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
-    throw new Error('Map routing is unavailable. Enter trip miles manually.')
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < 6_000) {
-    const maps = (window as any).google?.maps
-    if (maps?.DirectionsService) return maps
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  throw new Error('Map routing is unavailable. Enter trip miles manually.')
-}
-
 async function calculateRouteMiles() {
   const selected = destination.value
   const origin = props.origin
@@ -157,25 +147,27 @@ async function calculateRouteMiles() {
   routeOrigin.value = { ...origin }
   routeLoading.value = true
   try {
-    const maps = await waitForDirectionsService()
+    const route = await fetchMapRoute(
+      [
+        { latitude: origin.latitude, longitude: origin.longitude },
+        { latitude: selected.latitude, longitude: selected.longitude },
+      ],
+      false
+    )
     if (version !== routeVersion || !props.open) return
-    const result = await new maps.DirectionsService().route({
-      origin: { lat: origin.latitude, lng: origin.longitude },
-      destination: { lat: selected.latitude, lng: selected.longitude },
-      travelMode: maps.TravelMode.DRIVING,
-      provideRouteAlternatives: false,
-    })
-    if (version !== routeVersion || !props.open) return
-    const legs = result?.routes?.[0]?.legs
-    if (!legs?.length || legs.some((leg: any) => !Number.isFinite(leg.distance?.value)))
-      throw new Error('No driving route was found. Enter trip miles manually.')
-    const miles = Math.round(legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0) / 1609.344 * 10) / 10
+    if (!Number.isFinite(route?.distanceMeters)) {
+      routeError.value = 'No driving route was found. Enter trip miles manually.'
+      return
+    }
+    const miles = Math.round(route.distanceMeters / 1609.344 * 10) / 10
     routeMiles.value = miles
     tripMiles.value = miles
     distanceSource.value = 'route'
   } catch (error) {
     if (version === routeVersion && props.open)
-      routeError.value = error instanceof Error ? error.message : 'Road distance could not be calculated.'
+      routeError.value = isMapRouteNotFound(error)
+        ? 'No driving route was found. Enter trip miles manually.'
+        : 'Map routing is unavailable. Enter trip miles manually.'
   } finally {
     if (version === routeVersion) routeLoading.value = false
   }
@@ -185,6 +177,19 @@ function selectDestination(location: AlprLocation) {
   destination.value = location
   destinationLabel.value = location.label
   void calculateRouteMiles()
+}
+
+function openGoogleMapsDirections() {
+  const selected = destination.value
+  const origin = props.origin
+  if (!selected || !origin) return
+  const query = new URLSearchParams({
+    api: '1',
+    origin: `${origin.latitude},${origin.longitude}`,
+    destination: `${selected.latitude},${selected.longitude}`,
+    travelmode: 'driving',
+  })
+  window.open(`https://www.google.com/maps/dir/?${query.toString()}`, '_blank', 'noopener,noreferrer')
 }
 
 const borderOptions: { value: Border; label: string; delay: number }[] = [
@@ -411,12 +416,26 @@ watch(() => [props.open, props.driverId] as const, async ([open, driverId]) => {
               Recalculate
             </button>
           </div>
-          <CAlprLocationInput
-            v-model="destinationLabel"
-            placeholder="Search a destination or enter coordinates"
-            @select="selectDestination"
-            @clear="clearDestination"
-          />
+          <div class="flex items-start gap-2">
+            <CAlprLocationInput
+              v-model="destinationLabel"
+              class="min-w-0 flex-1"
+              placeholder="Search a destination or enter coordinates"
+              @select="selectDestination"
+              @clear="clearDestination"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              class="h-10 w-10 shrink-0"
+              :disabled="!destination || !origin"
+              title="Open directions in Google Maps"
+              aria-label="Open directions in Google Maps"
+              @click="openGoogleMapsDirections"
+            >
+              <Navigation class="h-4 w-4" />
+            </Button>
+          </div>
           <p class="text-[11px] text-muted-foreground">
             <template v-if="displayedOrigin">
               From last known driver location: {{ originLocation }} · {{ new Date(displayedOrigin.timestamp).toLocaleString() }}

@@ -1,9 +1,9 @@
 name: Deploy HOS based FORTEX (Vue/Vite) for FDS
+run-name: Deploy FDS frontend from copy2fds-main (by @${{ github.actor }})
 
+# Deploys are manual. Merging no longer ships anything: start a run from the Actions tab,
+# it always deploys the copy2fds-main branch, whatever branch is picked in "Run workflow".
 on:
-  push:
-    branches:
-      - 'copy2fds-main'
   workflow_dispatch:
 
 jobs:
@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: copy2fds-main
 
       - name: Setup node
         uses: actions/setup-node@v4

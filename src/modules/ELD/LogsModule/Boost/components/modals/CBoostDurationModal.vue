@@ -38,7 +38,7 @@
             {{ mode === 'expand' ? 'Expanding time' : 'Reducing time' }}
           </span>
           <span class="font-mono text-xs text-muted-foreground">
-            {{ mode === 'expand' ? 'available' : 'max' }} {{ formatDuration(maximumDurationMs) }}
+            {{ mode === 'expand' ? 'available' : 'max' }} {{ formatBoostDuration(maximumDurationMs) }}
           </span>
         </div>
         <div class="grid grid-cols-3 gap-3">
@@ -59,7 +59,7 @@
           <span class="text-xs text-muted-foreground">
             {{ mode === 'expand' ? 'Transferable rest remaining' : 'Selected duration after reduction' }}
           </span>
-          <span class="font-mono text-sm font-semibold">{{ formatDuration(remainingDurationMs) }}</span>
+          <span class="font-mono text-sm font-semibold">{{ formatBoostDuration(remainingDurationMs) }}</span>
         </div>
         <label v-if="mode === 'expand'" class="flex items-start gap-2 text-sm">
           <Checkbox v-model:checked="ensurePti" />
@@ -96,7 +96,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { RouteEldHosEvent } from '../../types/boost'
-import { resolveRouteEldScheduleTimeZone } from '../../composables/useScheduleBoost'
+import { formatRouteEldEventTime } from '@/utils/routeEldTimeZone'
+import {
+  areBoostDurationPartsValid,
+  boostDurationPartsToSeconds,
+  formatBoostDuration,
+} from '../../utils/formatters'
 
 const props = withDefaults(
   defineProps<{
@@ -133,7 +138,13 @@ const hours = ref(0)
 const minutes = ref(0)
 const seconds = ref(0)
 const ensurePti = ref(false)
-const durationSeconds = computed(() => hours.value * 3600 + minutes.value * 60 + seconds.value)
+const durationSeconds = computed(() =>
+  boostDurationPartsToSeconds({
+    hours: hours.value,
+    minutes: minutes.value,
+    seconds: seconds.value,
+  })
+)
 const requestedDurationMs = computed(() => durationSeconds.value * 1_000)
 const maximumDurationMs = computed(() =>
   mode.value === 'expand' ? props.availableExpandMs : props.availableReduceMs
@@ -146,26 +157,15 @@ const remainingDurationMs = computed(() =>
 const selectedEventTime = computed(() => {
   const event = props.selectedEvent
   if (!event) return '—'
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: resolveRouteEldScheduleTimeZone(event.timeZone),
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(event.timestamp))
+  return formatRouteEldEventTime(event.timestamp, event.timeZone)
 })
 const validationError = computed(() => {
   if (props.selectionError) return props.selectionError
-  if (
-    ![hours.value, minutes.value, seconds.value].every(Number.isInteger) ||
-    hours.value < 0 ||
-    minutes.value < 0 ||
-    minutes.value > 59 ||
-    seconds.value < 0 ||
-    seconds.value > 59
-  )
+  if (!areBoostDurationPartsValid({
+    hours: hours.value,
+    minutes: minutes.value,
+    seconds: seconds.value,
+  }))
     return 'Enter whole hours, with minutes and seconds between 0 and 59.'
   if (durationSeconds.value < 1) return 'Boost duration must be greater than zero.'
   if (requestedDurationMs.value > maximumDurationMs.value)
@@ -184,10 +184,6 @@ const validationError = computed(() => {
   return ''
 })
 const displayError = computed(() => validationError.value || props.externalError)
-const formatDuration = (milliseconds: number) => {
-  const total = Math.max(0, Math.round(milliseconds / 1_000))
-  return `${String(Math.floor(total / 3600)).padStart(2, '0')}:${String(Math.floor((total % 3600) / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
 watch(
   () => props.open,
   (open) => {

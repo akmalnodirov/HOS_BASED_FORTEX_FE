@@ -1,5 +1,4 @@
 import { RouteRecordRaw } from 'vue-router'
-import POverviewId from '@/modules/Overview/pages/POverviewId.vue'
 
 const routes: Readonly<RouteRecordRaw[]> = [
   {
@@ -13,7 +12,7 @@ const routes: Readonly<RouteRecordRaw[]> = [
   {
     path: '/overview/:id',
     name: 'OverviewDetail',
-    component: POverviewId,
+    component: () => import('@/modules/Overview/pages/POverviewId.vue'),
     props: true,
   },
 ]
