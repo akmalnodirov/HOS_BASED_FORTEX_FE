@@ -896,12 +896,11 @@ const runCameraCheckQueue = () => {
           const controller = new AbortController()
           activeCameraCheck = { sessionId: batch.sessionId, tabId: batch.tabId, controller }
           try {
-            // const response = await api.post<
-            //   RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
-            // >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
-            //   { eventIds: batch.sources.map((source) => source.eventId) },
-            //   { params: { radiusMetres: 97 }, signal: controller.signal })
-            const response = null
+            const response = await api.post<
+              RouteEldEventCameraPresence[] | ApiEnvelope<RouteEldEventCameraPresence[]>
+            >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_CAMERA_PRESENCE(batch.sessionId, batch.tabId),
+              { eventIds: batch.sources.map((source) => source.eventId) },
+              { params: { radiusMetres: 97 }, signal: controller.signal })
             const results = 'successResult' in response.data
               ? response.data.successResult : response.data
             cameraCheckErrorShown = false
@@ -925,7 +924,7 @@ const runCameraCheckQueue = () => {
             }
             if (!controller.signal.aborted && !cameraCheckErrorShown) {
               cameraCheckErrorShown = true
-              // toast.error(getApiErrorMessage(error, 'Camera analysis could not be loaded'))
+              toast.error(getApiErrorMessage(error, 'Camera analysis could not be loaded'))
             }
           } finally {
             if (activeCameraCheck?.controller === controller) activeCameraCheck = null
