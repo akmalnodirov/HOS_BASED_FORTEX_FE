@@ -1,8 +1,12 @@
 import { ref } from 'vue'
 import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
-import type { RouteEldCompaniesResponse } from '@/types/company'
-import type { EventSessionFilters, EventSessionOperation, EventSessionPage } from '../types'
+import type {
+  EventSessionFilterOptions,
+  EventSessionFilters,
+  EventSessionOperation,
+  EventSessionPage,
+} from '../types'
 
 interface ApiEnvelope<T> {
   successResult: T
@@ -47,6 +51,7 @@ export function useEventSessions() {
   const isLoading = ref(false)
   const isRefreshing = ref(false)
   const rollingBackId = ref<string | null>(null)
+  const deletingId = ref<string | null>(null)
   const error = ref<string | null>(null)
   let requestVersion = 0
 
@@ -74,13 +79,11 @@ export function useEventSessions() {
     }
   }
 
-  async function fetchSelectedCompanyExternalId(companyId: string) {
-    const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
-    return (
-      response.data.successResult.find(
-        (company) => company.id.toLowerCase() === companyId.toLowerCase()
-      )?.externalCompanyId ?? null
-    )
+  async function fetchFilterOptions() {
+    const response = await api.get<
+      EventSessionFilterOptions | ApiEnvelope<EventSessionFilterOptions>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_FILTER_OPTIONS)
+    return unwrap(response.data)
   }
 
   async function rollbackSession(sessionId: string) {
@@ -121,14 +124,29 @@ export function useEventSessions() {
     }
   }
 
+  async function deleteSession(sessionId: string) {
+    deletingId.value = sessionId
+    try {
+      await api.delete(ApiEndpoints.ROUTE_ELD_EVENT_SESSION(sessionId), {
+        _skipErrorHandling: true,
+      })
+    } catch (exception) {
+      throw new Error(errorMessage(exception, 'The session could not be deleted'))
+    } finally {
+      deletingId.value = null
+    }
+  }
+
   return {
     page,
     isLoading,
     isRefreshing,
     rollingBackId,
+    deletingId,
     error,
     fetchSessions,
-    fetchSelectedCompanyExternalId,
+    fetchFilterOptions,
     rollbackSession,
+    deleteSession,
   }
 }

@@ -1,6 +1,7 @@
 .env
 .env-fds
 .env-cc
+.env-noor
 git-auto.sh
 
 # [Id]

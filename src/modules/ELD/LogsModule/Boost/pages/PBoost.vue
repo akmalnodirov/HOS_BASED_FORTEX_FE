@@ -5,6 +5,7 @@
       :tabs="tabs"
       :selected-tab="selectedTab"
       :session-status="session?.status"
+      :is-audit="!!session && (session.name?.startsWith('Audit:') || route.query.auditSessionId === session.id)"
       :pending-submission-count="session?.pendingSubmissionCount ?? 0"
       :pending-rollback-count="session?.pendingRollbackCount ?? 0"
       :rollback-blocked="Boolean(session?.isRollbackBlocked)"
@@ -99,6 +100,7 @@
         :to-date="session?.toDate ?? ''"
         :time-zone="workspaceTimeZone"
         :session-created-at="session?.createdAt"
+        :is-audit="session?.name?.startsWith('Audit:')"
         :selected-event-id="selectedEventId"
         :boost-selected-ids="rangeBoostSelectedIds"
         :free-times="displayedFreeTimes"
@@ -220,6 +222,7 @@
       :can-delete="allowed('route_eld.log_details.events.delete')"
       :can-multi-update="allowed('route_eld.log_details.events.multi_update')"
       :can-boost="allowed('route_eld.log_details.boost')"
+      :can-repair="allowed('route_eld.log_details.boost')"
       :can-normalize="allowed('route_eld.log_details.normalize')"
       :can-certification="allowed('route_eld.log_details.certification_fix')"
       :can-reassign="allowed('route_eld.log_details.reassign_replicate')"
@@ -229,12 +232,17 @@
         selectedRowIds.length !== 1 || !canEditSession || Boolean(durationSelectionError)
       "
       :duration-title="durationSelectionError"
+      :repair-disabled="Boolean(repairSelectionError) || !canEditSession"
+      :repair-title="
+        repairSelectionError || 'Generate repair options for the selected event'
+      "
       :reassign-disabled="!selectedRowIds.length || !canEditSession"
       :normalize-disabled="!canEditSession"
       :selected-count="selectedRowIds.length"
       @dragdrop-change="dragDropEnabled = $event"
       @delete-click="deleteSelectedBoostEvents"
       @duration-click="openDurationModal"
+      @repair-click="openRepairModal"
       @reassign-click="openReassignModal"
       @multi-update-click="multiUpdateModalOpen = true"
       @normalize-click="openNormalize"
@@ -311,14 +319,9 @@
       :target-duration-ms="rangeBoostTargetDurationMs"
       :affected-count="rangeBoostAffectedCount"
       :selection-error="rangeBoostSelectionError"
-      :external-error="rangeBoostFailureReason"
       :time-zone="workspaceTimeZone"
       :loading="store.isMutating"
-      @reset-error="rangeBoostFailureReason = ''"
-      @switch="
-        rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0;
-        rangeBoostFailureReason = ''
-      "
+      @switch="rangeBoostSourceIndex = rangeBoostSourceIndex === 0 ? 1 : 0"
       @submit="confirmRangeBoost"
     />
     <CBoostReassignModal
@@ -337,7 +340,6 @@
       v-model:open="showEditEventModal"
       :form="editEventForm"
       :edit-options="store.eventEditOptions"
-      :users="responsibleUsers"
       :disable-sleeper-berth="Boolean(activeDriverId === session?.driverId
         ? session?.disableSleeperBerth : session?.coDriverDisableSleeperBerth)"
       :from-date="session?.fromDate"
@@ -376,6 +378,8 @@
       :tab-id="store.activeTabId ?? ''"
       :driver-name="session?.driverName ?? ''"
       :other-driver-selected="assistantOtherDriverSelected"
+      :can-apply="allowed('route_eld.log_details.boost')"
+      @applied="refreshAfterAssistantApplied"
     />
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
@@ -397,6 +401,23 @@
       :external-error="durationFailureReason"
       @reset-error="durationFailureReason = ''"
       @submit="runDurationBoost"
+    />
+    <CBoostRepairModal
+      v-model:open="repairOpen"
+      :loading="repairGenerating"
+      :applying-option-id="applyingRepairOptionId"
+      :selected-event="selectedRepairEvent"
+      :selection-error="repairSelectionError"
+      :result="repairResult"
+      :error="repairFailureReason"
+      :from-date="session?.fromDate ?? ''"
+      :to-date="session?.toDate ?? ''"
+      :time-zone="workspaceTimeZone"
+      :session-created-at="session?.createdAt ?? null"
+      @reset-error="repairFailureReason = ''"
+      @change-request="resetRepairRequest"
+      @generate="generateRepairOptions"
+      @apply="applyRepairOption"
     />
 
     <CBoostAlprRouteDialog
@@ -560,10 +581,12 @@ import type {
   RouteEldCertificationReport,
   RouteEldEventCameraAnalysis,
   RouteEldEventCameraPresence,
+  GenerateRouteEldRepairRequest,
   RouteEldHosEvent,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
   RouteEldSessionOperation,
+  RouteEldRepairRequestResponse,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
 import CBoostGraphHeaderControls from '../components/CBoostGraphHeaderControls.vue'
@@ -582,8 +605,10 @@ import CBoostEditDailyFormModal from '../components/modals/CBoostEditDailyFormMo
 import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.vue'
 import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
 import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
+import { useAssistantWorkspaceRefresh } from '../composables/useAssistantWorkspaceRefresh'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
+import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
 import CBoostCertificationModal from '../components/modals/CBoostCertificationModal.vue'
 import CBoostAlprRouteDialog from '../components/modals/CBoostAlprRouteDialog.vue'
 import CBoostEventTableColumnSettings from '../components/CBoostEventTableColumnSettings.vue'
@@ -616,7 +641,6 @@ const {
   session,
   workspace,
   profileForms,
-  responsibleUsers,
   workspaceTimeZone,
   driverId,
   headerDate,
@@ -697,6 +721,7 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
+const refreshAfterAssistantApplied = useAssistantWorkspaceRefresh()
 const assistantOpen = ref(false)
 const assistantOtherDriverSelected = computed(() =>
   Boolean(
@@ -718,6 +743,11 @@ interface ApiEnvelope<T> {
 const certificationReport = ref<RouteEldCertificationReport | null>(null)
 const durationOpen = ref(false)
 const durationFailureReason = ref('')
+const repairOpen = ref(false)
+const repairGenerating = ref(false)
+const applyingRepairOptionId = ref('')
+const repairFailureReason = ref('')
+const repairResult = ref<RouteEldRepairRequestResponse | null>(null)
 const reassignTargetsLoading = ref(false)
 const eventEditorReadonly = ref(false)
 const cameraRouteOpen = ref(false)
@@ -799,6 +829,23 @@ const graphEvents = computed(() =>
       (item.ownerDriverId || session.value?.driverId) === activeDriverId.value)
     .map((item) => item.event)
 )
+const selectedRepairEvent = computed(
+  () => graphEvents.value.find((event) => event.id === selectedEventId.value) ?? null
+)
+const repairSelectionError = computed(() => {
+  const currentSession = session.value
+  const selected = selectedRepairEvent.value
+  if (!currentSession || !selected)
+    return 'Select an event from the graph or events table first.'
+  if (activeDriverId.value !== currentSession.driverId)
+    return 'Repair is available only while viewing the session driver.'
+  if (!isRouteEldEventWithinSession(selected, currentSession))
+    return 'Events outside the session period cannot be repaired.'
+  if (selected.isFrozen) return 'DOT-inspected events cannot be repaired.'
+  if (selected.recordStatus.toUpperCase() !== 'ACTIVE')
+    return 'Only active events can be used to generate repair options.'
+  return ''
+})
 type CameraSource = { eventId: string; signature: string }
 const cameraSources = computed<CameraSource[]>(() => {
   if (!session.value || workspace.value?.session.id !== session.value.id ||
@@ -943,7 +990,6 @@ const selectedSourceEvents = computed(() =>
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
 const rangeBoostModalOpen = ref(false)
-const rangeBoostFailureReason = ref('')
 const rangeBoostSelectedEvents = computed(() =>
   rangeBoostSelectedIds.value
     .map((id) => graphEvents.value.find((event) => event.id === id))
@@ -1321,7 +1367,7 @@ watch(activeDriverId, () => {
   normalizeResult.value = null
   if (activeDriverId.value) {
     void store.fetchEventEditOptions(activeDriverId.value).catch(() => {})
-    void store.fetchDriverOptions(activeDriverId.value).catch(() => {})
+    void store.fetchCoDrivers(activeDriverId.value).catch(() => {})
   }
 })
 const changeStatusLabel = (value?: string) => {
@@ -1421,7 +1467,14 @@ const selectInitialTab = () => {
   if (initial) selectTab(initial)
 }
 const onSelectedRowIdsUpdate = (ids: string[]) => {
+  // The repair anchor (selectedEventId) is sticky so it can also be set straight from the
+  // graph, where no row is checked. That makes it go stale when a checked row is cleared:
+  // Repair stays enabled on an event the user can no longer see as selected. Drop the anchor
+  // whenever its own row leaves the table selection (row toggled off, shift-range, clear-all).
+  const anchorId = selectedEventId.value
+  const anchorWasSelected = Boolean(anchorId) && selectedRowIds.value.includes(anchorId)
   selectedRowIds.value = ids
+  if (anchorWasSelected && !ids.includes(anchorId)) selectedEventId.value = ''
 }
 const highlightEventRow = (eventId: string) => {
   highlightedEventId.value = eventId
@@ -1457,19 +1510,16 @@ const onGraphBoostSelect = (eventId: string) => {
     return
   }
   if (rangeBoostSelectedIds.value.includes(eventId)) {
-    rangeBoostFailureReason.value = ''
     rangeBoostSelectedIds.value = rangeBoostSelectedIds.value.filter((id) => id !== eventId)
     return
   }
   const next = [...rangeBoostSelectedIds.value, eventId]
   if (next.length > 2) next.shift()
-  rangeBoostFailureReason.value = ''
   rangeBoostSelectedIds.value = next
 }
 const clearRangeBoost = () => {
   rangeBoostSelectedIds.value = []
   rangeBoostSourceIndex.value = 0
-  rangeBoostFailureReason.value = ''
 }
 watch([() => session.value?.id, () => store.activeTabId], clearRangeBoost)
 const openRangeBoostModal = () => {
@@ -1483,7 +1533,6 @@ const openRangeBoostModal = () => {
   rangeBoostSourceIndex.value = rangeBoostChronologicalEvents.value.findIndex(
     (event) => event.id === firstClickedId
   )
-  rangeBoostFailureReason.value = ''
   rangeBoostModalOpen.value = true
 }
 const confirmRangeBoost = async (seconds: number) => {
@@ -1496,18 +1545,13 @@ const confirmRangeBoost = async (seconds: number) => {
     return
   }
   try {
-    rangeBoostFailureReason.value = ''
     const deltaSeconds = source.id === left.id ? -seconds : seconds
     await store.boostEvents([left.id, right.id], deltaSeconds)
     rangeBoostModalOpen.value = false
     clearRangeBoost()
     toast.success('Time boost saved to the active Boost tab')
   } catch (error: any) {
-    rangeBoostFailureReason.value = getApiErrorMessage(
-      error,
-      'The time transfer could not be applied'
-    )
-    toast.error(rangeBoostFailureReason.value)
+    toast.error(getApiErrorMessage(error, 'The time transfer could not be applied'))
   }
 }
 const formatGraphEventTime = (timestamp: number) =>
@@ -1674,6 +1718,54 @@ const openDurationModal = () => {
   }
   durationFailureReason.value = ''
   durationOpen.value = true
+}
+const openRepairModal = () => {
+  if (!canEditSession.value) return
+  if (repairSelectionError.value) {
+    toast.error(repairSelectionError.value)
+    return
+  }
+  repairResult.value = null
+  repairFailureReason.value = ''
+  applyingRepairOptionId.value = ''
+  repairOpen.value = true
+}
+const resetRepairRequest = () => {
+  repairResult.value = null
+  repairFailureReason.value = ''
+}
+const generateRepairOptions = async (request: GenerateRouteEldRepairRequest) => {
+  repairGenerating.value = true
+  repairFailureReason.value = ''
+  try {
+    repairResult.value = await store.generateRepair(request)
+  } catch (error) {
+    repairFailureReason.value = getApiErrorMessage(error, 'Repair options could not be generated.')
+  } finally {
+    repairGenerating.value = false
+  }
+}
+const applyRepairOption = async (optionId: string) => {
+  const repairId = repairResult.value?.id
+  if (!repairId || applyingRepairOptionId.value) return
+  applyingRepairOptionId.value = optionId
+  repairFailureReason.value = ''
+  try {
+    const outcome = await store.applyRepair(repairId, optionId)
+    repairOpen.value = false
+    repairResult.value = null
+    if (outcome.refreshError) {
+      toast.warning(
+        'The repair was applied, but the workspace could not be refreshed. Reload the tab to see the updated events.'
+      )
+    } else {
+      toast.success('Repair option applied to the active working tab.')
+    }
+  } catch (error) {
+    repairFailureReason.value = getApiErrorMessage(error, 'The repair option could not be applied.')
+  } finally {
+    applyingRepairOptionId.value = ''
+  }
 }
 const openInsertModal = async () => {
   if (!canEditSession.value) return

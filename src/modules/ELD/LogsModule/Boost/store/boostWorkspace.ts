@@ -11,12 +11,14 @@ import type {
   RouteEldProfileForm,
   RouteEldSchedule,
   RouteEldEventEditOptions,
-  RouteEldResponsibleUser,
+  RouteEldCoDriverOption,
   RouteEldWorkspace,
   RouteEldWorkspaceEvent,
   RouteEldSessionOperation,
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
+  GenerateRouteEldRepairRequest,
+  RouteEldRepairRequestResponse,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -61,8 +63,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const profileForms = ref<RouteEldProfileForm[]>([])
   const schedule = ref<RouteEldSchedule | null>(null)
   const eventEditOptions = ref<RouteEldEventEditOptions>({ vehicles: [], elds: [] })
-  const responsibleUsers = ref<RouteEldResponsibleUser[]>([])
-  const coDrivers = ref<RouteEldResponsibleUser[]>([])
+  const coDrivers = ref<RouteEldCoDriverOption[]>([])
   const reassignTargets = ref<RouteEldDriverOption[]>([])
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
@@ -613,17 +614,11 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
   }
 
-  async function fetchDriverOptions(driverId: string) {
-    const [usersResponse, coDriversResponse] = await Promise.all([
-      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
-        ApiEndpoints.ROUTE_ELD_DRIVER_RESPONSIBLE_USERS(driverId)
-      ),
-      api.get<RouteEldResponsibleUser[] | ApiEnvelope<RouteEldResponsibleUser[]>>(
-        ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId)
-      ),
-    ])
+  async function fetchCoDrivers(driverId: string) {
+    const coDriversResponse = await api.get<
+      RouteEldCoDriverOption[] | ApiEnvelope<RouteEldCoDriverOption[]>
+    >(ApiEndpoints.ROUTE_ELD_DRIVER_CO_DRIVERS(driverId))
     if ((selectedDriverId.value || session.value?.driverId) === driverId) {
-      responsibleUsers.value = unwrap(usersResponse.data) ?? []
       coDrivers.value = unwrap(coDriversResponse.data) ?? []
     }
   }
@@ -645,6 +640,68 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
       { adviceType, driverId: selectedDriverId.value || session.value.driverId }
     )
     return unwrap(response.data)
+  }
+
+  async function generateRepair(request: GenerateRouteEldRepairRequest) {
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before generating repair options.')
+    assertEditableSession()
+    assertCanMutate()
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId),
+        request
+      )
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  /** Reads one repair with option previews and live status; never mutates. */
+  async function getRepair(sessionId: string, tabId: string, repairId: string) {
+    const response = await api.get<
+      RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+    >(ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIR(sessionId, tabId, repairId))
+    return unwrap(response.data)
+  }
+
+  async function applyRepair(repairId: string, optionId: string) {
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before applying a repair option.')
+    assertEditableSession()
+    assertCanMutate()
+    const sessionId = session.value.id
+    const tabId = activeTabId.value
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY(
+          sessionId,
+          tabId,
+          repairId,
+          optionId
+        ),
+        null
+      )
+      const repair = unwrap(response.data)
+      let refreshError: unknown = null
+      try {
+        await synchronizeWorkspace(sessionId, tabId, true)
+      } catch (error) {
+        refreshError = error
+      }
+      return { repair, refreshError }
+    } finally {
+      isMutating.value = false
+    }
   }
 
   async function normalize(normalizeList: RouteEldNormalizeType[], applyCertificationFix: boolean) {
@@ -805,7 +862,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     profileForms.value = []
     schedule.value = null
     eventEditOptions.value = { vehicles: [], elds: [] }
-    responsibleUsers.value = []
     coDrivers.value = []
     reassignTargets.value = []
     profileFormEditRequest.value = null
@@ -824,7 +880,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     profileForms,
     schedule,
     eventEditOptions,
-    responsibleUsers,
     coDrivers,
     reassignTargets,
     profileFormEditRequest,
@@ -852,9 +907,12 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     boostEventDuration,
     reassignEvents,
     updateProfileForm,
-    fetchDriverOptions,
+    fetchCoDrivers,
     fetchReassignTargets,
     analyzeAiAdvice,
+    generateRepair,
+    getRepair,
+    applyRepair,
     normalize,
     submitOrRollback,
     activeOperation,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide } from 'vue'
+import { computed, provide } from 'vue'
 import { RefreshCw, Search } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -13,6 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import CELDLogsTable from '../components/CELDLogsTable.vue'
+import CLloraLauncher from '@/modules/ELD/LogsModule/Ai/components/CLloraLauncher.vue'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 import { useELDLogs } from '../composables/useELDLogs'
 
 const eventOptions = [
@@ -38,6 +41,12 @@ provide('eldLogs', logsInstance)
 
 const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilter, fetchLogs } =
   logsInstance
+
+const authStore = useAuthStore()
+const canUseAssistant = computed(() => hasPermission(authStore.token, 'route_eld.log_details.assistant'))
+const launcherDrivers = computed(() =>
+  logsInstance.driverLogs.value.map((log) => ({ driverId: log.driverId, displayName: log.displayName }))
+)
 </script>
 
 <template>
@@ -126,5 +135,10 @@ const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilte
     </div>
 
     <CELDLogsTable class="min-h-0 flex-1" />
+    <CLloraLauncher
+      v-if="canUseAssistant"
+      :drivers="launcherDrivers"
+      :first-name="authStore.user?.firstName"
+    />
   </div>
 </template>

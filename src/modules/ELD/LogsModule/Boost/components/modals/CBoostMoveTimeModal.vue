@@ -33,7 +33,7 @@
         <div>
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium">Transfer time</label>
-            <span class="font-mono text-xs text-muted-foreground">max {{ formatDuration(availableMs) }}</span>
+            <span class="font-mono text-xs text-muted-foreground">max {{ formatBoostDuration(availableMs) }}</span>
           </div>
           <div class="mt-1 flex items-center gap-2">
             <Input v-model.number="hours" type="number" min="0" class="w-16 text-center" />
@@ -45,7 +45,7 @@
           </div>
           <div class="mt-3 flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
             <span class="text-xs text-muted-foreground">Source duration after transfer</span>
-            <span class="font-mono text-sm font-semibold">{{ formatDuration(remainingMs) }}</span>
+            <span class="font-mono text-sm font-semibold">{{ formatBoostDuration(remainingMs) }}</span>
           </div>
           <p v-if="displayError" class="mt-1.5 text-xs text-red-600">{{ displayError }}</p>
         </div>
@@ -68,7 +68,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { RouteEldHosEvent } from '../../types/boost'
-import { resolveRouteEldScheduleTimeZone } from '../../composables/useScheduleBoost'
+import { formatRouteEldEventTime } from '@/utils/routeEldTimeZone'
+import {
+  areBoostDurationPartsValid,
+  boostDurationPartsToSeconds,
+  formatBoostDuration,
+} from '../../utils/formatters'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -79,14 +84,12 @@ const props = withDefaults(defineProps<{
   targetDurationMs: number
   affectedCount: number
   selectionError?: string
-  externalError?: string
   timeZone?: string | null
   loading?: boolean
-}>(), { selectionError: '', externalError: '', timeZone: 'CT', loading: false })
+}>(), { selectionError: '', timeZone: 'CT', loading: false })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'reset-error': []
   switch: []
   submit: [seconds: number]
 }>()
@@ -95,23 +98,20 @@ const hours = ref(0)
 const minutes = ref(0)
 const seconds = ref(0)
 watch(() => props.open, (open) => { if (open) { hours.value = 0; minutes.value = 0; seconds.value = 0 } })
-const totalSeconds = computed(() => Math.max(0, Number(hours.value) || 0) * 3600 + Math.max(0, Number(minutes.value) || 0) * 60 + Math.max(0, Number(seconds.value) || 0))
+const totalSeconds = computed(() => boostDurationPartsToSeconds({
+  hours: Number(hours.value) || 0,
+  minutes: Number(minutes.value) || 0,
+  seconds: Number(seconds.value) || 0,
+}))
 const availableMs = computed(() => Math.max(0, props.sourceDurationMs - 1000))
 const remainingMs = computed(() => Math.max(0, props.sourceDurationMs - totalSeconds.value * 1000))
 const error = computed(() => {
   if (props.selectionError) return props.selectionError
-  if (![hours.value, minutes.value, seconds.value].every(Number.isInteger) || minutes.value < 0 || minutes.value > 59 || seconds.value < 0 || seconds.value > 59) return 'Enter whole hours, with minutes and seconds between 0 and 59.'
+  if (!areBoostDurationPartsValid({ hours: hours.value, minutes: minutes.value, seconds: seconds.value })) return 'Enter whole hours, with minutes and seconds between 0 and 59.'
   if (totalSeconds.value * 1000 > availableMs.value) return 'Transfer time exceeds the available source duration.'
   return ''
 })
-const displayError = computed(() => error.value || props.externalError)
-watch([hours, minutes, seconds], () => {
-  if (props.externalError) emit('reset-error')
-})
-const formatDuration = (milliseconds: number) => {
-  const total = Math.max(0, Math.round(milliseconds / 1000))
-  return `${String(Math.floor(total / 3600)).padStart(2, '0')}:${String(Math.floor((total % 3600) / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
+const displayError = computed(() => error.value)
 const EventCard = defineComponent({
   props: {
     event: { type: Object as PropType<RouteEldHosEvent>, required: true },
@@ -122,8 +122,8 @@ const EventCard = defineComponent({
     return () => h('div', { class: 'rounded-md border p-3' }, [
       h('div', { class: 'text-[11px] font-medium uppercase text-muted-foreground' }, cardProps.role),
       h('div', { class: 'mt-0.5 truncate text-sm font-medium' }, cardProps.event.eventName),
-      h('div', { class: 'text-xs text-muted-foreground' }, new Intl.DateTimeFormat('en-US', { timeZone: resolveRouteEldScheduleTimeZone(props.timeZone), month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(new Date(cardProps.event.timestamp))),
-      h('div', { class: 'mt-1.5 font-mono text-xs' }, `Duration ${formatDuration(cardProps.durationMs)}`),
+      h('div', { class: 'text-xs text-muted-foreground' }, formatRouteEldEventTime(cardProps.event.timestamp, cardProps.event.timeZone ?? props.timeZone)),
+      h('div', { class: 'mt-1.5 font-mono text-xs' }, `Duration ${formatBoostDuration(cardProps.durationMs)}`),
     ])
   },
 })

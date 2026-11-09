@@ -6,48 +6,14 @@
       isFullscreen ? 'h-screen' : 'h-full min-h-[380px]',
     ]"
   >
-    <div
-      v-if="!apiKey"
-      class="flex h-full items-center justify-center text-sm text-muted-foreground"
-    >
-      Google Maps API key is not configured.
-    </div>
-    <GoogleMap
-      v-else
-      ref="mapRef"
-      :api-key="apiKey"
-      :center="{ lat: 39.5, lng: -98.35 }"
-      :zoom="4"
-      :styles="mapStyles"
-      :map-type-id="mapTypeId"
-      gesture-handling="greedy"
-      :disable-default-ui="true"
-      :zoom-control="true"
-      :street-view-control="true"
-      style="width: 100%; height: 100%"
-      @ready="onReady"
-      @zoom_changed="refreshZoom"
-    >
-      <Polyline
-        v-if="selectedRoute.length > 1"
-        :options="{
-          path: selectedRoute,
-          strokeColor: '#2563EB',
-          strokeOpacity: 0.95,
-          strokeWeight: 5,
-          clickable: false,
-          zIndex: 20,
-        }"
-      />
+    <CMap ref="mapRef" :center="{ lat: 39.5, lng: -98.35 }" :zoom="4" @ready="onReady">
+      <CMapLine :path="selectedRoute" color="#2563EB" :width="5" :opacity="0.95" />
 
-      <CustomMarker
+      <CMapMarker
         v-for="cluster in eventClusters"
         :key="cluster.key"
-        :options="{
-          position: { lat: cluster.latitude, lng: cluster.longitude },
-          anchorPoint: 'CENTER',
-          zIndex: 100,
-        }"
+        :position="{ lat: cluster.latitude, lng: cluster.longitude }"
+        :z-index="1"
       >
         <button
           type="button"
@@ -59,16 +25,13 @@
         >
           {{ cluster.events.length > 1 ? cluster.events.length : '' }}
         </button>
-      </CustomMarker>
+      </CMapMarker>
 
-      <CustomMarker
+      <CMapMarker
         v-for="camera in selectedCameras"
         :key="camera.id"
-        :options="{
-          position: { lat: camera.latitude, lng: camera.longitude },
-          anchorPoint: 'CENTER',
-          zIndex: 1000,
-        }"
+        :position="{ lat: camera.latitude, lng: camera.longitude }"
+        :z-index="2"
       >
         <button
           type="button"
@@ -98,11 +61,11 @@
             <circle cx="20" cy="20" r="7" fill="#E5484D" stroke="#FFFFFF" stroke-width="2" />
           </svg>
         </button>
-      </CustomMarker>
-    </GoogleMap>
+      </CMapMarker>
+    </CMap>
 
-    <div v-if="apiKey" class="absolute right-3 top-3 z-10 flex items-center gap-2">
-      <CMapTypeControl v-model="mapTypeId" :get-map="getMap" />
+    <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
+      <CMapTypeControl />
       <button
         type="button"
         title="Toggle fullscreen"
@@ -188,10 +151,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Maximize, Minimize, X } from 'lucide-vue-next'
-import { CustomMarker, GoogleMap, Polyline } from 'vue3-google-map'
+import type { Map as MapLibreMap } from 'maplibre-gl'
+import CMap from '@/components/custom/CMap.vue'
+import CMapLine from '@/components/custom/CMapLine.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
 import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
-import type { MapType } from '@/components/custom/CMapTypeControl.vue'
-import { mapStyles } from '@/utils/maps'
+import { positionsBounds } from '@/utils/maps'
 import { resolveRouteEldScheduleTimeZone } from '../../composables/useScheduleBoost'
 import type { RouteEldEventCameraAnalysis, RouteEldHosEvent, RouteEldMatchedCamera } from '../../types/boost'
 
@@ -212,11 +177,9 @@ const props = defineProps<{
   selectedEventId?: string | null
 }>()
 const emit = defineEmits<{ (event: 'select-event', eventId: string | null): void }>()
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-const mapRef = ref<any>(null)
+const mapRef = ref<InstanceType<typeof CMap> | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const zoom = ref(4)
-const mapTypeId = ref<MapType>('roadmap')
 const isFullscreen = ref(false)
 const localSelectedEventId = ref<string | null>(null)
 const selectedCamera = ref<RouteEldMatchedCamera | null>(null)
@@ -292,47 +255,48 @@ onMounted(() => document.addEventListener('fullscreenchange', handleFullscreenCh
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', handleFullscreenChange))
 
 function getMap() {
-  return mapRef.value?.map
+  return mapRef.value?.getMap() ?? null
 }
 async function toggleFullscreen() {
-  if (!containerRef.value) return
-  if (document.fullscreenElement === containerRef.value) await document.exitFullscreen()
-  else await containerRef.value.requestFullscreen()
+  const element = containerRef.value
+  if (!element) return
+  if (document.fullscreenElement === element) await document.exitFullscreen().catch(() => {})
+  else await element.requestFullscreen().catch(() => {})
 }
 function handleFullscreenChange() {
   isFullscreen.value = document.fullscreenElement === containerRef.value
   void nextTick(() => {
-    const map = getMap()
-    const googleMaps = (window as any).google?.maps
-    if (map && googleMaps?.event) googleMaps.event.trigger(map, 'resize')
+    getMap()?.resize()
     if (selectedEvent.value) focusSelection()
     else fitAll()
   })
 }
-function onReady() {
+function onReady(map: MapLibreMap) {
+  map.on('zoomend', () => refreshZoom(map))
   if (selectedEvent.value) focusSelection()
   else fitAll()
+  refreshZoom(map)
 }
-function refreshZoom() {
-  zoom.value = getMap()?.getZoom?.() ?? zoom.value
+function refreshZoom(map: MapLibreMap) {
+  zoom.value = Math.floor(map.getZoom())
 }
 function fitAll() {
   const map = getMap()
-  const googleMaps = (window as any).google?.maps
-  if (!map || !googleMaps || visibleLocatedEvents.value.length === 0) return
+  if (!map || visibleLocatedEvents.value.length === 0) return
   if (visibleLocatedEvents.value.length === 1) {
-    map.setCenter({
-      lat: visibleLocatedEvents.value[0].latitude!,
-      lng: visibleLocatedEvents.value[0].longitude!,
+    map.jumpTo({
+      center: {
+        lat: visibleLocatedEvents.value[0].latitude!,
+        lng: visibleLocatedEvents.value[0].longitude!,
+      },
+      zoom: 14,
     })
-    map.setZoom(14)
     return
   }
-  const bounds = new googleMaps.LatLngBounds()
-  visibleLocatedEvents.value.forEach((event) =>
-    bounds.extend({ lat: event.latitude!, lng: event.longitude! })
+  const bounds = positionsBounds(
+    visibleLocatedEvents.value.map((event) => ({ lat: event.latitude!, lng: event.longitude! }))
   )
-  map.fitBounds(bounds, 60)
+  if (bounds) map.fitBounds(bounds, { padding: 60, duration: 0 })
 }
 function selectCluster(cluster: {
   events: RouteEldHosEvent[]
@@ -340,9 +304,11 @@ function selectCluster(cluster: {
   longitude: number
 }) {
   const map = getMap()
-  if (cluster.events.length > 1 && (map?.getZoom?.() ?? 0) < 16) {
-    map?.panTo({ lat: cluster.latitude, lng: cluster.longitude })
-    map?.setZoom(Math.min(16, (map.getZoom?.() ?? 4) + 3))
+  if (map && cluster.events.length > 1 && map.getZoom() < 16) {
+    map.easeTo({
+      center: { lat: cluster.latitude, lng: cluster.longitude },
+      zoom: Math.min(16, map.getZoom() + 3),
+    })
     return
   }
   localSelectedEventId.value = cluster.events[0].id
@@ -358,18 +324,13 @@ function clearSelection() {
 function focusSelection() {
   const map = getMap()
   const event = selectedEvent.value
-  const googleMaps = (window as any).google?.maps
-  if (!map || !event || !googleMaps) return
-  const bounds = new googleMaps.LatLngBounds()
-  bounds.extend({ lat: event.latitude!, lng: event.longitude! })
-  selectedRoute.value.forEach((point) => bounds.extend(point))
-  selectedCameras.value.forEach((camera) =>
-    bounds.extend({ lat: camera.latitude, lng: camera.longitude })
-  )
-  map.fitBounds(bounds, 90)
-  googleMaps.event?.addListenerOnce(map, 'idle', () => {
-    if ((map.getZoom?.() ?? 0) > 17) map.setZoom(17)
-  })
+  if (!map || !event) return
+  const bounds = positionsBounds([
+    { lat: event.latitude!, lng: event.longitude! },
+    ...selectedRoute.value,
+    ...selectedCameras.value.map((camera) => ({ lat: camera.latitude, lng: camera.longitude })),
+  ])
+  if (bounds) map.fitBounds(bounds, { padding: 90, maxZoom: 17, duration: 0 })
 }
 function formatMiles(metres: number) {
   return (metres / 1609.344).toFixed(1)

@@ -195,12 +195,6 @@ export class ApiEndpoints {
   // Audit endpoints
   private static readonly AUDIT_URL = `${this.BASE_URL}/audit`
   static readonly AUDIT = this.AUDIT_URL
-  static readonly AUDIT_EVENTS = `${this.AUDIT_URL}/events`
-  static readonly AUDIT_SUMMARY = `${this.AUDIT_URL}/summary`
-  static readonly AUDIT_GRAPH = `${this.AUDIT_URL}/graph`
-  static readonly AUDIT_VIOLATIONS = `${this.AUDIT_URL}/violations`
-  static readonly AUDIT_WEIGHT_STATIONS = `${this.AUDIT_URL}/weight-stations`
-  static readonly AUDIT_TRACKING = `${this.AUDIT_URL}/tracking`
 
   // Portal Users endpoints
   private static readonly PORTAL_USERS_URL = `${this.BASE_URL}/portal-users`
@@ -253,6 +247,7 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
   static readonly ROUTE_ELD_LOG_DETAILS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/details`
   static readonly ROUTE_ELD_EVENT_SESSIONS = `${this.BASE_URL}/route-eld/event-sessions`
+  static readonly ROUTE_ELD_EVENT_SESSION_FILTER_OPTIONS = `${this.ROUTE_ELD_EVENT_SESSIONS}/filter-options`
   static readonly ROUTE_ELD_EVENT_SESSION = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSIONS}/${sessionId}`
   static readonly ROUTE_ELD_EVENT_SESSION_SYNC_CO_DRIVER = (sessionId: string, tabId: string) =>
@@ -304,6 +299,8 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
   static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
@@ -316,6 +313,20 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/boost`
   static readonly ROUTE_ELD_EVENT_SESSION_DURATION_BOOST = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/duration-boost`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIRS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/repairs`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR = (
+    sessionId: string,
+    tabId: string,
+    repairId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_REPAIR_OPTION_APPLY = (
+    sessionId: string,
+    tabId: string,
+    repairId: string,
+    optionId: string
+  ) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}/options/${optionId}/apply`
   static readonly ROUTE_ELD_EVENT_SESSION_REASSIGN = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
   static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>
@@ -330,8 +341,6 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/rollback`
   static readonly ROUTE_ELD_EVENT_SESSION_OPERATION = (sessionId: string, operationId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/operations/${operationId}`
-  static readonly ROUTE_ELD_DRIVER_RESPONSIBLE_USERS = (driverId: string) =>
-    `${this.ROUTE_ELD_DRIVERS}/${driverId}/responsible-users`
   static readonly ROUTE_ELD_DRIVER_CO_DRIVERS = (driverId: string) =>
     `${this.ROUTE_ELD_DRIVERS}/${driverId}/co-drivers`
   static readonly ROUTE_ELD_NORMALIZE = `${this.BASE_URL}/route-eld/normalize`
@@ -363,6 +372,8 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVERS = `${this.BASE_URL}/route-eld/live-tracking/drivers`
   static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS = (driverId: string) =>
     `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points`
+  static readonly ROUTE_ELD_LIVE_TRACKING_DRIVER_POINTS_WITH_SPEED_CHART = (driverId: string) =>
+    `${this.ROUTE_ELD_LIVE_TRACKING_DRIVERS}/${driverId}/points-with-speed-chart`
   static readonly ROUTE_ELD_LIVE_SHARE = `${this.BASE_URL}/route-eld/live-share`
   static readonly ROUTE_ELD_LIVE_SHARE_TRACKING = (token: string) =>
     `${this.ROUTE_ELD_LIVE_SHARE}/${token}/tracking`
@@ -418,6 +429,9 @@ export class ApiEndpoints {
   static readonly ALPR_GEOCODE_REVERSE = `${this.BASE_URL}/geocode/reverse`
   static readonly ALPR_CAMERA_CLUSTERS = `${this.BASE_URL}/cameras/clusters`
   static readonly ALPR_CAMERAS = `${this.BASE_URL}/cameras`
+
+  // Self-hosted map routing
+  static readonly MAPS_ROUTE = `${this.BASE_URL}/maps/route`
 
   // External APIs
   static readonly TELEGRAM_SEND_MESSAGE = 'https://dev-new.routeeld.uz/bot/send_message/'

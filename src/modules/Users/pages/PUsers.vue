@@ -23,6 +23,7 @@ const isModalOpen = ref(false)
 const editingUser = ref<User | null>(null)
 const deleteUser = ref<User | null>(null)
 const deleting = ref(false)
+const savingUser = ref(false)
 
 function openAddModal() {
   editingUser.value = null
@@ -35,10 +36,20 @@ function openEditModal(user: User) {
 }
 
 async function saveUser(data: UserFormData) {
-  if (editingUser.value) await users.updateUser(editingUser.value.id, data, editingUser.value.status)
-  else await users.addUser(data)
-  isModalOpen.value = false
-  editingUser.value = null
+  if (savingUser.value) return
+  savingUser.value = true
+  try {
+    if (editingUser.value) await users.updateUser(editingUser.value.id, data, editingUser.value.status)
+    else await users.addUser(data)
+    isModalOpen.value = false
+    editingUser.value = null
+  } catch (error) {
+    const response = error as { response?: { data?: string | { message?: string } } }
+    const data = response.response?.data
+    toast.error(typeof data === 'string' ? data : data?.message ?? 'Could not save user')
+  } finally {
+    savingUser.value = false
+  }
 }
 
 async function confirmDelete() {
@@ -61,7 +72,7 @@ async function confirmDelete() {
       <div>
         <h2 class="text-xl font-semibold text-foreground">Users</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Manage Route ELD dispatchers, roles, and company access.
+          Manage Vectorium users, roles, and optional Route ELD company access.
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -143,6 +154,7 @@ async function confirmDelete() {
       :roles="users.roles.value"
       :companies="users.companies.value"
       :is-loading-roles="users.isLoadingRoles.value"
+      :saving="savingUser"
       @close="isModalOpen = false"
       @save="saveUser"
     />

@@ -123,7 +123,6 @@
             class="w-105 p-0 overflow-hidden rounded border-none shadow-xl"
             :side-offset="8"
           >
-            <!-- Search Section -->
             <div class="p-4 flex items-center gap-2 bg-[#F0F0F0] dark:bg-muted">
               <div class="relative flex-1">
                 <Search
@@ -150,7 +149,6 @@
               <button type="button" class="mb-3 w-full rounded border border-border px-3 py-2 text-left text-sm font-medium hover:bg-muted" @click="isDropdownOpen = false; router.push('/initial/companies')">
                 All Companies
               </button>
-              <!-- Companies List -->
               <div class="max-h-[320px] overflow-y-auto pr-1 flex flex-col gap-3">
                 <div
                   v-if="isLoading"
@@ -214,7 +212,6 @@
               </div>
             </div>
 
-            <!-- User Profile Footer -->
             <div
               class="p-4 border-t border-border bg-background dark:bg-card flex items-center gap-2"
             >
@@ -223,19 +220,39 @@
                 @click="handleProfileClick"
               >
                 <User class="w-[18px] h-[18px] text-[#090909] dark:text-gray-200" />
-                <span class="text-sm font-semibold text-[#090909] dark:text-gray-100">
-                  {{
-                    authStore.user
-                      ? `${authStore.user.firstName} ${authStore.user.lastName}`
-                      : 'User'
-                  }}
-                  ({{ authStore.user?.roles?.[0]?.name || 'Admin' }})
+                <span class="flex min-w-0 flex-col text-[#090909] dark:text-gray-100">
+                  <span class="text-sm font-semibold">
+                    {{ authStore.user ? `${authStore.user.firstName} ${authStore.user.lastName}` : 'User' }}
+                    ({{ authStore.user?.roles?.[0]?.name || 'Admin' }})
+                  </span>
+                  <span v-if="teamInfoLoaded" class="text-xs text-muted-foreground">Team: {{ teamName || 'Unassigned' }}</span>
                 </span>
               </div>
               <Button
+                v-if="canViewOwnKpi"
                 variant="ghost"
                 size="icon"
-                class="h-11 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
+                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                title="My KPI"
+                aria-label="My KPI"
+                @click.stop="openMyKpi"
+              >
+                <BadgeDollarSign class="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                title="Change password"
+                aria-label="Change password"
+                @click.stop="openChangePassword"
+              >
+                <KeyRound class="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-20 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
                 @click.stop="handleLogout"
               >
                 <LogOut class="w-5 h-5 text-[#C53030] transition-transform group-hover:scale-110" />
@@ -268,6 +285,8 @@ import {
   ShieldAlert,
   Eye,
   Check,
+  BadgeDollarSign,
+  KeyRound,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -282,6 +301,8 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useCompanySwitcher } from '@/layouts/Default/useCompanySwitcher'
 import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { useApi } from '@/composables/useAxiosService'
+import { hasPermission } from '@/router/permissions'
 import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
@@ -321,9 +342,16 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+const api = useApi()
+const teamName = ref<string | null>(null)
+const teamInfoLoaded = ref(false)
+const canViewOwnKpi = computed(() => hasPermission(authStore.token, 'report.my_kpi.view'))
+function openMyKpi() {
+  isDropdownOpen.value = false
+  void router.push('/report/my-kpi')
+}
 watch(() => authStore.loggedIn, (loggedIn) => { if (loggedIn) void refreshNotifications() }, { immediate: true })
 
-// Company dropdown state
 const {
   companies,
   selectedCompanyId,
@@ -354,8 +382,21 @@ const handleCompanySelection = async (company: RouteEldCompany) => {
 }
 
 watch(isDropdownOpen, (open) => {
-  if (open) loadCompanies()
+  if (open) {
+    loadCompanies()
+    void loadTeamInfo()
+  }
 })
+
+async function loadTeamInfo() {
+  try {
+    const response = await api.get<{ successResult: { teamName: string | null } }>('/report/api/team-info')
+    teamName.value = response.data.successResult.teamName
+    teamInfoLoaded.value = true
+  } catch {
+    teamInfoLoaded.value = false
+  }
+}
 
 const pageTitle = computed(() => {
   const path = route.path
@@ -395,6 +436,11 @@ const pageTitle = computed(() => {
     '/report/activity': 'Report / Activity',
     '/report/checker': 'Report / Checker',
     '/report/assistant': 'Report / Assistant',
+    '/report/inspection/violation': 'Report / Inspection / Violation',
+    '/report/inspection/no-violation': 'Report / Inspection / No Violation',
+    '/report/manage/drivers': 'Report / Manage / Drivers',
+    '/report/manage/companies': 'Report / Manage / Companies',
+    '/report/levels': 'Report / Levels',
 
     '/tools/activity': 'Tools / Activity',
     '/tools/monitoring': 'Tools / Monitoring',
@@ -425,6 +471,11 @@ const pageTitle = computed(() => {
 const handleProfileClick = () => {
   isDropdownOpen.value = false
   router.push('/profile')
+}
+
+const openChangePassword = () => {
+  isDropdownOpen.value = false
+  router.push('/profile#password')
 }
 
 const handleLogout = async () => {

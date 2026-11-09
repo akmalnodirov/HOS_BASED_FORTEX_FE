@@ -1,9 +1,9 @@
 name: Deploy HOS based FORTEX (Vue/Vite)
+run-name: Deploy frontend (main) from main (by @${{ github.actor }})
 
+# Deploys are manual. Merging no longer ships anything: start a run from the Actions tab,
+# it always deploys the main branch, whatever branch is picked in "Run workflow".
 on:
-  push:
-    branches:
-      - 'main'
   workflow_dispatch:
 
 jobs:
@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup node
         uses: actions/setup-node@v4

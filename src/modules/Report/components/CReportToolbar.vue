@@ -9,7 +9,7 @@
       <p v-if="subtitle" class="text-sm text-muted-foreground">{{ subtitle }}</p>
     </div>
 
-    <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4">
+    <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 xl:justify-end">
       <slot name="actions" />
 
       <template v-if="showFilters">
@@ -94,6 +94,7 @@ import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight } from
 import { CalendarDate } from '@internationalized/date'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
+import { reportToday } from '@/modules/Report/utils/operations'
 
 type PeriodKey = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
 
@@ -110,11 +111,13 @@ const props = withDefaults(
     showFilters?: boolean
     hideDaily?: boolean
     fullPeriods?: boolean
+    rollingWeek?: boolean
     defaultPeriod?: PeriodKey
     monthPicker?: boolean
     monthValue?: string
+    initialRange?: { startTime: string; endTime: string }
   }>(),
-  { showFilters: true, hideDaily: false, fullPeriods: false, defaultPeriod: 'day', monthPicker: false }
+  { showFilters: true, hideDaily: false, fullPeriods: false, rollingWeek: false, defaultPeriod: 'day', monthPicker: false }
 )
 
 const emit = defineEmits<{
@@ -132,6 +135,7 @@ const allPeriods: { key: PeriodKey; label: string }[] = [
 const periods = computed(() => {
   if (props.monthPicker) return []
   return allPeriods.filter((p) => !(props.hideDaily && p.key === 'day'))
+    .map((p) => p.key === 'week' && props.rollingWeek ? { ...p, label: 'Weekly' } : p)
 })
 
 function currentMonthValue(): string {
@@ -160,8 +164,8 @@ function monthRange(value: string): { start: CalendarDate; end: CalendarDate } {
   return { start: new CalendarDate(y, m, 1), end: calFrom(new Date(y, m, 0)) }
 }
 
-const selectedPeriod = ref<PeriodKey>(props.monthPicker ? 'custom' : props.defaultPeriod)
-const dateRange = ref<any>(props.monthPicker ? monthRange(selectedMonth.value) : periodToRange(props.defaultPeriod))
+const selectedPeriod = ref<PeriodKey>(props.monthPicker || props.initialRange ? 'custom' : props.defaultPeriod)
+const dateRange = ref<any>(props.monthPicker ? monthRange(selectedMonth.value) : props.initialRange ? rangeFromDates(props.initialRange) : periodToRange(props.defaultPeriod))
 let programmatic = true
 
 function today(): CalendarDate {
@@ -173,9 +177,22 @@ function calFrom(d: Date): CalendarDate {
   return new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
 }
 
+function rangeFromDates(value: { startTime: string; endTime: string }) {
+  const start = value.startTime.slice(0, 10).split('-').map(Number)
+  const end = value.endTime.slice(0, 10).split('-').map(Number)
+  return { start: new CalendarDate(start[0], start[1], start[2]), end: new CalendarDate(end[0], end[1], end[2]) }
+}
+
 function periodToRange(period: PeriodKey): { start: CalendarDate; end: CalendarDate } {
   const now = new Date()
   const end = today()
+  if (period === 'week' && props.rollingWeek) {
+    const [year, month, day] = reportToday().split('-').map(Number)
+    const current = new Date(year, month - 1, day)
+    const start = new Date(current)
+    start.setDate(start.getDate() - 6)
+    return { start: calFrom(start), end: calFrom(current) }
+  }
   if (period === 'week') {
     const monday = new Date(now)
     const offset = (now.getDay() + 6) % 7

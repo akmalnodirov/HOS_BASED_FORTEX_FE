@@ -49,7 +49,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="role in roles" :key="role.id" :value="role.id">
-                {{ role.name }}
+                {{ role.name }}<span v-if="role.clientName" class="text-muted-foreground"> · {{ role.clientName }}</span>
               </SelectItem>
             </SelectContent>
           </Select>
@@ -60,17 +60,17 @@
         </div>
 
         <div class="space-y-2">
-          <Label>Companies</Label>
+          <Label>Route ELD companies (optional)</Label>
           <CIftaMultiSelect
             v-model="form.companyIds"
             :options="companyOptions"
-            placeholder="Select companies"
+            placeholder="No Route ELD companies"
             search-placeholder="Search companies"
             searchable
             show-chips
             show-select-all
           />
-          <p v-if="errors.companyIds" class="text-xs text-destructive">{{ errors.companyIds }}</p>
+          <p class="text-xs text-muted-foreground">Leave empty for Board-only access.</p>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
@@ -106,8 +106,9 @@ const props = withDefaults(
     roles?: Role[]
     companies?: DispatcherCompany[]
     isLoadingRoles?: boolean
+    saving?: boolean
   }>(),
-  { user: null, roles: () => [], companies: () => [], isLoadingRoles: false }
+  { user: null, roles: () => [], companies: () => [], isLoadingRoles: false, saving: false }
 )
 const emit = defineEmits<{
   (event: 'close'): void
@@ -124,7 +125,7 @@ const blank = (): UserFormData => ({
 })
 const form = reactive<UserFormData>(blank())
 const errors = ref<Partial<Record<keyof UserFormData, string>>>({})
-const saving = ref(false)
+const saving = computed(() => props.saving)
 const isEditMode = computed(() => Boolean(props.user))
 const companyOptions = computed(() => props.companies.map((item) => ({ value: item.id, label: item.name })))
 const selectedRole = computed(() => props.roles.find((role) => role.id === form.roleId))
@@ -159,19 +160,13 @@ function validate() {
   if (form.password && form.password.length < 6) next.password = 'Use at least 6 characters.'
   if (form.password !== form.confirmPassword) next.confirmPassword = 'Passwords do not match.'
   if (!form.roleId) next.roleId = 'Role is required.'
-  if (!form.companyIds.length) next.companyIds = 'Select at least one company.'
   errors.value = next
   return Object.keys(next).length === 0
 }
 
 async function handleSubmit() {
-  if (!validate()) return
-  saving.value = true
-  try {
-    emit('save', { ...form, companyIds: [...form.companyIds] })
-  } finally {
-    saving.value = false
-  }
+  if (saving.value || !validate()) return
+  emit('save', { ...form, companyIds: [...form.companyIds] })
 }
 
 function handleClose() {

@@ -23,27 +23,17 @@
           </div>
         </div>
         <div
-          v-if="hasCoordinates && apiKey"
+          v-if="hasCoordinates"
           class="relative mt-2 h-72 overflow-hidden rounded-md border border-border"
         >
           <div class="absolute right-3 top-3 z-10">
-            <CMapTypeControl v-model="mapType" :get-map="getMap" />
+            <CMapTypeControl />
           </div>
-          <GoogleMap
-            ref="mapRef"
-            :api-key="apiKey"
-            :center="mapCenter"
-            :zoom="12"
-            :styles="mapStyles"
-            :map-type-id="mapType"
-            :disable-default-ui="true"
-            :zoom-control="true"
-            class="h-full w-full"
-            @ready="fitMarkers"
-          >
-            <CustomMarker
+          <CMap ref="mapRef" :center="mapCenter" :zoom="12" @ready="fitMarkers">
+            <CMapMarker
               v-if="driverPosition"
-              :options="{ position: driverPosition, anchorPoint: 'CENTER' }"
+              :position="driverPosition"
+              :z-index="showDriverInfo ? 2 : 1"
             >
               <div class="relative">
                 <button
@@ -62,10 +52,11 @@
                   @close="showDriverInfo = false"
                 />
               </div>
-            </CustomMarker>
-            <CustomMarker
+            </CMapMarker>
+            <CMapMarker
               v-if="targetPosition"
-              :options="{ position: targetPosition, anchorPoint: 'CENTER' }"
+              :position="targetPosition"
+              :z-index="showTargetInfo ? 2 : 1"
             >
               <div class="relative">
                 <button
@@ -84,12 +75,11 @@
                   @close="showTargetInfo = false"
                 />
               </div>
-            </CustomMarker>
-          </GoogleMap>
+            </CMapMarker>
+          </CMap>
         </div>
         <p v-else class="text-xs text-muted-foreground">
-          Map unavailable:
-          {{ !apiKey ? 'Google Maps key is not configured.' : 'Coordinates were not provided.' }}
+          Map unavailable: Coordinates were not provided.
         </p>
         <div class="flex justify-end">
           <Button variant="outline" @click="emit('close')">Close</Button>
@@ -101,23 +91,23 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { CustomMarker, GoogleMap } from 'vue3-google-map'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { MapPin, Truck } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import CMapTypeControl, { type MapType } from '@/components/custom/CMapTypeControl.vue'
+import CMap from '@/components/custom/CMap.vue'
+import CMapMarker from '@/components/custom/CMapMarker.vue'
+import CMapTypeControl from '@/components/custom/CMapTypeControl.vue'
 import CMapMarkerInfo from '@/components/custom/CMapMarkerInfo.vue'
-import { mapMarkerInfoPadding, mapStyles } from '@/utils/maps'
+import { mapMarkerInfoPadding, positionsBounds } from '@/utils/maps'
 import type { NotificationItem } from '../types'
 
 const props = defineProps<{ notification: NotificationItem | null }>()
 const emit = defineEmits<{ (event: 'close'): void }>()
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-const mapRef = ref<any>(null)
-const mapType = ref<MapType>('roadmap')
+const mapRef = ref<InstanceType<typeof CMap> | null>(null)
 const showDriverInfo = ref(true)
 const showTargetInfo = ref(true)
-const getMap = () => mapRef.value?.map ?? null
+const getMap = () => mapRef.value?.getMap() ?? null
 const driverPosition = computed(() =>
   props.notification?.latitude != null && props.notification?.longitude != null
     ? { lat: props.notification.latitude, lng: props.notification.longitude }
@@ -157,25 +147,21 @@ watch(
     void nextTick(() => fitMarkers())
   }
 )
-function fitMarkers(instance?: any) {
-  const map = instance?.map ?? instance ?? getMap()
-  const googleMaps = (window as any).google?.maps
-  if (!map || !googleMaps || !hasCoordinates.value) return
+function fitMarkers(instance?: MapLibreMap) {
+  const map = instance ?? getMap()
+  if (!map || !hasCoordinates.value) return
   if (
     !driverPosition.value ||
     !targetPosition.value ||
     (driverPosition.value.lat === targetPosition.value.lat &&
       driverPosition.value.lng === targetPosition.value.lng)
   ) {
-    map.setCenter(mapCenter.value)
-    map.setZoom(12)
-    map.panBy?.(0, -75)
+    map.jumpTo({ center: mapCenter.value, zoom: 12 })
+    map.panBy([0, -75], { duration: 0 })
     return
   }
-  const bounds = new googleMaps.LatLngBounds()
-  bounds.extend(driverPosition.value)
-  bounds.extend(targetPosition.value)
-  map.fitBounds(bounds, mapMarkerInfoPadding(map))
+  const bounds = positionsBounds([driverPosition.value, targetPosition.value])
+  if (bounds) map.fitBounds(bounds, { padding: mapMarkerInfoPadding(map), duration: 0 })
 }
 const fields = computed(() => {
   const item = props.notification
