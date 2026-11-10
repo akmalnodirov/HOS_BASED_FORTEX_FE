@@ -371,3 +371,31 @@ test('a rejected message is not offered again, and a missing chat is replaced on
   assert.equal(await store.send('Hello', focus), false)
   assert.equal(store.conversationId, null)
 })
+
+test('reloading the same chat lets a correction applied meanwhile refresh the draft', async () => {
+  globalThis.assistantTestApi.get = async () => ({ data: { ...conversation(), items: [applied('old')] } })
+  await store.load()
+  assert.deepEqual(store.takeNewlyApplied(), [])
+  globalThis.assistantTestApi.get = async () => ({
+    data: { ...conversation(), items: [applied('old'), applied('lost-answer')] },
+  })
+  await store.load()
+  assert.deepEqual(store.takeNewlyApplied().map((correction) => correction.id), ['lost-answer'])
+})
+
+test('a new chat that overtakes a reload never leaves the chat loading', async () => {
+  globalThis.assistantTestApi.get = async () => ({ data: conversation() })
+  await store.load()
+  let answer
+  globalThis.assistantTestApi.get = () => new Promise((resolve) => (answer = resolve))
+  const reload = store.load()
+  assert.equal(store.isLoading, true)
+  assert.equal(await store.newChat(), false, 'no new chat while the chat reloads')
+  globalThis.assistantTestApi.post = async () => ({ data: conversation('conversation-2') })
+  store.isLoading = false
+  assert.equal(await store.newChat(), true)
+  answer({ data: conversation() })
+  await reload
+  assert.equal(store.isLoading, false)
+  assert.equal(store.conversationId, 'conversation-2')
+})

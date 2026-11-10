@@ -156,6 +156,9 @@ export const useAssistantStore = defineStore('assistant', () => {
   }
 
   function show(conversation: AssistantConversation | null) {
+    // Reloading the same chat lets corrections applied meanwhile (a lost decision answer, another tab) refresh the
+    // draft; a different chat starts with its history marked as handled.
+    const sameChat = Boolean(conversation && conversation.id === conversationId.value)
     stopPolling()
     conversationVersion += 1
     conversationId.value = conversation?.id ?? null
@@ -167,7 +170,9 @@ export const useAssistantStore = defineStore('assistant', () => {
       applyTurn(conversation.openTurn, false)
       if (isActiveStatus(conversation.openTurn.status)) startPolling(conversation.openTurn)
     }
-    for (const correction of appliedCorrections.value) handledCorrections.add(correction.id)
+    if (!sameChat) {
+      for (const correction of appliedCorrections.value) handledCorrections.add(correction.id)
+    }
   }
 
   /** Corrections applied since the chat was shown, each returned once. */
@@ -355,7 +360,9 @@ export const useAssistantStore = defineStore('assistant', () => {
     if (!conversation?.id) throw new Error('Empty conversation response')
     // A reset (another user signed in) or another chat shown meanwhile wins over this late answer.
     if (version !== conversationVersion) throw new StaleResponse()
+    // Supersedes a chat reload in flight, which then must not leave the chat marked as loading.
     loadSequence += 1
+    isLoading.value = false
     show(conversation)
     isLoaded.value = true
     return conversation.id
@@ -487,14 +494,14 @@ export const useAssistantStore = defineStore('assistant', () => {
 
   /** Starts a new chat; the server reuses the current one while it has no message yet. */
   async function newChat() {
-    if (isSending.value || isDeciding.value) return false
+    if (isSending.value || isDeciding.value || isLoading.value) return false
     error.value = null
     resendText.value = null
     try {
       await createConversation()
       return true
     } catch (err) {
-      setError(errorText(err, 'Could not start a new chat.'))
+      if (!(err instanceof StaleResponse)) setError(errorText(err, 'Could not start a new chat.'))
       return false
     }
   }

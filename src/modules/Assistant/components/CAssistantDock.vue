@@ -17,7 +17,7 @@
             variant="ghost"
             size="sm"
             class="h-7 text-xs"
-            :disabled="assistant.isSending || assistant.isDeciding"
+            :disabled="assistant.isSending || assistant.isDeciding || assistant.isLoading"
             @click="assistant.newChat()"
           >
             New chat
