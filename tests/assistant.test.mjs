@@ -460,7 +460,7 @@ const startedItem = (id) => ({
     summary: 'Submit',
     decision: 2,
     outcome: 1,
-    operation: { id: 'operation-1', sessionId: 'session-1', type: 'SUBMIT' },
+    operation: { id: 'operation-1', sessionId: 'session-1', operationType: 'SUBMIT' },
   },
 })
 
@@ -471,7 +471,7 @@ test('a submit the assistant started is followed once; history never starts foll
   store.conversationId = 'conversation-1'
   globalThis.assistantTestApi.post = async () => ({ data: turn({ items: [startedItem('new')] }) })
   assert.equal(await store.send('Yes, submit it', focus), true)
-  assert.deepEqual(store.takeStartedOperations(), [{ id: 'operation-1', sessionId: 'session-1', type: 'SUBMIT' }])
+  assert.deepEqual(store.takeStartedOperations(), [{ id: 'operation-1', sessionId: 'session-1', operationType: 'SUBMIT' }])
   assert.deepEqual(store.takeStartedOperations(), [])
 })
 

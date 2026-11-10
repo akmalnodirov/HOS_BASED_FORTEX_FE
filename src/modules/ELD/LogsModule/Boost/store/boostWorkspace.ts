@@ -741,6 +741,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     assertCanMutate()
     if (activeOperation.value) throw new Error('Wait for the running session operation to finish.')
     const sessionId = session.value.id
+    const driverId = session.value.driverId
+    const originalTabId = activeTabId.value
     const url =
       type === 'rollback'
         ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(sessionId)
@@ -760,7 +762,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     } finally {
       isMutating.value = false
     }
-    return followOperation(sessionId, type, operation, onProgress)
+    return followOperation(sessionId, driverId, originalTabId, type, operation, onProgress)
   }
 
   /**
@@ -774,6 +776,8 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     onProgress?: (operation: RouteEldSessionOperation) => void
   ) {
     if (activeOperation.value || session.value?.id !== sessionId) return null
+    const driverId = session.value.driverId
+    const originalTabId = activeTabId.value
     const operation = unwrap(
       (
         await api.get<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(
@@ -783,18 +787,18 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
       ).data
     )
     if (activeOperation.value || session.value?.id !== sessionId) return null
-    return followOperation(sessionId, type, operation, onProgress)
+    return followOperation(sessionId, driverId, originalTabId, type, operation, onProgress)
   }
 
   async function followOperation(
     sessionId: string,
+    driverId: string,
+    originalTabId: string | null,
     type: 'submit' | 'rollback',
     started: RouteEldSessionOperation,
     onProgress?: (operation: RouteEldSessionOperation) => void
   ) {
     let operation = started
-    const driverId = session.value?.driverId ?? ''
-    const originalTabId = activeTabId.value
     activeOperation.value = { sessionId, type, operation }
     onProgress?.(operation)
     const isCurrentSession = () => session.value?.id === sessionId
@@ -833,7 +837,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         await loadSession(sessionId, targetTab?.id)
         refreshed = true
       }
-      if (driverId) void fetchSessions(driverId).catch(() => {})
+      void fetchSessions(driverId).catch(() => {})
       return operation
     } catch (error) {
       if (!refreshed && isCurrentSession()) {
