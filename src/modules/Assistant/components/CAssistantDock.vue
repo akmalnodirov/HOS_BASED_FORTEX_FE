@@ -111,6 +111,19 @@ watch(
   }
 )
 
+// A card whose changes sit on a preview tab of the open draft shows that tab once, so the page shows the changes
+// (and the base tab's stale "editable" state is replaced) while the user decides.
+const shownPreviews = new Set<string>()
+watch(
+  () => assistant.confirmation,
+  (card) => {
+    const navigation = card?.navigation
+    if (!card || !navigation || shownPreviews.has(card.id) || !draftTab.isOpen(navigation)) return
+    shownPreviews.add(card.id)
+    void draftTab.reload(navigation)
+  }
+)
+
 // Opening the dock shows what changed meanwhile (another tab, a lost answer).
 watch(
   () => assistant.isOpen,
