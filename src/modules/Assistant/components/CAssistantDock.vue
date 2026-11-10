@@ -58,6 +58,7 @@ import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { navigationRoute } from '../utils/focus'
 import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
+import { useAssistantDraftTab } from '../composables/useAssistantDraftTab'
 
 const assistant = useAssistantStore()
 const auth = useAuthStore()
@@ -65,6 +66,7 @@ const focus = useAssistantFocus()
 const route = useRoute()
 const router = useRouter()
 const refreshWorkspace = useAssistantWorkspaceRefresh()
+const draftTab = useAssistantDraftTab()
 
 // The AI page shows the same chat inline, so the floating one stays out of the way there.
 const isAiPage = computed(() => route.name === 'ELDAi')
@@ -97,6 +99,15 @@ watch(
       )
         void refreshWorkspace({ sessionId, tabId })
     }
+  }
+)
+
+// A decided card that named a draft tab (shift, normalize, a kept or deleted optimize preview) reloads that draft
+// once when it is open, on that tab or on the latest tab when the preview is gone.
+watch(
+  () => assistant.items,
+  () => {
+    for (const navigation of assistant.takeDecidedDrafts()) void draftTab.reload(navigation)
   }
 )
 

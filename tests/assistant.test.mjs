@@ -399,3 +399,53 @@ test('a new chat that overtakes a reload never leaves the chat loading', async (
   assert.equal(store.isLoading, false)
   assert.equal(store.conversationId, 'conversation-2')
 })
+
+const previewTab = { driverId: 'driver-1', sessionId: 'session-1', tabId: 'tab-preview', fromDate: '2026-10-01', toDate: '2026-10-07' }
+const decided = (id, decision) => ({
+  id,
+  kind: 3,
+  text: null,
+  createdAt: '',
+  action: { toolName: 'prepare_optimize', summary: 'Optimize preview', decision, outcome: 1, navigation: previewTab },
+})
+
+test('a decided card that named a draft tab reloads that draft once; history never does', async () => {
+  globalThis.assistantTestApi.get = async () => ({ data: { ...conversation(), items: [decided('old', 2)] } })
+  await store.load()
+  assert.deepEqual(store.takeDecidedDrafts(), [])
+  store.conversationId = 'conversation-1'
+  globalThis.assistantTestApi.post = async () => ({ data: turn({ items: [decided('declined', 3)] }) })
+  assert.equal(await store.send('Decline it', focus), true)
+  assert.deepEqual(store.takeDecidedDrafts(), [previewTab])
+  assert.deepEqual(store.takeDecidedDrafts(), [])
+})
+
+test('the latest working tab is the one with the highest position', async () => {
+  const { latestWorkingTabId } = await import('../src/modules/Assistant/composables/useAssistantDraftTab.ts')
+  assert.equal(
+    latestWorkingTabId([
+      { id: 'initial', kind: 'INITIAL', position: 0 },
+      { id: 'w2', kind: 'WORKING', position: 2 },
+      { id: 'w1', kind: 'WORKING', position: 1 },
+    ]),
+    'w2'
+  )
+  assert.equal(latestWorkingTabId([{ id: 'initial', kind: 'INITIAL', position: 0 }]), null)
+})
+
+test('an optimize card on the open draft can be applied from its base tab and offers to show the preview tab', async () => {
+  const html = await renderChat('/logs/driver-1/ai', () => {
+    useBoostWorkspaceStore().session = session
+    useBoostWorkspaceStore().activeTabId = 'tab-1'
+    const assistant = useAssistantStore()
+    assistant.isLoaded = true
+    assistant.activeTurn = turn({
+      status: 'AWAITING_CONFIRMATION',
+      confirmation: card({ toolName: 'prepare_optimize', navigation: previewTab }),
+      focus: { ...previewTab, tabId: 'tab-1', page: 'ai', companyId: null, driverName: 'Sam Roe', selectedEventId: null },
+    })
+  })
+  assert.match(html, /The changes are on a preview tab of this draft/)
+  assert.match(html, />(?:\s|<!--[^>]*-->)*Show the preview tab(?:\s|<!--[^>]*-->)*</)
+  assert.doesNotMatch(html, /belongs to/)
+})

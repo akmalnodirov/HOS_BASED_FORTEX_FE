@@ -42,6 +42,24 @@
         @decide="decide"
       />
       <div
+        v-if="
+          assistant.confirmation?.navigation &&
+          cardMatchesPage &&
+          !isShowing(assistant.confirmation.navigation)
+        "
+        class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+      >
+        <span>The changes are on a preview tab of this draft.</span>
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 text-xs"
+          @click="open(assistant.confirmation.navigation)"
+        >
+          Show the preview tab
+        </Button>
+      </div>
+      <div
         v-if="assistant.confirmation && !cardMatchesPage"
         role="status"
         class="flex flex-wrap items-center gap-2 text-xs text-amber-600"
@@ -137,7 +155,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onActivated, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -146,17 +163,17 @@ import CRouteEldAssistantMessage from '@/modules/ELD/LogsModule/Boost/components
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
-import { navigationRoute } from '../utils/focus'
+import { useAssistantDraftTab } from '../composables/useAssistantDraftTab'
 import { AssistantItemKind, type AssistantNavigation } from '../types'
 
 const MAX_LENGTH = 2000
 // Each chip fills the input with an editable request; it never sends on its own.
 const CHIPS = [
-  { label: 'New shift', text: 'Plan a new shift starting at ' },
-  { label: 'New break', text: 'Add a 30-minute break to fix the break violation' },
-  { label: 'Optimize', text: 'Suggest options to fix the violations in this draft' },
-  { label: 'Add PTI', text: 'Add a pre-trip inspection (on duty) at ' },
-  { label: 'Adjust hours', text: 'Adjust the driving hours so the 11-hour limit is not exceeded' },
+  { label: 'New shift', text: 'Open a new shift at ' },
+  { label: 'New break', text: 'Repair the break violations in this draft' },
+  { label: 'Optimize', text: 'Optimize this draft: normalize it and repair the violations' },
+  { label: 'Add PTI', text: 'Add the missing pre-trip inspections' },
+  { label: 'Adjust hours', text: 'Adjust the hours of the latest shift' },
 ] as const
 
 const props = withDefaults(defineProps<{ canApply?: boolean }>(), { canApply: false })
@@ -164,7 +181,7 @@ const props = withDefaults(defineProps<{ canApply?: boolean }>(), { canApply: fa
 const assistant = useAssistantStore()
 const auth = useAuthStore()
 const focus = useAssistantFocus()
-const router = useRouter()
+const draftTab = useAssistantDraftTab()
 const draft = ref('')
 const listRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -191,8 +208,10 @@ const canRetry = computed(
     !assistant.isSending && !assistant.isDeciding && !assistant.isLoading && !assistant.isProcessing
 )
 
-// The draft a card changes: its correction preview's, else the draft the turn worked on.
+// The draft a card changes: the tab it names (an optimize preview), its correction preview's, else the turn's draft.
 const cardTarget = computed(() => {
+  const named = assistant.confirmation?.navigation
+  if (named) return { sessionId: named.sessionId, tabId: null }
   const preview = assistant.confirmation?.correction
   if (preview) return { sessionId: preview.sessionId, tabId: preview.tabId }
   const turnFocus = assistant.activeTurn?.focus
@@ -208,6 +227,7 @@ const cardMatchesPage = computed(() => {
 })
 const cardDriverName = computed(() => assistant.activeTurn?.focus?.driverName ?? null)
 const cardNavigation = computed<AssistantNavigation | null>(() => {
+  if (assistant.confirmation?.navigation) return assistant.confirmation.navigation
   const turnFocus = assistant.activeTurn?.focus
   const target = cardTarget.value
   if (!turnFocus?.driverId || !turnFocus.fromDate || !turnFocus.toDate || !target?.tabId)
@@ -236,7 +256,7 @@ function isShowing(navigation: AssistantNavigation) {
 }
 
 function open(navigation: AssistantNavigation) {
-  void router.push(navigationRoute(navigation))
+  void draftTab.show(navigation)
 }
 
 function fill(text: string) {
