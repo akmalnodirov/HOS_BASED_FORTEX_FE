@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { computed, onActivated, ref, watch } from 'vue'
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
-import { useRouteEldAssistantStore } from '@/modules/ELD/LogsModule/Boost/store/routeEldAssistant'
+import { useAssistantStore } from '@/modules/Assistant/store/assistant'
 import type { RouteEldRepairOption } from '@/modules/ELD/LogsModule/Boost/types/boost'
 import { latestRepairOptions } from '../utils/aiOptions'
 import CAiOptionCard from './CAiOptionCard.vue'
@@ -49,7 +49,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'use', message: string): void }>()
 
-const assistant = useRouteEldAssistantStore()
+const assistant = useAssistantStore()
 const workspace = useBoostWorkspaceStore()
 const liveOptions = ref(new Map<string, RouteEldRepairOption>())
 const loadError = ref<string | null>(null)

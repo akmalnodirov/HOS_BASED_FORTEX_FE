@@ -4,9 +4,10 @@ import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { createPinia, setActivePinia } from 'pinia'
 import Message from '../src/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantMessage.vue'
-import ChatPanel from '../src/modules/ELD/LogsModule/Ai/components/CAiChatPanel.vue'
+import ChatPanel from '../src/modules/Assistant/components/CAssistantChat.vue'
 import DraftTabs from '../src/modules/ELD/LogsModule/Ai/components/CAiDraftTabs.vue'
 import { useBoostWorkspaceStore } from '../src/modules/ELD/LogsModule/Boost/store/boostWorkspace.ts'
+import { createAssistantRouter } from './assistant-router.mjs'
 
 let pinia
 
@@ -26,9 +27,10 @@ const deleteButton = (html) => {
   return tag
 }
 
-const render = (component, props) => {
+const render = async (component, props) => {
   const app = createSSRApp({ render: () => h(component, props) })
   app.use(pinia)
+  app.use(await createAssistantRouter('/logs/driver-1/ai'))
   return renderToString(app)
 }
 
@@ -41,7 +43,7 @@ test('a "Use this option" message shows without its apply marker', async () => {
 })
 
 test('the chat panel offers the five quick requests and no voice input', async () => {
-  const html = await render(ChatPanel, { sessionId: 's1', tabId: 't1', canApply: true })
+  const html = await render(ChatPanel, { canApply: true })
   for (const chip of ['New shift', 'New break', 'Optimize', 'Add PTI', 'Adjust hours'])
     assert.match(html, new RegExp(`>\\s*${chip}\\s*<`))
   assert.doesNotMatch(html, /aria-label="Voice|mic/i)

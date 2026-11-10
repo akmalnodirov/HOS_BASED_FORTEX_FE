@@ -27,6 +27,7 @@
         <router-view />
       </div>
     </main>
+    <CAssistantDock v-if="canUseAssistant" />
   </div>
 </template>
 
@@ -36,8 +37,13 @@ import { useRoute } from 'vue-router'
 import AppSidebar from '@/layouts/Default/components/AppSidebar.vue'
 import AppHeader from '@/layouts/Default/components/AppHeader.vue'
 import CToggle from '@/layouts/Default/components/CToggle.vue'
+import CAssistantDock from '@/modules/Assistant/components/CAssistantDock.vue'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
 
 const route = useRoute()
+const authStore = useAuthStore()
+const canUseAssistant = computed(() => hasPermission(authStore.token, 'route_eld.log_details.assistant'))
 const isBoardPage = computed(() => ['/report/tasks', '/report/activity', '/report/checker', '/report/assistant'].includes(route.path))
 const isAuditPage = computed(() => route.path === '/tools/audit' || route.path.startsWith('/tools/audit/'))
 const isViewportPage = computed(() => isBoardPage.value || isAuditPage.value)
