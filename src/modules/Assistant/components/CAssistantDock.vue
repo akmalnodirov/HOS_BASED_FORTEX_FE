@@ -59,6 +59,8 @@ import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { navigationRoute } from '../utils/focus'
 import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 import { useAssistantDraftTab } from '../composables/useAssistantDraftTab'
+import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
+import { toast } from 'vue-sonner'
 
 const assistant = useAssistantStore()
 const auth = useAuthStore()
@@ -67,6 +69,7 @@ const route = useRoute()
 const router = useRouter()
 const refreshWorkspace = useAssistantWorkspaceRefresh()
 const draftTab = useAssistantDraftTab()
+const workspace = useBoostWorkspaceStore()
 
 // The AI page shows the same chat inline, so the floating one stays out of the way there.
 const isAiPage = computed(() => route.name === 'ELDAi')
@@ -123,6 +126,24 @@ watch(
     if (navigation.tabId.toLowerCase() === focus.value.tabId?.toLowerCase()) return
     shownPreviews.add(card.id)
     void draftTab.reload(navigation)
+  }
+)
+
+// A submit or rollback the assistant started on the open log shows its progress and result tab, as the Boost buttons do.
+watch(
+  () => assistant.items,
+  () => {
+    for (const operation of assistant.takeStartedOperations()) {
+      if (workspace.session?.id.toLowerCase() !== operation.sessionId.toLowerCase()) continue
+      const type = operation.type === 'ROLLBACK' ? 'rollback' : 'submit'
+      workspace
+        .followSessionOperation(workspace.session.id, type, operation.id)
+        .catch((error: unknown) => {
+          toast.error(
+            error instanceof Error && error.message ? error.message : `The ${type} did not finish.`
+          )
+        })
+    }
   }
 )
 

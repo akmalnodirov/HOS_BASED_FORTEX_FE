@@ -741,8 +741,6 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     assertCanMutate()
     if (activeOperation.value) throw new Error('Wait for the running session operation to finish.')
     const sessionId = session.value.id
-    const driverId = session.value.driverId
-    const originalTabId = activeTabId.value
     const url =
       type === 'rollback'
         ? ApiEndpoints.ROUTE_ELD_EVENT_SESSION_START_ROLLBACK(sessionId)
@@ -762,6 +760,41 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     } finally {
       isMutating.value = false
     }
+    return followOperation(sessionId, type, operation, onProgress)
+  }
+
+  /**
+   * Follows a session operation someone else started (the assistant's submit or rollback card) on the open session,
+   * exactly as the Boost buttons follow their own: progress, then the result tab. Null when another one is followed.
+   */
+  async function followSessionOperation(
+    sessionId: string,
+    type: 'submit' | 'rollback',
+    operationId: string,
+    onProgress?: (operation: RouteEldSessionOperation) => void
+  ) {
+    if (activeOperation.value || session.value?.id !== sessionId) return null
+    const operation = unwrap(
+      (
+        await api.get<RouteEldSessionOperation | ApiEnvelope<RouteEldSessionOperation>>(
+          ApiEndpoints.ROUTE_ELD_EVENT_SESSION_OPERATION(sessionId, operationId),
+          { _skipErrorHandling: true }
+        )
+      ).data
+    )
+    if (activeOperation.value || session.value?.id !== sessionId) return null
+    return followOperation(sessionId, type, operation, onProgress)
+  }
+
+  async function followOperation(
+    sessionId: string,
+    type: 'submit' | 'rollback',
+    started: RouteEldSessionOperation,
+    onProgress?: (operation: RouteEldSessionOperation) => void
+  ) {
+    let operation = started
+    const driverId = session.value?.driverId ?? ''
+    const originalTabId = activeTabId.value
     activeOperation.value = { sessionId, type, operation }
     onProgress?.(operation)
     const isCurrentSession = () => session.value?.id === sessionId
@@ -800,7 +833,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         await loadSession(sessionId, targetTab?.id)
         refreshed = true
       }
-      void fetchSessions(driverId).catch(() => {})
+      if (driverId) void fetchSessions(driverId).catch(() => {})
       return operation
     } catch (error) {
       if (!refreshed && isCurrentSession()) {
@@ -831,7 +864,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
         null
       )
       await loadSession(sessionId, tabId)
-      void fetchSessions(driverId).catch(() => {})
+      if (driverId) void fetchSessions(driverId).catch(() => {})
       return tabKind
     } finally {
       isMutating.value = false
@@ -916,6 +949,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     normalize,
     submitOrRollback,
     activeOperation,
+    followSessionOperation,
     isSessionLocked,
     isBusy,
     runSessionOperation,
