@@ -41,9 +41,17 @@ export interface AssistantNavigation {
   toDate: string
 }
 
+/** A submit or rollback an approved card started; the app follows it like the Boost buttons do. */
+export interface AssistantSessionOperation {
+  id: string
+  sessionId: string
+  operationType: 'SUBMIT' | 'ROLLBACK'
+}
+
 /** An action item; navigation is the draft tab the action concerned (an optimize preview tab, for example). */
 export interface AssistantAction extends RouteEldAssistantAction {
   navigation?: AssistantNavigation | null
+  operation?: AssistantSessionOperation | null
 }
 
 export interface AssistantItem extends Omit<RouteEldAssistantItem, 'action'> {

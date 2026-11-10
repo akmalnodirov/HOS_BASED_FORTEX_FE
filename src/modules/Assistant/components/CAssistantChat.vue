@@ -86,6 +86,10 @@
         You do not have the permission to apply this change. You can still decline it.
       </p>
 
+      <p v-if="operationStatus" role="status" class="text-sm text-muted-foreground animate-pulse">
+        {{ operationStatus }}
+      </p>
+
       <div v-if="assistant.isProcessing" class="text-sm text-muted-foreground animate-pulse">
         Thinking…
       </div>
@@ -164,6 +168,7 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { useAssistantDraftTab } from '../composables/useAssistantDraftTab'
+import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
 import { AssistantItemKind, type AssistantNavigation } from '../types'
 
 const MAX_LENGTH = 2000
@@ -182,6 +187,7 @@ const assistant = useAssistantStore()
 const auth = useAuthStore()
 const focus = useAssistantFocus()
 const draftTab = useAssistantDraftTab()
+const workspace = useBoostWorkspaceStore()
 const draft = ref('')
 const listRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -202,6 +208,14 @@ const emptyHint = computed(() =>
       : 'Ask about a driver’s logs. Name the driver and the dates, and the AI finds or opens the draft.'
 )
 const canSend = computed(() => !assistant.isBusy)
+// A submit or rollback running on the log in focus, whoever started it.
+const operationStatus = computed(() => {
+  const active = workspace.activeOperation
+  if (!active || !sameId(active.sessionId, focus.value.sessionId)) return null
+  const label = active.type === 'rollback' ? 'Rolling back' : 'Submitting'
+  const { completed, total } = active.operation
+  return total ? `${label} the log… ${completed} of ${total}` : `${label} the log…`
+})
 // Retry also recovers a card left behind by a lost decision answer: it resends the message or reloads the chat.
 const canRetry = computed(
   () =>

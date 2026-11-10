@@ -133,6 +133,8 @@ export const useAssistantStore = defineStore('assistant', () => {
   const handledCorrections = new Set<string>()
   // Decided actions that named a draft tab, handled the same way: each reloads that draft once.
   const handledDraftActions = new Set<string>()
+  // Submits and rollbacks the assistant started, each followed once.
+  const handledOperations = new Set<string>()
 
   const isBusy = computed(
     () => isSending.value || isLoading.value || isDeciding.value || activeTurn.value !== null
@@ -175,7 +177,21 @@ export const useAssistantStore = defineStore('assistant', () => {
     if (!sameChat) {
       for (const correction of appliedCorrections.value) handledCorrections.add(correction.id)
       for (const item of draftActions.value) handledDraftActions.add(item.id)
+      for (const item of operationActions.value) handledOperations.add(item.id)
     }
+  }
+
+  const operationActions = computed(() =>
+    items.value.filter(
+      (item) => item.kind === AssistantItemKind.Action && Boolean(item.action?.operation)
+    )
+  )
+
+  /** Submits and rollbacks started since the chat was shown, each returned once. */
+  function takeStartedOperations() {
+    const fresh = operationActions.value.filter((item) => !handledOperations.has(item.id))
+    for (const item of fresh) handledOperations.add(item.id)
+    return fresh.flatMap((item) => (item.action?.operation ? [item.action.operation] : []))
   }
 
   /** Decided actions that changed or discarded a draft tab, for example a kept or deleted optimize preview. */
@@ -344,6 +360,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     show(null)
     handledCorrections.clear()
     handledDraftActions.clear()
+    handledOperations.clear()
     pendingSend = null
     isLoaded.value = false
     isLoading.value = false
@@ -553,6 +570,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     refreshIfIdle,
     takeNewlyApplied,
     takeDecidedDrafts,
+    takeStartedOperations,
     send,
     decide,
     newChat,

@@ -449,3 +449,50 @@ test('an optimize card on the open draft can be applied from its base tab and of
   assert.match(html, />(?:\s|<!--[^>]*-->)*Show the preview tab(?:\s|<!--[^>]*-->)*</)
   assert.doesNotMatch(html, /belongs to/)
 })
+
+const startedItem = (id) => ({
+  id,
+  kind: 3,
+  text: null,
+  createdAt: '',
+  action: {
+    toolName: 'prepare_session_operation',
+    summary: 'Submit',
+    decision: 2,
+    outcome: 1,
+    operation: { id: 'operation-1', sessionId: 'session-1', operationType: 'SUBMIT' },
+  },
+})
+
+test('a submit the assistant started is followed once; history never starts following', async () => {
+  globalThis.assistantTestApi.get = async () => ({ data: { ...conversation(), items: [startedItem('old')] } })
+  await store.load()
+  assert.deepEqual(store.takeStartedOperations(), [])
+  store.conversationId = 'conversation-1'
+  globalThis.assistantTestApi.post = async () => ({ data: turn({ items: [startedItem('new')] }) })
+  assert.equal(await store.send('Yes, submit it', focus), true)
+  assert.deepEqual(store.takeStartedOperations(), [{ id: 'operation-1', sessionId: 'session-1', operationType: 'SUBMIT' }])
+  assert.deepEqual(store.takeStartedOperations(), [])
+})
+
+test('following a started submit on the open log shows its progress, and only on that log', async () => {
+  const workspace = useBoostWorkspaceStore()
+  workspace.session = { ...session, status: 'DRAFT', tabs: [{ id: 'tab-1', kind: 'WORKING', position: 1 }] }
+  workspace.activeTabId = 'tab-1'
+  const seen = []
+  globalThis.assistantTestApi.get = async (url) => {
+    if (url.endsWith('/operations/operation-1')) {
+      seen.push(workspace.activeOperation?.type ?? 'none')
+      return {
+        data: { id: 'operation-1', status: seen.length < 2 ? 'RUNNING' : 'COMPLETED', total: 2, completed: seen.length, succeeded: 2, failed: 0, failures: [] },
+      }
+    }
+    // Reloading the log afterwards is the Boost buttons' own path; it is not under test here.
+    throw new Error('reload')
+  }
+  assert.equal(await workspace.followSessionOperation('session-other', 'submit', 'operation-1'), null)
+  assert.deepEqual(seen, [], 'a submit on another log is not followed here')
+  await workspace.followSessionOperation('session-1', 'submit', 'operation-1').catch(() => null)
+  assert.deepEqual(seen, ['none', 'submit'], 'the operation is shown as running while it is polled')
+  assert.equal(workspace.activeOperation, null, 'nothing stays locked afterwards')
+})
