@@ -33,20 +33,29 @@ export interface EldAgentReply {
 }
 
 /**
- * The agent URL from VITE_APP_AI_AGENT_WS_URL, or null (agent hidden). Every message carries the user's Bearer
- * token, so only wss:// is accepted, except plain ws:// to this machine for local development.
+ * The agent URL from VITE_APP_AI_AGENT_WS_URL, or null (agent hidden). It is either a full ws(s) URL or a
+ * same-origin path such as `/ai-agent/`, which is served on the page's own host (wss on an https page).
+ * Every message carries the user's Bearer token, so only wss:// is accepted, except plain ws:// to this
+ * machine for local development.
  */
-export function eldAgentUrl(configured: unknown): string | null {
+export function eldAgentUrl(configured: unknown, pageUrl?: string): string | null {
   const value = String(configured ?? '').trim()
+  if (!value) return null
   let url: URL
   try {
-    url = new URL(value)
+    if (value.startsWith('/') && !value.startsWith('//')) {
+      const page = new URL(pageUrl ?? globalThis.location?.href ?? '')
+      url = new URL(value, page)
+      url.protocol = page.protocol === 'https:' ? 'wss:' : 'ws:'
+    } else {
+      url = new URL(value)
+    }
   } catch {
     return null
   }
-  if (url.protocol === 'wss:') return value
+  if (url.protocol === 'wss:') return url.href
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-  return url.protocol === 'ws:' && local ? value : null
+  return url.protocol === 'ws:' && local ? url.href : null
 }
 
 /** One chat message, in the shape the agent reads (it forwards `token` as the backend Bearer token). */
