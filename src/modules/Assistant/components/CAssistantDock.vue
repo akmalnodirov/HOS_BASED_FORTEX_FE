@@ -119,6 +119,8 @@ watch(
   (card) => {
     const navigation = card?.navigation
     if (!card || !navigation || shownPreviews.has(card.id) || !draftTab.isOpen(navigation)) return
+    // Only a card on another tab (an optimize preview) moves the page; a card on the shown tab changes nothing yet.
+    if (navigation.tabId.toLowerCase() === focus.value.tabId?.toLowerCase()) return
     shownPreviews.add(card.id)
     void draftTab.reload(navigation)
   }
