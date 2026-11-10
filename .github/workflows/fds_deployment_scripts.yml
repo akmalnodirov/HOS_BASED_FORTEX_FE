@@ -34,6 +34,10 @@ jobs:
             echo "::error::FRONTEND_ENV must contain VITE_APP_BASE_URL"
             exit 1
           fi
+          # The dispatcher agent is proxied by nginx on this tenant's own host; the secret may override it.
+          if ! grep -q '^VITE_APP_AI_AGENT_WS_URL=' .env.production; then
+            echo 'VITE_APP_AI_AGENT_WS_URL=/ai-agent/' >> .env.production
+          fi
           npm install
           npm run build
           test -f dist/index.html
