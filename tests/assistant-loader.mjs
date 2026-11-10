@@ -19,6 +19,9 @@ registerHooks({
     if (specifier === '@/components/ui/textarea')
       return { url: 'assistant-test:textarea', shortCircuit: true }
     if (specifier === 'vue-sonner') return { url: 'assistant-test:toast', shortCircuit: true }
+    // The real auth store imports the whole app router; tests only need its token and company.
+    if (specifier === '@/modules/Auth/store/authStore')
+      return { url: 'assistant-test:auth', shortCircuit: true }
     // The SVG log chart pulls dayjs plugins that Node cannot resolve; tests only need to know it renders.
     if (specifier === '@/modules/ELD/LogsModule/Boost/components/CBoostGraph.vue')
       return { url: 'assistant-test:graph', shortCircuit: true }
@@ -68,6 +71,17 @@ registerHooks({
         source: `
       import { defineComponent, h } from 'vue';
       export default defineComponent({ props: ['events', 'compact'], setup: (props) => () => h('div', { 'data-graph': props.compact ? 'compact' : 'full' }) });`,
+      }
+    if (url === 'assistant-test:auth')
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
+      import { defineStore } from 'pinia';
+      export const useAuthStore = defineStore('authStore', {
+        state: () => ({ token: null, company: null, user: null }),
+        getters: { companyId: (state) => state.company?.id || null },
+      });`,
       }
     if (url === 'assistant-test:textarea')
       return {

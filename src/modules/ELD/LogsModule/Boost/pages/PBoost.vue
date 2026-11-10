@@ -27,7 +27,7 @@
       @select-tab="selectTab"
       @remove-tab="removeTab"
       @ai-advice-click="aiAdviceOpen = true"
-      @assistant-click="assistantOpen = true"
+      @assistant-click="assistant.isOpen = true"
     />
     <div
       v-if="store.isSessionLocked && !sessionProgressOpen"
@@ -371,16 +371,6 @@
       :result="aiAdviceResult"
       @analyze="analyzeAiAdvice"
     />
-    <CRouteEldAssistantSheet
-      v-if="allowAssistant"
-      v-model:open="assistantOpen"
-      :session-id="session?.id ?? ''"
-      :tab-id="store.activeTabId ?? ''"
-      :driver-name="session?.driverName ?? ''"
-      :other-driver-selected="assistantOtherDriverSelected"
-      :can-apply="allowed('route_eld.log_details.boost')"
-      @applied="refreshAfterAssistantApplied"
-    />
     <CBoostNormalizeModal
       v-model:open="normalizeOpen"
       :loading="store.isMutating"
@@ -604,8 +594,7 @@ import CBoostEditEventModal from '../components/modals/CBoostEditEventModal.vue'
 import CBoostEditDailyFormModal from '../components/modals/CBoostEditDailyFormModal.vue'
 import CBoostMultiUpdateModal from '../components/modals/CBoostMultiUpdateModal.vue'
 import CBoostAiAdviceModal from '../components/modals/CBoostAiAdviceModal.vue'
-import CRouteEldAssistantSheet from '../components/assistant/CRouteEldAssistantSheet.vue'
-import { useAssistantWorkspaceRefresh } from '../composables/useAssistantWorkspaceRefresh'
+import { useAssistantStore } from '@/modules/Assistant/store/assistant'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
@@ -721,15 +710,8 @@ const showViolationModal = ref(false)
 const aiAdviceOpen = ref(false)
 const aiAdviceLoading = ref(false)
 const aiAdviceResult = ref<RouteEldAiAdvice | null>(null)
-const refreshAfterAssistantApplied = useAssistantWorkspaceRefresh()
-const assistantOpen = ref(false)
-const assistantOtherDriverSelected = computed(() =>
-  Boolean(
-    session.value?.driverId &&
-    activeDriverId.value &&
-    activeDriverId.value !== session.value.driverId
-  )
-)
+// The toolbar's assistant button opens the app-wide chat, which knows this draft from the page.
+const assistant = useAssistantStore()
 const normalizeOpen = ref(false)
 const normalizeResult = ref<RouteEldNormalizeResponse | null>(null)
 const certificationOpen = ref(false)
@@ -801,7 +783,6 @@ onMounted(enableStableScrollbar)
 onActivated(enableStableScrollbar)
 onDeactivated(() => {
   disableStableScrollbar()
-  assistantOpen.value = false
 })
 onBeforeUnmount(() => {
   disableStableScrollbar()

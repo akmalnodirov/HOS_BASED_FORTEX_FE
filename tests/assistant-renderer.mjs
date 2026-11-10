@@ -3,7 +3,7 @@ import { setImmediate } from 'node:timers'
 
 export function createAssistantRenderer() {
   const renderer = createRenderer({
-    createElement: (tag) => ({ tag, children: [], props: {} }),
+    createElement: (tag) => ({ tag, children: [], props: {}, addEventListener() {}, removeEventListener() {} }),
     createText: (text) => ({ text }),
     createComment: () => ({ text: '' }),
     insert(node, parent, anchor) {

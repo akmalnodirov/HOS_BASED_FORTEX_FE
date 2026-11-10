@@ -4,9 +4,10 @@ import { h } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAssistantWorkspaceRefresh } from '../src/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh.ts'
 import { useBoostWorkspaceStore } from '../src/modules/ELD/LogsModule/Boost/store/boostWorkspace.ts'
-import { useRouteEldAssistantStore } from '../src/modules/ELD/LogsModule/Boost/store/routeEldAssistant.ts'
-import Sheet from '../src/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantSheet.vue'
+import { useAssistantStore } from '../src/modules/Assistant/store/assistant.ts'
+import Chat from '../src/modules/Assistant/components/CAssistantChat.vue'
 import { createAssistantRenderer, flushAssistant } from './assistant-renderer.mjs'
+import { createAssistantRouter } from './assistant-router.mjs'
 
 let workspace
 let app
@@ -17,14 +18,14 @@ beforeEach(() => {
   globalThis.assistantTestApi = { get: async () => ({ data: [] }) }
   globalThis.assistantTestToasts = []
   workspace = useBoostWorkspaceStore()
-  workspace.session = { id: 'session-1' }
+  workspace.session = { id: 'session-1', driverId: 'driver-1', fromDate: '2026-10-01', toDate: '2026-10-07' }
   workspace.activeTabId = 'tab-A'
   workspace.workspace = snapshot()
 })
 afterEach(() => {
   app?.unmount()
   app = null
-  useRouteEldAssistantStore().stopPolling()
+  useAssistantStore().stopPolling()
 })
 
 test('PBoost refresh boundary ignores events for another session or tab', async () => {
@@ -39,8 +40,8 @@ test('PBoost refresh boundary ignores events for another session or tab', async 
   assert.equal(requests, 0)
 })
 
-test('mounted Sheet calls the real PBoost refresh boundary only once after an applied result', async () => {
-  const assistant = useRouteEldAssistantStore()
+test('the mounted chat refreshes the open draft only once after an applied result', async () => {
+  const assistant = useAssistantStore()
   const preview = {
     ...scope,
     repairId: 'repair-1',
@@ -56,7 +57,7 @@ test('mounted Sheet calls the real PBoost refresh boundary only once after an ap
   })
   let requests = 0
   globalThis.assistantTestApi.get = async (url) => {
-    if (url.endsWith('/assistant'))
+    if (url.endsWith('/assistant/conversations/current'))
       return { data: { id: 'conversation-1', items: [], openTurn: null } }
     if (url.endsWith('/events')) {
       requests += 1
@@ -65,10 +66,9 @@ test('mounted Sheet calls the real PBoost refresh boundary only once after an ap
     return { data: [] }
   }
   const host = createAssistantRenderer()
-  const refresh = useAssistantWorkspaceRefresh()
-  app = host.renderer.createApp({
-    render: () => h(Sheet, { ...scope, open: true, onApplied: refresh }),
-  })
+  const router = await createAssistantRouter('/logs/driver-1/ai')
+  app = host.renderer.createApp({ render: () => h(Chat, { canApply: true }) })
+  app.use(router)
   app.mount(host.root)
   await flushAssistant()
   for (const status of ['awaitingDriverAcceptance', 'failed', 'expired', 'declined']) {
@@ -105,7 +105,7 @@ test('a workspace refresh started for A cannot overwrite B after its network res
 })
 
 test('refresh failure preserves applied status and explains only the workspace refresh failed', async () => {
-  const assistant = useRouteEldAssistantStore()
+  const assistant = useAssistantStore()
   assistant.items = [
     {
       id: 'action-1',

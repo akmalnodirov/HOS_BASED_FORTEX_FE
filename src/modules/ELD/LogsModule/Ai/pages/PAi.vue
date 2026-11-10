@@ -11,26 +11,16 @@
         :violations="calculations?.violations ?? []"
         :event-issues="calculations?.eventIssues ?? []"
         :is-graph-loading="store.isLoading"
-        :selected-event-id="chatMode === 'agent' ? (agentEvent?.id ?? null) : null"
-        @selected-event="selectAgentEvent"
+        :selected-event-id="selectedEventId"
+        @selected-event="selectEvent"
       />
     </section>
 
-    <p
-      v-if="request && ready && chatMode === 'agent'"
-      role="status"
-      class="bg-background px-4 py-2 text-sm"
-    >
-      Your request will be sent to the Assistant when you switch back to it.
-    </p>
-    <p v-if="waitingRequest" role="status" class="bg-background px-4 py-2 text-sm">
-      Your request is saved. Open or create a draft for {{ waitingRequest.fromDate }} – {{ waitingRequest.toDate }} to send it.
-    </p>
-    <div v-if="!session" class="bg-background p-10 text-center text-sm text-muted-foreground">
-      Pick dates and create or open a draft to work with the AI.
-    </div>
-    <div v-else class="grid min-h-[560px] grid-cols-1 gap-2 xl:grid-cols-[7fr_3fr]">
-      <section class="flex min-h-0 flex-col bg-background">
+    <div class="grid min-h-[560px] grid-cols-1 gap-2 xl:grid-cols-[7fr_3fr]">
+      <div v-if="!session" class="bg-background p-10 text-center text-sm text-muted-foreground">
+        Pick dates and create or open a draft, or ask the AI to open one for you.
+      </div>
+      <section v-else class="flex min-h-0 flex-col bg-background">
         <CAiDraftTabs :can-manage-tabs="canManageTabs" />
         <div class="min-h-0 flex-1 overflow-y-auto">
           <p v-if="!canBoost" role="status" class="p-6 text-center text-sm text-muted-foreground">
@@ -49,8 +39,8 @@
           />
         </div>
       </section>
-      <div v-if="tabId" class="flex max-h-[720px] min-h-0 flex-col bg-background">
-        <div v-if="agentUrl" class="flex gap-1 border-b border-border px-4 py-2" role="tablist">
+      <div class="flex max-h-[720px] min-h-0 flex-col bg-background">
+        <div v-if="agentUrl && session && tabId" class="flex gap-1 border-b border-border px-4 py-2" role="tablist">
           <Button
             v-for="mode in CHAT_MODES"
             :key="mode.value"
@@ -67,7 +57,7 @@
           </Button>
         </div>
         <CAiAgentChatPanel
-          v-if="agentUrl && chatMode === 'agent'"
+          v-if="agentUrl && session && tabId && chatMode === 'agent'"
           class="min-h-0 flex-1"
           :url="agentUrl"
           :session-id="session.id"
@@ -81,12 +71,10 @@
           @clear-event="agentEvent = null"
           @busy="agentBusy = $event"
         />
-        <CAiChatPanel
+        <CAssistantChat
           v-else
           ref="chatRef"
           class="min-h-0 flex-1"
-          :session-id="session.id"
-          :tab-id="tabId"
           :can-apply="canBoost"
           @applied="onApplied"
         />
@@ -98,26 +86,24 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import CBoostGraph from '@/modules/ELD/LogsModule/Boost/components/CBoostGraph.vue'
-import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
 import { Button } from '@/components/ui/button'
 import CAiAgentChatPanel from '../components/CAiAgentChatPanel.vue'
-import CAiChatPanel from '../components/CAiChatPanel.vue'
+import CAssistantChat from '@/modules/Assistant/components/CAssistantChat.vue'
+import { useAssistantStore } from '@/modules/Assistant/store/assistant'
 import { eldAgentUrl, type EldAgentSelectedEvent } from '../utils/eldAgent'
 import CAiDraftTabs from '../components/CAiDraftTabs.vue'
 import CAiOptionsPanel from '../components/CAiOptionsPanel.vue'
-import { deliverHandoff, handoffReady, useAiHandoffStore } from '../store/aiHandoff'
-import { useRouteEldAssistantStore } from '@/modules/ELD/LogsModule/Boost/store/routeEldAssistant'
 
 const store = useBoostWorkspaceStore()
 const authStore = useAuthStore()
 const { session, workspace, activeTabId } = storeToRefs(store)
-const chatRef = ref<InstanceType<typeof CAiChatPanel> | null>(null)
+const assistant = useAssistantStore()
+const chatRef = ref<InstanceType<typeof CAssistantChat> | null>(null)
 const optionsRef = ref<InstanceType<typeof CAiOptionsPanel> | null>(null)
 
 const allowed = (code: string) => hasPermission(authStore.token, code)
@@ -134,7 +120,6 @@ const graphEvents = computed(() =>
     .map((item) => item.event)
 )
 const timeZone = computed(() => workspace.value?.events[0]?.event.timeZone ?? 'CT')
-const refreshAfterApplied = useAssistantWorkspaceRefresh()
 
 // A card never applies by itself: it asks the AI, which shows the usual attested confirmation.
 // Option cards go to the assistant, also from agent mode, since applying one needs its attested confirmation.
@@ -160,12 +145,29 @@ const chatMode = ref<'assistant' | 'agent'>('assistant')
 const agentEvent = ref<EldAgentSelectedEvent | null>(null)
 const agentBusy = ref(false)
 
-function selectAgentEvent(eventId: string) {
-  if (chatMode.value !== 'agent') return
+// The assistant's selection lives in its store and goes with the next message while this draft tab is open.
+const assistantEventId = computed(() => {
+  const selected = assistant.selectedEvent
+  return selected && session.value && selected.sessionId === session.value.id && selected.tabId === tabId.value
+    ? selected.eventId
+    : null
+})
+const selectedEventId = computed(() =>
+  chatMode.value === 'agent' ? (agentEvent.value?.id ?? null) : assistantEventId.value
+)
+
+function selectEvent(eventId: string) {
   const selected = graphEvents.value.find((event) => event.id === eventId)
-  agentEvent.value =
-    selected && agentEvent.value?.id !== eventId
-      ? { id: selected.id, timestamp: selected.timestamp }
+  if (chatMode.value === 'agent') {
+    agentEvent.value =
+      selected && agentEvent.value?.id !== eventId
+        ? { id: selected.id, timestamp: selected.timestamp }
+        : null
+    return
+  }
+  assistant.selectedEvent =
+    selected && session.value && tabId.value && assistantEventId.value !== eventId
+      ? { sessionId: session.value.id, tabId: tabId.value, eventId }
       : null
 }
 
@@ -176,46 +178,14 @@ watch([() => session.value?.id, tabId], () => {
 watch(graphEvents, (events) => {
   const selected = agentEvent.value
   if (selected && !events.some((event) => event.id === selected.id)) agentEvent.value = null
+  const eventId = assistantEventId.value
+  if (eventId && !events.some((event) => event.id === eventId)) assistant.selectedEvent = null
 })
 
-async function onApplied(applied: { sessionId: string; tabId: string }) {
-  await refreshAfterApplied(applied)
+// The chat reloads the workspace itself; the options panel reloads its live option status.
+async function onApplied() {
   await optionsRef.value?.refresh()
 }
-
-// The launcher's request is sent once, after the draft and tab are open; it is forgotten only once sent.
-const route = useRoute()
-const handoff = useAiHandoffStore()
-const assistant = useRouteEldAssistantStore()
-const driverId = computed(() => String(route.params.id ?? ''))
-const request = computed(() =>
-  handoff.pending?.driverId.toLowerCase() === driverId.value.toLowerCase() ? handoff.pending : null
-)
-const ready = computed(() =>
-  handoffReady({
-    request: request.value,
-    session: session.value,
-    querySessionId: String(route.query.sessionId ?? ''),
-    tabId: tabId.value,
-    busy: assistant.isBusy || store.isBusy,
-  })
-)
-// Shown while the request waits for its own draft (wrong dates, a submitted session, no permission).
-const waitingRequest = computed(() => (request.value && !store.isLoading && !ready.value ? request.value : null))
-let delivering = false
-watch(
-  [ready, chatRef],
-  async ([isReady, chat]) => {
-    if (!isReady || !chat || delivering) return
-    delivering = true
-    try {
-      await deliverHandoff(handoff, driverId.value, chat)
-    } finally {
-      delivering = false
-    }
-  },
-  { flush: 'post' }
-)
 
 defineExpose({ chatRef })
 </script>
