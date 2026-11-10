@@ -58,6 +58,7 @@ import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { navigationRoute } from '../utils/focus'
 import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
+import { useAssistantDraftTab } from '../composables/useAssistantDraftTab'
 
 const assistant = useAssistantStore()
 const auth = useAuthStore()
@@ -65,6 +66,7 @@ const focus = useAssistantFocus()
 const route = useRoute()
 const router = useRouter()
 const refreshWorkspace = useAssistantWorkspaceRefresh()
+const draftTab = useAssistantDraftTab()
 
 // The AI page shows the same chat inline, so the floating one stays out of the way there.
 const isAiPage = computed(() => route.name === 'ELDAi')
@@ -97,6 +99,30 @@ watch(
       )
         void refreshWorkspace({ sessionId, tabId })
     }
+  }
+)
+
+// A decided card that named a draft tab (shift, normalize, a kept or deleted optimize preview) reloads that draft
+// once when it is open, on that tab or on the latest tab when the preview is gone.
+watch(
+  () => assistant.items,
+  () => {
+    for (const navigation of assistant.takeDecidedDrafts()) void draftTab.reload(navigation)
+  }
+)
+
+// A card whose changes sit on a preview tab of the open draft shows that tab once, so the page shows the changes
+// (and the base tab's stale "editable" state is replaced) while the user decides.
+const shownPreviews = new Set<string>()
+watch(
+  () => assistant.confirmation,
+  (card) => {
+    const navigation = card?.navigation
+    if (!card || !navigation || shownPreviews.has(card.id) || !draftTab.isOpen(navigation)) return
+    // Only a card on another tab (an optimize preview) moves the page; a card on the shown tab changes nothing yet.
+    if (navigation.tabId.toLowerCase() === focus.value.tabId?.toLowerCase()) return
+    shownPreviews.add(card.id)
+    void draftTab.reload(navigation)
   }
 )
 

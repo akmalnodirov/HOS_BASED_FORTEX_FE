@@ -1,4 +1,5 @@
 import type {
+  RouteEldAssistantAction,
   RouteEldAssistantConfirmation,
   RouteEldAssistantItem,
   RouteEldAssistantTurnStatus,
@@ -40,13 +41,21 @@ export interface AssistantNavigation {
   toDate: string
 }
 
-export interface AssistantItem extends RouteEldAssistantItem {
+/** An action item; navigation is the draft tab the action concerned (an optimize preview tab, for example). */
+export interface AssistantAction extends RouteEldAssistantAction {
+  navigation?: AssistantNavigation | null
+}
+
+export interface AssistantItem extends Omit<RouteEldAssistantItem, 'action'> {
+  action: AssistantAction | null
   navigation?: AssistantNavigation | null
 }
 
 export interface AssistantConfirmation extends RouteEldAssistantConfirmation {
   isAttestationRequired?: boolean
   canApply?: boolean
+  /** The draft tab the card concerns, such as the optimize preview tab it made its changes on. */
+  navigation?: AssistantNavigation | null
 }
 
 export interface AssistantTurn {

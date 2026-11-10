@@ -131,6 +131,8 @@ export const useAssistantStore = defineStore('assistant', () => {
   let conversationVersion = 0
   // Applied corrections whose draft refresh is already handled; history is seeded here so it never replays.
   const handledCorrections = new Set<string>()
+  // Decided actions that named a draft tab, handled the same way: each reloads that draft once.
+  const handledDraftActions = new Set<string>()
 
   const isBusy = computed(
     () => isSending.value || isLoading.value || isDeciding.value || activeTurn.value !== null
@@ -172,7 +174,22 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
     if (!sameChat) {
       for (const correction of appliedCorrections.value) handledCorrections.add(correction.id)
+      for (const item of draftActions.value) handledDraftActions.add(item.id)
     }
+  }
+
+  /** Decided actions that changed or discarded a draft tab, for example a kept or deleted optimize preview. */
+  const draftActions = computed(() =>
+    items.value.filter(
+      (item) => item.kind === AssistantItemKind.Action && Boolean(item.action?.navigation)
+    )
+  )
+
+  /** Draft tabs whose actions were decided since the chat was shown, each returned once. */
+  function takeDecidedDrafts() {
+    const fresh = draftActions.value.filter((item) => !handledDraftActions.has(item.id))
+    for (const item of fresh) handledDraftActions.add(item.id)
+    return fresh.flatMap((item) => (item.action?.navigation ? [item.action.navigation] : []))
   }
 
   /** Corrections applied since the chat was shown, each returned once. */
@@ -326,6 +343,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     loadSequence += 1
     show(null)
     handledCorrections.clear()
+    handledDraftActions.clear()
     pendingSend = null
     isLoaded.value = false
     isLoading.value = false
@@ -534,6 +552,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     claim,
     refreshIfIdle,
     takeNewlyApplied,
+    takeDecidedDrafts,
     send,
     decide,
     newChat,
