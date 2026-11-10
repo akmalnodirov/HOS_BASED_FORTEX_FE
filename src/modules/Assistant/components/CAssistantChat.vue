@@ -136,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -144,6 +144,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import CRouteEldAssistantConfirmation from '@/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantConfirmation.vue'
 import CRouteEldAssistantMessage from '@/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantMessage.vue'
 import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { navigationRoute } from '../utils/focus'
@@ -163,6 +164,7 @@ const props = withDefaults(defineProps<{ canApply?: boolean }>(), { canApply: fa
 const emit = defineEmits<{ (e: 'applied', value: { sessionId: string; tabId: string }): void }>()
 
 const assistant = useAssistantStore()
+const auth = useAuthStore()
 const focus = useAssistantFocus()
 const router = useRouter()
 const refreshWorkspace = useAssistantWorkspaceRefresh()
@@ -265,7 +267,12 @@ async function decide(approve: boolean, factualAttestation: boolean) {
   await assistant.decide(approve, factualAttestation)
 }
 
-onMounted(() => assistant.ensureLoaded())
+// The chat belongs to the signed-in user; it loads once per user.
+watch(
+  () => (auth.token ? (auth.user?.id ?? null) : null),
+  (userId) => assistant.ensureLoaded(userId),
+  { immediate: true }
+)
 
 // An applied correction on the open draft reloads its workspace once.
 watch(

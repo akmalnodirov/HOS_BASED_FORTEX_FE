@@ -74,6 +74,13 @@ const focusLabel = computed(() => {
   return value.page === 'logs' ? 'All drivers' : ''
 })
 
+// Signing in as someone else without a page reload must not show the previous user's chat.
+watch(
+  () => (auth.token ? (auth.user?.id ?? null) : null),
+  (userId) => assistant.claim(userId),
+  { immediate: true }
+)
+
 // A draft the assistant opened during a reply is shown on the driver's AI page, once.
 watch(
   () => assistant.pendingNavigation,

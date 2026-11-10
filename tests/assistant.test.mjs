@@ -298,3 +298,21 @@ test('a card for the open draft without attestation shows no attestation checkbo
   const apply = buttonTag(html, 'Apply to draft')
   assert.doesNotMatch(apply, DISABLED)
 })
+
+test("signing in as another user without a reload never shows the previous user's chat", async () => {
+  let loads = 0
+  globalThis.assistantTestApi.get = async () => {
+    loads += 1
+    return { data: { ...conversation(), items: [{ id: 'm1', kind: 1, text: 'Private question' }] } }
+  }
+  store.ensureLoaded('user-a')
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(store.items.length, 1)
+  store.isOpen = true
+  store.claim(null)
+  assert.deepEqual([store.items.length, store.conversationId, store.isOpen], [0, null, false])
+  store.ensureLoaded('user-b')
+  assert.equal(loads, 2, 'the new user loads their own chat')
+  store.ensureLoaded('user-b')
+  assert.equal(loads, 2, 'the same user loads once')
+})

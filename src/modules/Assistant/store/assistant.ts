@@ -115,6 +115,8 @@ export const useAssistantStore = defineStore('assistant', () => {
   const selectedEvent = ref<AssistantSelectedEvent | null>(null)
   /** A draft the assistant opened during a reply the user is waiting for; the app opens it once, then clears it. */
   const pendingNavigation = ref<AssistantNavigation | null>(null)
+  /** The signed-in user this chat belongs to; another user (logout without a page reload) gets a clean store. */
+  const ownerId = ref<string | null>(null)
 
   let pollController: AbortController | null = null
   let pollGeneration = 0
@@ -298,8 +300,31 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
 
-  function ensureLoaded() {
-    if (!isLoaded.value && !isLoading.value) void load()
+  /** Forgets everything shown and stops every request in flight, so nothing of it can reach another user. */
+  function reset() {
+    loadSequence += 1
+    show(null)
+    pendingSend = null
+    isLoaded.value = false
+    isLoading.value = false
+    isSending.value = false
+    isDeciding.value = false
+    error.value = null
+    resendText.value = null
+    isOpen.value = false
+    selectedEvent.value = null
+  }
+
+  /** Binds the chat to the signed-in user; a different user (or none) clears it first. */
+  function claim(userId: string | null) {
+    if (ownerId.value === userId) return
+    reset()
+    ownerId.value = userId
+  }
+
+  function ensureLoaded(userId: string | null) {
+    claim(userId)
+    if (userId && !isLoaded.value && !isLoading.value) void load()
   }
 
   async function createConversation() {
@@ -459,6 +484,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     pendingNavigation,
     load,
     ensureLoaded,
+    claim,
     send,
     decide,
     newChat,
