@@ -49,7 +49,7 @@ function sameId(left: string | null | undefined, right: string | null | undefine
  * it belongs to the page's driver; it then carries its own dates, since the server rejects other dates with a draft.
  */
 export function assistantFocusFor(state: AssistantFocusState): AssistantFocusRequest {
-  const companyId = state.companyId || null
+  const carrierId = state.companyId || null
   const none = {
     driverId: null,
     fromDate: null,
@@ -58,11 +58,14 @@ export function assistantFocusFor(state: AssistantFocusState): AssistantFocusReq
     tabId: null,
     selectedEventId: null,
   }
-  if (state.routeName === 'ELDLogs') return { page: 'logs', companyId, ...none }
+  if (state.routeName === 'ELDLogs') return { page: 'logs', companyId: carrierId, ...none }
 
   const page = state.routeName ? DRIVER_PAGES[state.routeName] : undefined
-  if (!page || !state.driverId) return { page: 'other', companyId, ...none }
+  if (!page || !state.driverId) return { page: 'other', companyId: carrierId, ...none }
 
+  // With a driver in focus the company is left out: the selected carrier can differ from the driver's company (a
+  // draft the assistant opened for another company), and the server checks driver and draft access on its own.
+  const companyId = null
   const driverId = state.driverId
   const session = state.session
   if ((page === 'boost' || page === 'ai') && session && sameId(session.driverId, driverId)) {

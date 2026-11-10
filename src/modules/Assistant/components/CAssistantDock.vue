@@ -57,12 +57,14 @@ import CAssistantChat from './CAssistantChat.vue'
 import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
 import { navigationRoute } from '../utils/focus'
+import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 
 const assistant = useAssistantStore()
 const auth = useAuthStore()
 const focus = useAssistantFocus()
 const route = useRoute()
 const router = useRouter()
+const refreshWorkspace = useAssistantWorkspaceRefresh()
 
 // The AI page shows the same chat inline, so the floating one stays out of the way there.
 const isAiPage = computed(() => route.name === 'ELDAi')
@@ -79,6 +81,31 @@ watch(
   () => (auth.token ? (auth.user?.id ?? null) : null),
   (userId) => assistant.claim(userId),
   { immediate: true }
+)
+
+// The dock is always mounted, so it alone reloads the open draft once per correction applied while the user
+// works; corrections already in the chat's history never replay. Another draft reloads when it is opened.
+watch(
+  () => assistant.appliedCorrections,
+  () => {
+    const value = focus.value
+    for (const correction of assistant.takeNewlyApplied()) {
+      const { sessionId, tabId } = correction.preview
+      if (
+        sessionId.toLowerCase() === value.sessionId?.toLowerCase() &&
+        tabId.toLowerCase() === value.tabId?.toLowerCase()
+      )
+        void refreshWorkspace({ sessionId, tabId })
+    }
+  }
+)
+
+// Opening the dock shows what changed meanwhile (another tab, a lost answer).
+watch(
+  () => assistant.isOpen,
+  (open) => {
+    if (open) assistant.refreshIfIdle()
+  }
 )
 
 // A draft the assistant opened during a reply is shown on the driver's AI page, once.

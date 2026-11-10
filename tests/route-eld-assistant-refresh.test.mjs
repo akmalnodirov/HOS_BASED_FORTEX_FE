@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAssistantWorkspaceRefresh } from '../src/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh.ts'
 import { useBoostWorkspaceStore } from '../src/modules/ELD/LogsModule/Boost/store/boostWorkspace.ts'
 import { useAssistantStore } from '../src/modules/Assistant/store/assistant.ts'
-import Chat from '../src/modules/Assistant/components/CAssistantChat.vue'
+import Dock from '../src/modules/Assistant/components/CAssistantDock.vue'
 import { createAssistantRenderer, flushAssistant } from './assistant-renderer.mjs'
 import { createAssistantRouter } from './assistant-router.mjs'
 
@@ -40,7 +40,7 @@ test('PBoost refresh boundary ignores events for another session or tab', async 
   assert.equal(requests, 0)
 })
 
-test('the mounted chat refreshes the open draft only once after an applied result', async () => {
+test('the always-mounted dock refreshes the open draft only once after an applied result', async () => {
   const assistant = useAssistantStore()
   const preview = {
     ...scope,
@@ -67,7 +67,7 @@ test('the mounted chat refreshes the open draft only once after an applied resul
   }
   const host = createAssistantRenderer()
   const router = await createAssistantRouter('/logs/driver-1/ai')
-  app = host.renderer.createApp({ render: () => h(Chat, { canApply: true }) })
+  app = host.renderer.createApp({ render: () => h(Dock) })
   app.use(router)
   app.mount(host.root)
   await flushAssistant()

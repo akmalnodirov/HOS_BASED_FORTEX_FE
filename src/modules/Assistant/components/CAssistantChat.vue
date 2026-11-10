@@ -82,7 +82,7 @@
           variant="outline"
           size="sm"
           class="h-7 shrink-0 text-xs"
-          :disabled="assistant.isBusy"
+          :disabled="!canRetry"
           @click="retry"
         >
           Retry
@@ -136,14 +136,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import CRouteEldAssistantConfirmation from '@/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantConfirmation.vue'
 import CRouteEldAssistantMessage from '@/modules/ELD/LogsModule/Boost/components/assistant/CRouteEldAssistantMessage.vue'
-import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useAssistantStore } from '../store/assistant'
 import { useAssistantFocus } from '../composables/useAssistantFocus'
@@ -161,17 +160,14 @@ const CHIPS = [
 ] as const
 
 const props = withDefaults(defineProps<{ canApply?: boolean }>(), { canApply: false })
-const emit = defineEmits<{ (e: 'applied', value: { sessionId: string; tabId: string }): void }>()
 
 const assistant = useAssistantStore()
 const auth = useAuthStore()
 const focus = useAssistantFocus()
 const router = useRouter()
-const refreshWorkspace = useAssistantWorkspaceRefresh()
 const draft = ref('')
 const listRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
-const refreshedProposals = new Set<string>()
 
 const visibleItems = computed(() =>
   assistant.items.filter((item) => {
@@ -189,6 +185,11 @@ const emptyHint = computed(() =>
       : 'Ask about a driver’s logs. Name the driver and the dates, and the AI finds or opens the draft.'
 )
 const canSend = computed(() => !assistant.isBusy)
+// Retry also recovers a card left behind by a lost decision answer: it resends the message or reloads the chat.
+const canRetry = computed(
+  () =>
+    !assistant.isSending && !assistant.isDeciding && !assistant.isLoading && !assistant.isProcessing
+)
 
 // The draft a card changes: its correction preview's, else the draft the turn worked on.
 const cardTarget = computed(() => {
@@ -274,23 +275,6 @@ watch(
   { immediate: true }
 )
 
-// An applied correction on the open draft reloads its workspace once.
-watch(
-  () => [assistant.appliedCorrections, focus.value.sessionId, focus.value.tabId] as const,
-  ([proposals, sessionId, tabId]) => {
-    for (const proposal of proposals) {
-      if (refreshedProposals.has(proposal.id)) continue
-      const preview = proposal.preview
-      if (!sameId(preview.sessionId, sessionId) || !sameId(preview.tabId, tabId)) continue
-      refreshedProposals.add(proposal.id)
-      const applied = { sessionId: preview.sessionId, tabId: preview.tabId }
-      void refreshWorkspace(applied)
-      emit('applied', applied)
-    }
-  },
-  { immediate: true }
-)
-
 watch(
   () => [
     assistant.confirmation?.id,
@@ -305,6 +289,9 @@ watch(
     }),
   { flush: 'post' }
 )
+
+// The AI page is kept alive; coming back shows what changed meanwhile.
+onActivated(() => assistant.refreshIfIdle())
 
 defineExpose({ send, fill })
 </script>

@@ -36,6 +36,8 @@ const POLL_INTERVAL_MS = 1000
 const POLL_TIMEOUT_MS = 300_000
 const POLL_MAX_CONSECUTIVE_FAILURES = 3
 const REQUEST_TIMEOUT_MS = 15_000
+// Approving a card applies the change to the draft, which can take longer than an ordinary request.
+const DECISION_TIMEOUT_MS = 90_000
 const NETWORK_MESSAGE = 'Could not reach the server. Try again.'
 const TIMEOUT_MESSAGE = 'The assistant is taking too long. Try again.'
 
@@ -45,6 +47,8 @@ function unwrap<T>(value: T | ApiEnvelope<T>): T {
   }
   return value
 }
+
+class StaleResponse extends Error {}
 
 function isActiveStatus(status: string) {
   return status === 'QUEUED' || status === 'RUNNING'
@@ -125,6 +129,8 @@ export const useAssistantStore = defineStore('assistant', () => {
   let acceptedTurn: { turnId: string; text: string } | null = null
   // Bumped whenever the shown conversation changes, so a late reply for the previous one is ignored.
   let conversationVersion = 0
+  // Applied corrections whose draft refresh is already handled; history is seeded here so it never replays.
+  const handledCorrections = new Set<string>()
 
   const isBusy = computed(
     () => isSending.value || isLoading.value || isDeciding.value || activeTurn.value !== null
@@ -161,6 +167,16 @@ export const useAssistantStore = defineStore('assistant', () => {
       applyTurn(conversation.openTurn, false)
       if (isActiveStatus(conversation.openTurn.status)) startPolling(conversation.openTurn)
     }
+    for (const correction of appliedCorrections.value) handledCorrections.add(correction.id)
+  }
+
+  /** Corrections applied since the chat was shown, each returned once. */
+  function takeNewlyApplied() {
+    const fresh = appliedCorrections.value.filter(
+      (correction) => !handledCorrections.has(correction.id)
+    )
+    for (const correction of fresh) handledCorrections.add(correction.id)
+    return fresh
   }
 
   function setError(message: string, resend: string | null = null) {
@@ -304,6 +320,7 @@ export const useAssistantStore = defineStore('assistant', () => {
   function reset() {
     loadSequence += 1
     show(null)
+    handledCorrections.clear()
     pendingSend = null
     isLoaded.value = false
     isLoading.value = false
@@ -328,6 +345,7 @@ export const useAssistantStore = defineStore('assistant', () => {
   }
 
   async function createConversation() {
+    const version = conversationVersion
     const response = await api.post<AssistantConversation | ApiEnvelope<AssistantConversation>>(
       ApiEndpoints.ASSISTANT_CONVERSATIONS,
       undefined,
@@ -335,6 +353,8 @@ export const useAssistantStore = defineStore('assistant', () => {
     )
     const conversation = response.data ? unwrap(response.data) : null
     if (!conversation?.id) throw new Error('Empty conversation response')
+    // A reset (another user signed in) or another chat shown meanwhile wins over this late answer.
+    if (version !== conversationVersion) throw new StaleResponse()
     loadSequence += 1
     show(conversation)
     isLoaded.value = true
@@ -387,12 +407,15 @@ export const useAssistantStore = defineStore('assistant', () => {
       if (activeTurn.value && isActiveStatus(activeTurn.value.status)) startPolling(turn)
       return true
     } catch (err) {
-      if (version === conversationVersion) {
-        setError(
-          errorText(err, 'Could not send the message.'),
-          statusOf(err) === 409 ? null : trimmed
-        )
-      }
+      if (err instanceof StaleResponse || version !== conversationVersion) return false
+      const status = statusOf(err)
+      // The chat is gone (deleted or not the user's): the next message starts a new one.
+      if (status === 404) conversationId.value = null
+      // The same body is rejected again for 400 and 409, so they offer no resend.
+      setError(
+        errorText(err, 'Could not send the message.'),
+        status === 400 || status === 409 ? null : trimmed
+      )
       return false
     } finally {
       isSending.value = false
@@ -420,6 +443,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     isDeciding.value = true
     error.value = null
     resendText.value = null
+    let resync = false
     try {
       const response = await api.post<
         AssistantTurn | ApiEnvelope<AssistantTurn>,
@@ -427,7 +451,7 @@ export const useAssistantStore = defineStore('assistant', () => {
       >(
         ApiEndpoints.ASSISTANT_DECISION(turn.conversationId, turn.turnId),
         { confirmationId: preview.id, approve, factualAttestation: approve && factualAttestation },
-        { timeout: REQUEST_TIMEOUT_MS, _skipErrorToast: true }
+        { timeout: DECISION_TIMEOUT_MS, _skipErrorToast: true }
       )
       if (version !== conversationVersion) return false
       const next = response.data ? unwrap(response.data) : null
@@ -438,11 +462,27 @@ export const useAssistantStore = defineStore('assistant', () => {
     } catch (err) {
       if (version === conversationVersion) {
         setError(errorText(err, 'Could not record the decision. Check status and try again.'))
+        // No answer, or the card moved on: the change may have been applied, so show the chat as the server has it.
+        const status = statusOf(err)
+        resync = status === undefined || status === 404 || status === 409
       }
       return false
     } finally {
       isDeciding.value = false
+      if (resync) void load()
     }
+  }
+
+  /** Reloads the chat when nothing is in flight, to show what changed elsewhere (another tab, a lost answer). */
+  function refreshIfIdle() {
+    if (
+      isLoaded.value &&
+      !isLoading.value &&
+      !isSending.value &&
+      !isDeciding.value &&
+      !isProcessing.value
+    )
+      void load()
   }
 
   /** Starts a new chat; the server reuses the current one while it has no message yet. */
@@ -485,6 +525,8 @@ export const useAssistantStore = defineStore('assistant', () => {
     load,
     ensureLoaded,
     claim,
+    refreshIfIdle,
+    takeNewlyApplied,
     send,
     decide,
     newChat,

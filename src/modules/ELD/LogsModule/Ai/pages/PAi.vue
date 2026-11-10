@@ -76,7 +76,6 @@
           ref="chatRef"
           class="min-h-0 flex-1"
           :can-apply="canBoost"
-          @applied="onApplied"
         />
       </div>
     </div>
@@ -91,6 +90,7 @@ import { hasPermission } from '@/router/permissions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import CBoostGraph from '@/modules/ELD/LogsModule/Boost/components/CBoostGraph.vue'
 import { useBoostWorkspaceStore } from '@/modules/ELD/LogsModule/Boost/store/boostWorkspace'
+import { useAssistantWorkspaceRefresh } from '@/modules/ELD/LogsModule/Boost/composables/useAssistantWorkspaceRefresh'
 import { Button } from '@/components/ui/button'
 import CAiAgentChatPanel from '../components/CAiAgentChatPanel.vue'
 import CAssistantChat from '@/modules/Assistant/components/CAssistantChat.vue'
@@ -182,8 +182,10 @@ watch(graphEvents, (events) => {
   if (eventId && !events.some((event) => event.id === eventId)) assistant.selectedEvent = null
 })
 
-// The chat reloads the workspace itself; the options panel reloads its live option status.
-async function onApplied() {
+// The dispatcher agent changes the draft outside the assistant chat: reload the workspace and the option status.
+const refreshAfterAgent = useAssistantWorkspaceRefresh()
+async function onApplied(applied: { sessionId: string; tabId: string }) {
+  await refreshAfterAgent(applied)
   await optionsRef.value?.refresh()
 }
 

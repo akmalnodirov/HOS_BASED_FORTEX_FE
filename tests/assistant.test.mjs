@@ -53,6 +53,12 @@ test("a draft of another driver left in the workspace is not sent; the page's da
   assert.deepEqual([focus.fromDate, focus.toDate], ['2026-09-01', '2026-09-03'])
 })
 
+test("with a driver in focus the selected carrier is not sent, since the driver may be another company's", () => {
+  assert.equal(assistantFocusFor(state()).companyId, null)
+  assert.equal(assistantFocusFor(state({ session: null })).companyId, null)
+  assert.equal(assistantFocusFor(state({ routeName: 'ELDLogDetail' })).companyId, null)
+})
+
 test('a draft is sent only from the Boost and AI pages', () => {
   const focus = assistantFocusFor(state({ routeName: 'ELDLogDetail', query: { date: '2026-10-03' } }))
   assert.equal(focus.page, 'driverLog')
@@ -315,4 +321,53 @@ test("signing in as another user without a reload never shows the previous user'
   assert.equal(loads, 2, 'the new user loads their own chat')
   store.ensureLoaded('user-b')
   assert.equal(loads, 2, 'the same user loads once')
+})
+
+const applied = (id) => ({
+  id: `action-${id}`,
+  kind: 3,
+  text: null,
+  createdAt: '',
+  action: { summary: 'Applied', correction: { id, status: 'applied', preview: { sessionId: 'session-1', tabId: 'tab-1' } } },
+})
+
+test('corrections already in the history never trigger a refresh; a new one does, once', async () => {
+  globalThis.assistantTestApi.get = async () => ({ data: { ...conversation(), items: [applied('old')] } })
+  await store.load()
+  assert.deepEqual(store.takeNewlyApplied(), [])
+  store.conversationId = 'conversation-1'
+  globalThis.assistantTestApi.post = async () => ({ data: turn({ items: [applied('new')] }) })
+  assert.equal(await store.send('Apply it', focus), true)
+  assert.deepEqual(store.takeNewlyApplied().map((correction) => correction.id), ['new'])
+  assert.deepEqual(store.takeNewlyApplied(), [])
+})
+
+test('a decision without an answer reloads the chat so its real state shows', async () => {
+  let loads = 0
+  globalThis.assistantTestApi.get = async () => {
+    loads += 1
+    return { data: conversation() }
+  }
+  globalThis.assistantTestApi.post = async () => {
+    throw { isAxiosError: true }
+  }
+  waiting(card())
+  assert.equal(await store.decide(true, true), false)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(loads, 1)
+  assert.equal(store.activeTurn, null)
+})
+
+test('a rejected message is not offered again, and a missing chat is replaced on the next message', async () => {
+  store.conversationId = 'conversation-1'
+  globalThis.assistantTestApi.post = async () => {
+    throw httpError(400, { code: 'Assistant.Correction.InvalidInput', message: 'The driver belongs to another company.' })
+  }
+  assert.equal(await store.send('Hello', focus), false)
+  assert.equal(store.resendText, null)
+  globalThis.assistantTestApi.post = async () => {
+    throw httpError(404, { code: 'Assistant.Correction.NotFound', message: 'The chat was not found.' })
+  }
+  assert.equal(await store.send('Hello', focus), false)
+  assert.equal(store.conversationId, null)
 })
