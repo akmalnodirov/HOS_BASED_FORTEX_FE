@@ -20,7 +20,8 @@ export interface Trip {
   trailerNumber: string
   odometer: number
   engineHours: number
-  dailyDistanceInMile: number
+  shiftDistanceInMile: number
+  dailyDistanceInMile?: number
   from: TripLocation
   to: TripLocation
   fuelLocations: TripLocation[]
@@ -58,7 +59,7 @@ export interface AuditTripForm {
   insertInfo: {
     odometer: number
     engHours: number
-    dailyDistance: number
+    shiftDistance: number
   }
   from: {
     location: string

@@ -27,7 +27,7 @@ function createEmptyTrip(): Trip {
     trailerNumber: '',
     odometer: 0,
     engineHours: 0,
-    dailyDistanceInMile: 0,
+    shiftDistanceInMile: 0,
     from: { latitude: 0, longitude: 0, address: '', locationType: 2 },
     to: { latitude: 0, longitude: 0, address: '', locationType: 3 },
     fuelLocations: [],
@@ -174,7 +174,7 @@ export function useAuditForm() {
     auditFormAll.endTime = newConstants.endTime
     auditFormAll.trips[0].odometer = newConstants.odometer
     auditFormAll.trips[0].engineHours = newConstants.engineHours
-    auditFormAll.trips[0].dailyDistanceInMile = newConstants.distance
+    auditFormAll.trips[0].shiftDistanceInMile = newConstants.distance
   }
 
   async function resolveAddress(latitude: number, longitude: number): Promise<string> {

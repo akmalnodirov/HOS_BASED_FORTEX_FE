@@ -4,19 +4,22 @@
       <div class="flex items-center gap-x-6">
         <h1 class="text-2xl font-semibold text-[#1A1A1A]">Trips</h1>
         <div class="flex items-center gap-x-2">
-          <div
+          <button
             v-for="(trip, ind) in auditFormAll.trips"
             :key="ind"
-            class="w-9.5 h-9.5 flex items-center justify-center rounded-lg cursor-pointer transition-colors border border-transparent"
+            type="button"
+            class="w-9.5 h-9.5 flex items-center justify-center rounded-lg cursor-pointer transition-colors border"
             :class="[
               selectedTripIndex === ind
-                ? 'bg-[#F3F4F6] border-[#B5B5B5]'
-                : 'bg-[#F3F4F6] text-[#666666] hover:bg-gray-200',
+                ? 'bg-[#1A1A1A] border-[#1A1A1A] text-white shadow-sm'
+                : 'bg-[#F3F4F6] border-transparent text-[#666666] hover:bg-gray-200',
             ]"
+            :aria-label="`Trip ${ind + 1}`"
+            :aria-current="selectedTripIndex === ind ? 'step' : undefined"
             @click="selectTrip(ind)"
           >
-            <span class="text-lg font-medium text-[#1A1A1A]">{{ ind + 1 }}</span>
-          </div>
+            <span class="text-lg font-medium">{{ ind + 1 }}</span>
+          </button>
 
           <button
             v-if="!tripsSaved"
@@ -91,7 +94,7 @@
             endDate: auditFormAll.endDate as Dayjs,
             odometer: auditFormAll.trips[0].odometer || 0,
             engineHours: auditFormAll.trips[0].engineHours || 0,
-            distance: auditFormAll.trips[0].dailyDistanceInMile || 0,
+            distance: auditFormAll.trips[0].shiftDistanceInMile || auditFormAll.trips[0].dailyDistanceInMile || 0,
           }"
           @trip:update="updateTrip($event, ind)"
           @constants:update="updateConstants"

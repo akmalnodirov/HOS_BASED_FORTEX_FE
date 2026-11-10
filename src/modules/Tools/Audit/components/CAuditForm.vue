@@ -4,7 +4,7 @@
       <div class="grid grid-cols-4 gap-x-6">
         <div class="space-y-1.5">
           <Label>Carrier</Label>
-          <Select v-model="form.carrier" :disabled="disabled">
+          <Select v-model="form.carrier" :disabled="disabled || order !== 1">
             <SelectTrigger>
               <SelectValue placeholder="Select carrier" />
             </SelectTrigger>
@@ -17,7 +17,7 @@
         </div>
         <div class="space-y-1.5">
           <Label>Driver</Label>
-          <Select v-model="form.driver" :disabled="disabled">
+          <Select v-model="form.driver" :disabled="disabled || order !== 1">
             <SelectTrigger>
               <SelectValue placeholder="Select driver" />
             </SelectTrigger>
@@ -62,12 +62,12 @@
           />
         </div>
         <div class="space-y-1.5">
-          <Label>Daily distance</Label>
+          <Label>Shift distance (mi)</Label>
           <Input
-            v-model.number="form.insertInfo.dailyDistance"
+            v-model.number="form.insertInfo.shiftDistance"
             :disabled="disabled"
             type="number"
-            placeholder="Daily distance"
+            placeholder="Maximum miles per shift"
           />
         </div>
       </div>
@@ -338,7 +338,7 @@ const form = reactive({
   insertInfo: {
     odometer: props.trip.odometer || (props.order !== 1 ? props.constants.odometer : 0),
     engHours: props.trip.engineHours || (props.order !== 1 ? props.constants.engineHours : 0),
-    dailyDistance: props.trip.dailyDistanceInMile || (props.order !== 1 ? props.constants.distance : 0),
+    shiftDistance: props.trip.shiftDistanceInMile || props.trip.dailyDistanceInMile || (props.order !== 1 ? props.constants.distance : 0),
   },
   from: { location: props.trip.from.address, latitude: props.trip.from.latitude, longitude: props.trip.from.longitude },
   to: { location: props.trip.to.address, latitude: props.trip.to.latitude, longitude: props.trip.to.longitude },
@@ -380,7 +380,7 @@ watch(
     if (props.order === 1) {
       form.insertInfo.odometer = newVal.odometer
       form.insertInfo.engHours = newVal.engineHours
-      form.insertInfo.dailyDistance = newVal.distance
+      form.insertInfo.shiftDistance = newVal.distance
     }
   },
   { deep: true }
@@ -394,9 +394,10 @@ watch(
     () => form.startDateTime.time,
     () => form.insertInfo.odometer,
     () => form.insertInfo.engHours,
-    () => form.insertInfo.dailyDistance,
+    () => form.insertInfo.shiftDistance,
   ],
   ([carrier, driver, startDate, startTime, odometer, engHours, distance]) => {
+    if (props.order !== 1) return
     emit('constants:update', {
       carrierId: carrier,
       driverId: driver,
@@ -420,7 +421,7 @@ watch(
       trailerNumber: form.trailerNumber,
       odometer: form.insertInfo.odometer,
       engineHours: form.insertInfo.engHours,
-      dailyDistanceInMile: form.insertInfo.dailyDistance,
+      shiftDistanceInMile: form.insertInfo.shiftDistance,
       from: {
         latitude: form.from.latitude,
         longitude: form.from.longitude,
