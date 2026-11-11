@@ -476,6 +476,7 @@ export interface RouteEldEventSession {
 }
 
 export interface RouteEldSessionOperationFailure {
+  itemType?: string
   label: string
   message: string
 }
