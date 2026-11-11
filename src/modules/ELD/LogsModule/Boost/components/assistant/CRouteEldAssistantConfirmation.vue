@@ -16,13 +16,15 @@
       {{
         confirmation.correction?.isNewStatus
           ? 'Review the actual status and time before adding this event to the draft.'
-          : 'Review these exact operations before applying this factual correction to the draft.'
+          : confirmation.correction || requireCorrection
+            ? 'Review these exact operations before applying this factual correction to the draft.'
+            : 'Review these changes before applying them to the draft.'
       }}
     </p>
-    <label class="flex items-start gap-2 text-xs">
+    <label v-if="attestationRequired" class="flex items-start gap-2 text-xs">
       <Checkbox
         v-model="attested"
-        :disabled="busy || !canApply || isExpired || !confirmation.correction"
+        :disabled="busy || !canApply || isExpired || missingCorrection"
       />
       <span>I confirm these exact changes reflect actual events.</span>
     </label>
@@ -32,13 +34,19 @@
     <div class="flex flex-wrap gap-2" :aria-busy="busy">
       <Button
         size="sm"
-        :disabled="busy || !canApply || isExpired || !attested || !confirmation.correction"
+        :disabled="busy || !canApply || isExpired || (attestationRequired && !attested) || missingCorrection"
         @click="decide(true)"
       >
         {{ busy ? 'Recording decision…' : 'Apply to draft' }}
       </Button>
       <Button variant="outline" size="sm" :disabled="busy" @click="decide(false)">
-        {{ confirmation.correction?.isNewStatus ? 'Reject status event' : 'Reject correction' }}
+        {{
+          confirmation.correction?.isNewStatus
+            ? 'Reject status event'
+            : confirmation.correction || requireCorrection
+              ? 'Reject correction'
+              : 'Decline'
+        }}
       </Button>
     </div>
   </section>
@@ -57,14 +65,19 @@ const props = withDefaults(
     confirmation: RouteEldAssistantConfirmation
     busy?: boolean
     canApply?: boolean
+    /** False for a card that applies without the factual attestation (the card's own gate). */
+    attestationRequired?: boolean
+    /** False in the app-wide chat, whose cards may change a draft without a correction preview. */
+    requireCorrection?: boolean
   }>(),
-  { canApply: true }
+  { canApply: true, attestationRequired: true, requireCorrection: true }
 )
 const emit = defineEmits<{
   (event: 'decide', approve: boolean, factualAttestation: boolean): void
 }>()
 const attested = ref(false)
 const now = useNow({ interval: 1000 })
+const missingCorrection = computed(() => props.requireCorrection && !props.confirmation.correction)
 const isExpired = computed(() => {
   const expiry = Date.parse(props.confirmation.expiresAt)
   return !Number.isFinite(expiry) || expiry <= now.value.getTime()
@@ -82,12 +95,12 @@ function decide(approve: boolean) {
   if (
     approve &&
     (!props.canApply ||
-      !attested.value ||
-      !props.confirmation.correction ||
+      (props.attestationRequired && !attested.value) ||
+      missingCorrection.value ||
       Date.parse(props.confirmation.expiresAt) <= Date.now() ||
       isExpired.value)
   )
     return
-  emit('decide', approve, approve && attested.value)
+  emit('decide', approve, approve && props.attestationRequired && attested.value)
 }
 </script>

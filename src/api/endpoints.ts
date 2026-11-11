@@ -293,14 +293,16 @@ export class ApiEndpoints {
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/ai-advice`
   static readonly ROUTE_ELD_EVENT_SESSION_AI_ADVICE_HISTORY = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/ai-advice`
-  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT = (sessionId: string) =>
-    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/assistant`
-  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS = (sessionId: string) =>
-    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT(sessionId)}/turns`
-  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN = (sessionId: string, turnId: string) =>
-    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURNS(sessionId)}/${turnId}`
-  static readonly ROUTE_ELD_EVENT_SESSION_ASSISTANT_DECISION = (sessionId: string, turnId: string) =>
-    `${this.ROUTE_ELD_EVENT_SESSION_ASSISTANT_TURN(sessionId, turnId)}/decision`
+  static readonly ASSISTANT_CONVERSATIONS = '/api/assistant/conversations'
+  static readonly ASSISTANT_CURRENT_CONVERSATION = `${this.ASSISTANT_CONVERSATIONS}/current`
+  static readonly ASSISTANT_CONVERSATION = (conversationId: string) =>
+    `${this.ASSISTANT_CONVERSATIONS}/${conversationId}`
+  static readonly ASSISTANT_TURNS = (conversationId: string) =>
+    `${this.ASSISTANT_CONVERSATION(conversationId)}/turns`
+  static readonly ASSISTANT_TURN = (conversationId: string, turnId: string) =>
+    `${this.ASSISTANT_TURNS(conversationId)}/${turnId}`
+  static readonly ASSISTANT_DECISION = (conversationId: string, turnId: string) =>
+    `${this.ASSISTANT_TURN(conversationId, turnId)}/decision`
   static readonly ROUTE_ELD_EVENT_SESSION_PROFILE_FORMS = (sessionId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/profile-forms`
   static readonly ROUTE_ELD_EVENT_SESSION_CERTIFICATION_FIX = (sessionId: string, tabId: string) =>
