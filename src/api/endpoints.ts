@@ -363,6 +363,11 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL = `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/read-all`
   static readonly ROUTE_ELD_ALPR_CAMERA_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_ALPR_CAMERA_ALERTS}/${id}/read`
+  static readonly ROUTE_ELD_RED_STATE_ALERTS = `${this.BASE_URL}/route-eld/red-state-alerts`
+  static readonly ROUTE_ELD_RED_STATE_ALERTS_READ_ALL = `${this.ROUTE_ELD_RED_STATE_ALERTS}/read-all`
+  static readonly ROUTE_ELD_RED_STATE_ALERT_READ = (id: string) =>
+    `${this.ROUTE_ELD_RED_STATE_ALERTS}/${id}/read`
+  static readonly ROUTE_ELD_RED_STATE_SETTINGS = `${this.BASE_URL}/route-eld/red-state-settings`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
   static readonly ROUTE_ELD_SPEED_ALERTS_READ_ALL = `${this.ROUTE_ELD_SPEED_ALERTS}/read-all`
   static readonly ROUTE_ELD_SPEED_ALERT_READ = (id: string) =>
