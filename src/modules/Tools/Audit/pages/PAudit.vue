@@ -123,7 +123,7 @@
         <div v-for="audit in previousAudits" :key="audit.id" class="flex items-center justify-between gap-4 py-3 text-sm">
           <div>
             <div class="font-medium">{{ audit.driverName }}</div>
-            <div class="text-muted-foreground">{{ audit.fromDate }} – {{ audit.toDate }} · {{ audit.status }}</div>
+            <div class="text-muted-foreground">{{ audit.fromDate }} –> {{ audit.toDate }} · {{ audit.status }}</div>
           </div>
           <div class="flex items-center gap-2">
             <Button variant="outline" size="sm" :disabled="loadingAuditId === audit.id" @click="restoreAudit(audit.id)">
