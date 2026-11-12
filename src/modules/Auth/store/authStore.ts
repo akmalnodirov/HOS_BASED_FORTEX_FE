@@ -5,6 +5,8 @@ import type { User, CurrentUserResponse, CurrentUserCompany } from '@/modules/Au
 import { setApiTimeZone, clearApiTimeZone } from '@/composables/useTimezone'
 import { getCompanyId, removeCompanyId, removeCompanyTimeZoneId } from '@/utils/company'
 
+let tokenSyncStarted = false
+
 export const useAuthStore = defineStore('authStore', {
   state: () => ({
     user: null as User | null,
@@ -27,6 +29,7 @@ export const useAuthStore = defineStore('authStore', {
   actions: {
     // Initialize auth state from localStorage
     initAuth() {
+      this.syncTokensAcrossTabs()
       const token = localStorage.getItem('token')
       const refreshToken = localStorage.getItem('refreshToken')
 
@@ -36,11 +39,28 @@ export const useAuthStore = defineStore('authStore', {
         // Don't set loggedIn here, wait for user data fetch
       }
     },
+    syncTokensAcrossTabs() {
+      if (tokenSyncStarted) return
+      tokenSyncStarted = true
+
+      window.addEventListener('storage', (event) => {
+        if (event.key !== null && event.key !== 'token' && event.key !== 'refreshToken') return
+
+        const token = localStorage.getItem('token')
+        this.refreshToken = localStorage.getItem('refreshToken')
+
+        if (token) {
+          this.token = token
+          return
+        }
+
+        if (!this.token) return
+        this.clearTokens()
+        router.push({ name: 'Login' })
+      })
+    },
     getTokens() {
       return this.token || localStorage.getItem('token')
-    },
-    getRefreshToken() {
-      return this.refreshToken || localStorage.getItem('refreshToken')
     },
     setTokens(token: string, refreshToken?: string) {
       this.token = token
