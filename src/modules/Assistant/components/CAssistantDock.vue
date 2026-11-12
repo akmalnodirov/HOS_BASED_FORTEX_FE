@@ -2,7 +2,7 @@
   <div v-if="!isAiPage" class="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
     <section
       v-if="assistant.isOpen"
-      class="flex h-[600px] max-h-[calc(100vh-120px)] w-[420px] max-w-[calc(100vw-48px)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
+      class="flex h-[600px] max-h-[calc(100vh-120px)] w-[420px] max-w-[calc(100vw-48px)] -translate-y-20 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
       aria-label="Llora AI"
     >
       <header
@@ -37,7 +37,7 @@
 
     <button
       type="button"
-      class="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg"
+      class="flex h-14 w-14 -translate-y-20 items-center justify-center rounded-full bg-foreground text-background shadow-lg"
       :aria-label="assistant.isOpen ? 'Close Llora AI' : 'Open Llora AI'"
       @click="assistant.isOpen = !assistant.isOpen"
     >

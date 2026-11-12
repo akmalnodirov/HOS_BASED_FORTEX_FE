@@ -88,7 +88,7 @@
                 </div>
                 <div class="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 text-muted-foreground">
                   <span>User ID</span><span class="truncate text-foreground" :title="user.employeeId">{{ user.employeeId || user.userId }}</span>
-                  <span>Log period</span><span class="text-foreground">{{ user.fromDate }} – {{ user.toDate }}</span>
+                  <span>Log period</span><span class="text-foreground">{{ user.fromDate }} –> {{ user.toDate }}</span>
                   <span>Date</span><span class="text-foreground">{{ formatPresenceDate(user.accessedAt) }}</span>
                   <span>Login time</span><span class="text-foreground">{{ formatPresenceTime(user.editingStartedAt || user.accessedAt) }}</span>
                   <span>Duration</span><span class="text-foreground">{{ formatPresenceDuration(user.editingStartedAt || user.accessedAt) }}</span>
