@@ -491,7 +491,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useDebounceSearch } from '@/composables/useDebounceSearch'
-import { useTimeZoneHelper } from '@/composables/useTimezone'
+import dayjs from 'dayjs'
 import { useEventSessions } from '../composables/useEventSessions'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
@@ -518,7 +518,7 @@ type SessionSortKey =
   | 'createdAt'
 
 const router = useRouter()
-const { formatToTimeZone } = useTimeZoneHelper()
+const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const { searchQuery: search, debouncedSearchQuery: debouncedSearch, cleanup } = useDebounceSearch()
 const {
   page,
@@ -570,6 +570,7 @@ const filters = computed<EventSessionFilters>(() => ({
   status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
   createdFrom: appliedRange.value.from,
   createdTo: appliedRange.value.to,
+  timeZone: viewerTimeZone,
   sortBy: sortKey.value,
   sortOrder: sortOrder.value,
   pageNumber: pageNumber.value,
@@ -794,7 +795,7 @@ function formatDay(value: string) {
 }
 
 function formatDateTime(value: string) {
-  return formatToTimeZone(value, 'MMM D, YYYY h:mm A')
+  return dayjs(value).format('MMM D, YYYY h:mm A')
 }
 
 function localDate(value: Date) {

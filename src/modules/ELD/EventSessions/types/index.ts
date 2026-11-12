@@ -50,6 +50,7 @@ export interface EventSessionFilters {
   status?: EventSessionStatus
   createdFrom?: string
   createdTo?: string
+  timeZone?: string
   sortBy: string
   sortOrder: 'asc' | 'desc'
   pageNumber: number
