@@ -98,12 +98,12 @@
           }"
           @trip:update="updateTrip($event, ind)"
           @constants:update="updateConstants"
-          @copy:from="handleCopy('from', ind)"
-          @paste:from="handlePaste('from', ind)"
-          @copy:to="handleCopy('to', ind)"
-          @paste:to="handlePaste('to', ind)"
-          @copy:fuel="handleCopy('fuel', ind)"
-          @paste:fuel="handlePaste('fuel', ind)"
+          @copy:from="handleCopy('from', $event)"
+          @paste:from="handlePaste('from', $event)"
+          @copy:to="handleCopy('to', $event)"
+          @paste:to="handlePaste('to', $event)"
+          @copy:fuel="handleCopy('fuel')"
+          @paste:fuel="handlePaste('fuel')"
         />
       </KeepAlive>
     </section>
@@ -241,16 +241,20 @@ function getFormRef() {
   return formRefs.value?.[0]
 }
 
-function handleCopy(type: 'from' | 'to' | 'fuel', _index: number) {
+function handleCopy(type: 'from' | 'to' | 'fuel', index = 0) {
   const form = getFormRef()?.form
   if (!form) return
-  copyLongLat(form[type])
+  const location = type === 'from' ? form.fromLocations[index] :
+    type === 'to' ? form.toLocations[index] : form.fuel
+  if (location) copyLongLat(location)
 }
 
-function handlePaste(type: 'from' | 'to' | 'fuel', _index: number) {
+function handlePaste(type: 'from' | 'to' | 'fuel', index = 0) {
   const form = getFormRef()?.form
   if (!form) return
-  pasteLongLat(form[type])
+  const location = type === 'from' ? form.fromLocations[index] :
+    type === 'to' ? form.toLocations[index] : form.fuel
+  if (location) pasteLongLat(location)
 }
 
 async function handleSave() {

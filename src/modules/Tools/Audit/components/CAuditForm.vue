@@ -95,84 +95,84 @@
     <div class="rounded-lg border border-border bg-card p-4 space-y-4">
       <div class="flex justify-between items-center">
         <h3 class="text-sm font-semibold">Load Location</h3>
-        <span class="text-xs font-bold text-primary uppercase">From</span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-primary uppercase">From</span>
+          <Button :disabled="disabled" size="sm" @click="addLocation('from')">Add location</Button>
+        </div>
       </div>
       <Separator />
-      <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2 space-y-1.5">
-          <Label>Location</Label>
-          <Input v-model="form.from.location" :disabled="disabled" placeholder="Location" />
+      <div v-for="(from, index) in form.fromLocations" :key="from.id" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-muted-foreground">FROM {{ index + 1 }}</span>
+          <Button v-if="form.fromLocations.length > 1" :disabled="disabled" variant="ghost" size="sm" @click="removeLocation('from', from.id)">
+            <X class="w-4 h-4 mr-1" /> Remove
+          </Button>
         </div>
-        <div class="space-y-1.5">
-          <Label>Latitude</Label>
-          <Input
-            v-model.number="form.from.latitude"
-            :disabled="disabled"
-            type="number"
-            step="any"
-            placeholder="Latitude"
-          />
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2 space-y-1.5">
+            <Label>Location</Label>
+            <Input v-model="from.location" :disabled="disabled" placeholder="Location" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>Latitude</Label>
+            <Input v-model.number="from.latitude" :disabled="disabled" type="number" step="any" placeholder="Latitude" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>Longitude</Label>
+            <Input v-model.number="from.longitude" :disabled="disabled" type="number" step="any" placeholder="Longitude" />
+          </div>
         </div>
-        <div class="space-y-1.5">
-          <Label>Longitude</Label>
-          <Input
-            v-model.number="form.from.longitude"
-            :disabled="disabled"
-            type="number"
-            step="any"
-            placeholder="Longitude"
-          />
+        <div class="flex gap-2">
+          <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('copy:from', index)">
+            <Copy class="w-4 h-4 mr-2" /> Copy
+          </Button>
+          <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('paste:from', index)">
+            <Clipboard class="w-4 h-4 mr-2" /> Paste
+          </Button>
         </div>
-      </div>
-      <div class="flex gap-2">
-        <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('copy:from')">
-          <Copy class="w-4 h-4 mr-2" /> Copy
-        </Button>
-        <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('paste:from')">
-          <Clipboard class="w-4 h-4 mr-2" /> Paste
-        </Button>
+        <Separator v-if="index < form.fromLocations.length - 1" />
       </div>
     </div>
 
     <div class="rounded-lg border border-border bg-card p-4 space-y-4">
       <div class="flex justify-between items-center">
         <h3 class="text-sm font-semibold">Load Location</h3>
-        <span class="text-xs font-bold text-primary uppercase">To</span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-primary uppercase">To</span>
+          <Button :disabled="disabled" size="sm" @click="addLocation('to')">Add location</Button>
+        </div>
       </div>
       <Separator />
-      <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2 space-y-1.5">
-          <Label>Location</Label>
-          <Input v-model="form.to.location" :disabled="disabled" placeholder="Location" />
+      <div v-for="(to, index) in form.toLocations" :key="to.id" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-muted-foreground">TO {{ index + 1 }}</span>
+          <Button v-if="form.toLocations.length > 1" :disabled="disabled" variant="ghost" size="sm" @click="removeLocation('to', to.id)">
+            <X class="w-4 h-4 mr-1" /> Remove
+          </Button>
         </div>
-        <div class="space-y-1.5">
-          <Label>Latitude</Label>
-          <Input
-            v-model.number="form.to.latitude"
-            :disabled="disabled"
-            type="number"
-            step="any"
-            placeholder="Latitude"
-          />
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2 space-y-1.5">
+            <Label>Location</Label>
+            <Input v-model="to.location" :disabled="disabled" placeholder="Location" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>Latitude</Label>
+            <Input v-model.number="to.latitude" :disabled="disabled" type="number" step="any" placeholder="Latitude" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>Longitude</Label>
+            <Input v-model.number="to.longitude" :disabled="disabled" type="number" step="any" placeholder="Longitude" />
+          </div>
         </div>
-        <div class="space-y-1.5">
-          <Label>Longitude</Label>
-          <Input
-            v-model.number="form.to.longitude"
-            :disabled="disabled"
-            type="number"
-            step="any"
-            placeholder="Longitude"
-          />
+        <div class="flex gap-2">
+          <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('copy:to', index)">
+            <Copy class="w-4 h-4 mr-2" /> Copy
+          </Button>
+          <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('paste:to', index)">
+            <Clipboard class="w-4 h-4 mr-2" /> Paste
+          </Button>
         </div>
-      </div>
-      <div class="flex gap-2">
-        <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('copy:to')">
-          <Copy class="w-4 h-4 mr-2" /> Copy
-        </Button>
-        <Button :disabled="disabled" variant="outline" class="flex-1" @click="emit('paste:to')">
-          <Clipboard class="w-4 h-4 mr-2" /> Paste
-        </Button>
+        <Separator v-if="index < form.toLocations.length - 1" />
       </div>
     </div>
 
@@ -286,7 +286,7 @@ import { useTimeZoneHelper } from '@/composables/useTimezone'
 import { formatTime } from '@/utils/time'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import type { AuditCarrier, AuditDriver, Trip, FuelLocationItem, TimeValue } from '../types'
+import type { AuditCarrier, AuditDriver, Trip, AuditLocationItem, FuelLocationItem, TimeValue } from '../types'
 
 interface Props {
   carriers: AuditCarrier[]
@@ -311,10 +311,10 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   'trip:update': [trip: Trip]
   'constants:update': [constants: any]
-  'copy:from': []
-  'paste:from': []
-  'copy:to': []
-  'paste:to': []
+  'copy:from': [index: number]
+  'paste:from': [index: number]
+  'copy:to': [index: number]
+  'paste:to': [index: number]
   'copy:fuel': []
   'paste:fuel': []
 }>()
@@ -340,8 +340,18 @@ const form = reactive({
     engHours: props.trip.engineHours || (props.order !== 1 ? props.constants.engineHours : 0),
     shiftDistance: props.trip.shiftDistanceInMile || props.trip.dailyDistanceInMile || (props.order !== 1 ? props.constants.distance : 0),
   },
-  from: { location: props.trip.from.address, latitude: props.trip.from.latitude, longitude: props.trip.from.longitude },
-  to: { location: props.trip.to.address, latitude: props.trip.to.latitude, longitude: props.trip.to.longitude },
+  fromLocations: (props.trip.fromLocations?.length ? props.trip.fromLocations : [props.trip.from]).map((location, index) => ({
+    id: Date.now() + index,
+    location: location.address,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  })) as AuditLocationItem[],
+  toLocations: (props.trip.toLocations?.length ? props.trip.toLocations : [props.trip.to]).map((location, index) => ({
+    id: Date.now() + index,
+    location: location.address,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  })) as AuditLocationItem[],
   fuel: { location: '', latitude: 0, longitude: 0, timing: 'before' },
   fuelLocations: props.trip.fuelLocations.map((fuel, index) => ({
     id: Date.now() + index,
@@ -351,6 +361,7 @@ const form = reactive({
     afterDelivery: fuel.afterDelivery ?? false,
   })) as FuelLocationItem[],
 })
+let nextLocationId = Date.now() + form.fromLocations.length + form.toLocations.length
 
 const startDateString = computed({
   get: () => formatTime(form.startDateTime.date, 'YYYY-MM-DD'),
@@ -422,18 +433,10 @@ watch(
       odometer: form.insertInfo.odometer,
       engineHours: form.insertInfo.engHours,
       shiftDistanceInMile: form.insertInfo.shiftDistance,
-      from: {
-        latitude: form.from.latitude,
-        longitude: form.from.longitude,
-        address: form.from.location,
-        locationType: 2,
-      },
-      to: {
-        latitude: form.to.latitude,
-        longitude: form.to.longitude,
-        address: form.to.location,
-        locationType: 3,
-      },
+      from: toTripLocation(form.fromLocations[0], 2),
+      to: toTripLocation(form.toLocations[0], 3),
+      fromLocations: form.fromLocations.map((location) => toTripLocation(location, 2)),
+      toLocations: form.toLocations.map((location) => toTripLocation(location, 3)),
       fuelLocations: form.fuelLocations.map((f) => ({
         latitude: f.latitude,
         longitude: f.longitude,
@@ -447,19 +450,46 @@ watch(
   { deep: true }
 )
 
-watch([() => form.from.latitude, () => form.from.longitude], async ([lat, lng]) => {
-  if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-    form.from.location =
-      (await geoLocationsStore.getCalculatedAddress({ latitude: lat, longitude: lng })) || ''
+function toTripLocation(location: AuditLocationItem, locationType: number) {
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    address: location.location,
+    locationType,
   }
-})
+}
 
-watch([() => form.to.latitude, () => form.to.longitude], async ([lat, lng]) => {
-  if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-    form.to.location =
-      (await geoLocationsStore.getCalculatedAddress({ latitude: lat, longitude: lng })) || ''
-  }
-})
+function addLocation(type: 'from' | 'to') {
+  const location = { id: ++nextLocationId, location: '', latitude: 0, longitude: 0 }
+  if (type === 'from') form.fromLocations.push(location)
+  else form.toLocations.push(location)
+}
+
+function removeLocation(type: 'from' | 'to', id: number) {
+  const locations = type === 'from' ? form.fromLocations : form.toLocations
+  const index = locations.findIndex((item) => item.id === id)
+  if (locations.length > 1 && index >= 0) locations.splice(index, 1)
+}
+
+function watchLocationAddresses(getLocations: () => AuditLocationItem[]) {
+  watch(
+    () => getLocations().map((item) => [item.id, item.latitude, item.longitude] as const),
+    async (locations, previous) => {
+      for (const [id, latitude, longitude] of locations) {
+        if (previous?.some(([previousId, previousLatitude, previousLongitude]) =>
+          previousId === id && previousLatitude === latitude && previousLongitude === longitude)) continue
+        if (!latitude || !longitude || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) continue
+        const address = await geoLocationsStore.getCalculatedAddress({ latitude, longitude })
+        const current = getLocations().find((item) => item.id === id)
+        if (current?.latitude === latitude && current.longitude === longitude)
+          current.location = address || ''
+      }
+    }
+  )
+}
+
+watchLocationAddresses(() => form.fromLocations)
+watchLocationAddresses(() => form.toLocations)
 
 watch([() => form.fuel.latitude, () => form.fuel.longitude], async ([lat, lng]) => {
   if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {

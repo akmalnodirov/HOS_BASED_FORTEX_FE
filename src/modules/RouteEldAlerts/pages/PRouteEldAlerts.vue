@@ -83,17 +83,28 @@
       {{ pageError }}
     </div>
 
-    <section v-if="mapSelection" class="mb-4 flex-none overflow-hidden rounded-lg border border-border bg-card">
+    <section
+      v-if="mapSelection"
+      ref="mapContainerRef"
+      class="mb-4 flex-none overflow-hidden rounded-lg border border-border bg-card"
+      :class="isMapFullscreen && 'mb-0 flex h-full w-full flex-col rounded-none border-0'"
+    >
       <div class="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div>
           <div class="font-semibold">{{ mapSelection.driver }} — {{ mapSelection.reason }}</div>
           <div class="text-xs text-muted-foreground">{{ mapSelection.detail }}</div>
         </div>
-        <Button variant="ghost" size="icon" aria-label="Close map" @click="mapSelection = null">
-          <X class="h-4 w-4" />
-        </Button>
+        <div class="flex shrink-0 items-center gap-1">
+          <Button variant="ghost" size="icon" :title="isMapFullscreen ? 'Exit fullscreen' : 'Fullscreen'" :aria-label="isMapFullscreen ? 'Exit fullscreen' : 'Fullscreen'" @click="toggleMapFullscreen">
+            <Minimize v-if="isMapFullscreen" class="h-4 w-4" />
+            <Maximize v-else class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label="Close map" @click="closeMap">
+            <X class="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      <div v-if="mapSelection.latitude !== null && mapSelection.longitude !== null" class="relative h-72">
+      <div v-if="mapSelection.latitude !== null && mapSelection.longitude !== null" class="relative" :class="isMapFullscreen ? 'min-h-0 flex-1' : 'h-72'">
       <div class="absolute right-3 top-3 z-10"><CMapTypeControl /></div>
       <CMap
         ref="mapRef"
@@ -101,24 +112,24 @@
         :zoom="12"
         @ready="fitMapSelection"
       >
-        <CMapMarker :position="{ lat: mapSelection.latitude, lng: mapSelection.longitude }" :z-index="showDriverInfo ? 2 : 1">
+        <CMapMarker :position="{ lat: mapSelection.latitude, lng: mapSelection.longitude }" :z-index="activeMapInfo === 'driver' ? 2 : 1">
           <div class="relative">
-          <button type="button" class="rounded-full border-2 border-white bg-blue-600 p-2 text-white shadow-lg" :title="mapSelection.driver" @click.stop="showDriverInfo = true">
+          <button type="button" class="rounded-full border-2 border-white bg-blue-600 p-2 text-white shadow-lg" :title="mapSelection.driver" @click.stop="activeMapInfo = 'driver'">
             <Truck class="h-4 w-4" />
           </button>
-          <CMapMarkerInfo v-if="showDriverInfo" placement="left" :title="mapSelection.driver" :rows="mapSelection.driverRows" @close="showDriverInfo = false" />
+          <CMapMarkerInfo v-if="activeMapInfo === 'driver'" placement="left" :title="mapSelection.driver" :rows="mapSelection.driverRows" @close="activeMapInfo = null" />
           </div>
         </CMapMarker>
         <CMapMarker
           v-if="mapSelection.targetLatitude !== null && mapSelection.targetLongitude !== null"
           :position="{ lat: mapSelection.targetLatitude, lng: mapSelection.targetLongitude }"
-          :z-index="showTargetInfo ? 2 : 1"
+          :z-index="activeMapInfo === 'target' ? 2 : 1"
         >
           <div class="relative">
-          <button type="button" class="rounded-full border-2 border-white bg-emerald-600 p-2 text-white shadow-lg" :title="mapSelection.reason" @click.stop="showTargetInfo = true">
+          <button type="button" class="rounded-full border-2 border-white bg-emerald-600 p-2 text-white shadow-lg" :title="mapSelection.reason" @click.stop="activeMapInfo = 'target'">
             <MapPin class="h-4 w-4" />
           </button>
-          <CMapMarkerInfo v-if="showTargetInfo" placement="right" :title="mapSelection.targetName || mapSelection.reason" :rows="mapSelection.targetRows" @close="showTargetInfo = false" />
+          <CMapMarkerInfo v-if="activeMapInfo === 'target'" placement="right" :title="mapSelection.targetName || mapSelection.reason" :rows="mapSelection.targetRows" @close="activeMapInfo = null" />
           </div>
         </CMapMarker>
       </CMap>
@@ -602,8 +613,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { Check, ChevronLeft, ChevronRight, LoaderCircle, MapPin, MapPinned, RefreshCw, Search, Truck, X } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Check, ChevronLeft, ChevronRight, LoaderCircle, MapPin, MapPinned, Maximize, Minimize, RefreshCw, Search, Truck, X } from 'lucide-vue-next'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import CMap from '@/components/custom/CMap.vue'
 import CMapMarker from '@/components/custom/CMapMarker.vue'
@@ -700,6 +711,8 @@ const statusFilter = ref('all')
 const pageNumber = ref(1)
 const pageSize = ref(25)
 const mapRef = ref<InstanceType<typeof CMap> | null>(null)
+const mapContainerRef = ref<HTMLElement | null>(null)
+const isMapFullscreen = ref(false)
 const getMap = () => mapRef.value?.getMap() ?? null
 interface AlertMapSelection {
   driver: string
@@ -713,8 +726,7 @@ interface AlertMapSelection {
   targetLatitude: number | null
   targetLongitude: number | null
 }
-const showDriverInfo = ref(true)
-const showTargetInfo = ref(true)
+const activeMapInfo = ref<'driver' | 'target' | null>('driver')
 const mapSelection = ref<AlertMapSelection | null>(null)
 let companyResolutionVersion = 0
 const pageError = computed(() => companyError.value ?? error.value)
@@ -1017,8 +1029,7 @@ watch(selectedCompanyId, async () => {
   await resolveSelectedCompany()
 })
 watch(mapSelection, () => {
-  showDriverInfo.value = true
-  showTargetInfo.value = true
+  activeMapInfo.value = 'driver'
   void nextTick(() => fitMapSelection())
 })
 watch([search, statusFilter, pageSize], () => {
@@ -1029,8 +1040,10 @@ watch(totalPages, (value) => {
 })
 
 onMounted(async () => {
+  document.addEventListener('fullscreenchange', handleMapFullscreenChange)
   await resolveSelectedCompany()
 })
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', handleMapFullscreenChange))
 
 async function resolveSelectedCompany() {
   const version = ++companyResolutionVersion
@@ -1191,6 +1204,27 @@ function viewViolationMap(alert: ViolationAlert) {
 
 function formatCoordinates(latitude: number | null, longitude: number | null) {
   return latitude === null || longitude === null ? '—' : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+}
+
+async function toggleMapFullscreen() {
+  const element = mapContainerRef.value
+  if (!element) return
+  if (document.fullscreenElement === element) await document.exitFullscreen().catch(() => {})
+  else await element.requestFullscreen().catch(() => {})
+}
+
+function handleMapFullscreenChange() {
+  isMapFullscreen.value = document.fullscreenElement === mapContainerRef.value
+  void nextTick(() => {
+    getMap()?.resize()
+    fitMapSelection()
+  })
+}
+
+async function closeMap() {
+  if (document.fullscreenElement === mapContainerRef.value)
+    await document.exitFullscreen().catch(() => {})
+  mapSelection.value = null
 }
 
 function fitMapSelection(instance?: MapLibreMap) {

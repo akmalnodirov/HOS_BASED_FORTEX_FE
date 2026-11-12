@@ -24,6 +24,8 @@ export interface Trip {
   dailyDistanceInMile?: number
   from: TripLocation
   to: TripLocation
+  fromLocations?: TripLocation[]
+  toLocations?: TripLocation[]
   fuelLocations: TripLocation[]
 }
 
@@ -61,22 +63,21 @@ export interface AuditTripForm {
     engHours: number
     shiftDistance: number
   }
-  from: {
-    location: string
-    latitude: number
-    longitude: number
-  }
-  to: {
-    location: string
-    latitude: number
-    longitude: number
-  }
+  fromLocations: AuditLocationItem[]
+  toLocations: AuditLocationItem[]
   fuel: {
     location: string
     latitude: number
     longitude: number
   }
   fuelLocations: FuelLocationItem[]
+}
+
+export interface AuditLocationItem {
+  id: number
+  latitude: number
+  longitude: number
+  location: string
 }
 
 export interface FuelLocationItem {

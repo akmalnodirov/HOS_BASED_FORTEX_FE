@@ -30,6 +30,8 @@ function createEmptyTrip(): Trip {
     shiftDistanceInMile: 0,
     from: { latitude: 0, longitude: 0, address: '', locationType: 2 },
     to: { latitude: 0, longitude: 0, address: '', locationType: 3 },
+    fromLocations: [{ latitude: 0, longitude: 0, address: '', locationType: 2 }],
+    toLocations: [{ latitude: 0, longitude: 0, address: '', locationType: 3 }],
     fuelLocations: [],
   }
 }
@@ -106,16 +108,16 @@ export function useAuditForm() {
         !trip.trailerNumber ||
         typeof trip.odometer !== 'number' ||
         typeof trip.engineHours !== 'number' ||
-        !Number.isFinite(trip.from.latitude) ||
-        !Number.isFinite(trip.from.longitude) ||
-        !trip.from.address ||
-        !Number.isFinite(trip.to.latitude) ||
-        !Number.isFinite(trip.to.longitude) ||
-        !trip.to.address ||
         !trip.fuelLocations
       ) {
         return true
       }
+      const pickups = trip.fromLocations?.length ? trip.fromLocations : [trip.from]
+      const deliveries = trip.toLocations?.length ? trip.toLocations : [trip.to]
+      if (!pickups.length || !deliveries.length ||
+        [...pickups, ...deliveries].some((location) => !location?.address ||
+          !Number.isFinite(location.latitude) || Math.abs(location.latitude) > 90 ||
+          !Number.isFinite(location.longitude) || Math.abs(location.longitude) > 180)) return true
       for (const fuel of trip.fuelLocations) {
         if (!fuel.address || !fuel.latitude || !fuel.longitude) return true
       }
