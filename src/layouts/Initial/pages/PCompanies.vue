@@ -39,7 +39,7 @@ const {
 } = useCompanies()
 const authStore = useAuthStore()
 const canViewAlerts = computed(() =>
-  ['station', 'alpr', 'speed', 'violation'].some((type) =>
+  ['station', 'alpr', 'red_state', 'speed', 'violation'].some((type) =>
     hasPermission(authStore.token, `route_eld.alerts.${type}`)
   )
 )

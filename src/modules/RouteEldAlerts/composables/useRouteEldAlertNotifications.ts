@@ -1,7 +1,7 @@
 import { defineComponent, h, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Camera, Check, Eye, Gauge, Scale, ShieldAlert } from 'lucide-vue-next'
+import { Camera, Check, Eye, Gauge, Scale, ShieldAlert, MapPinned } from 'lucide-vue-next'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -16,7 +16,7 @@ function coordinates(latitude: number, longitude: number) {
 }
 
 interface RouteEldAlertToast {
-  type: 'station' | 'alpr' | 'speed' | 'violation'
+  type: 'station' | 'alpr' | 'red_state' | 'speed' | 'violation'
   title: string
   description: string
   companyId: string
@@ -32,7 +32,7 @@ export function useRouteEldAlertNavigation() {
   const router = useRouter()
   const api = useApi()
   const authStore = useAuthStore()
-  async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'speed' | 'violation', alertId?: string) {
+  async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'red_state' | 'speed' | 'violation', alertId?: string) {
     if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type}`)) return false
     try {
       const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
@@ -65,7 +65,7 @@ export function useRouteEldAlertNotifications() {
   const { viewAlerts } = useRouteEldAlertNavigation()
   const { enabledTypes, markRead, refresh } = useRouteEldNotificationCenter()
   const authStore = useAuthStore()
-  const { latestWeighStationAlert, latestAlprCameraAlert, latestGenericAlert } = useRouteEldAlertSocket()
+  const { latestWeighStationAlert, latestAlprCameraAlert, latestRedStateAlert, latestGenericAlert } = useRouteEldAlertSocket()
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
   async function readAlert(alert: RouteEldAlertToast, toastId: string) {
@@ -80,7 +80,7 @@ export function useRouteEldAlertNotifications() {
 
   function showAlert(alert: RouteEldAlertToast, id: string) {
     if (!enabledTypes.value.includes(alert.type)) return
-    const icons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
+    const icons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
     const isViolation = alert.type === 'violation'
     const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-background text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
     const content = defineComponent({
@@ -144,12 +144,26 @@ export function useRouteEldAlertNotifications() {
       description: details, companyId: alert.companyId, alertId: alert.alertId }, `route-eld-alpr-${alert.alertId}`)
   })
 
+  watch(latestRedStateAlert, (alert) => {
+    if (!alert) return
+    if (!hasPermission(authStore.token, 'route_eld.alerts.red_state')) return
+
+    const details = [
+      `${alert.distanceMiles.toFixed(2)} mi away`,
+      `Driver: ${alert.driverLocation || coordinates(alert.driverLatitude, alert.driverLongitude)}`,
+    ].join(' · ')
+
+    if (alert.companyId) showAlert({ type: 'red_state', title: `${alert.driverName} is approaching ${alert.stateCode}`,
+      description: details, companyId: alert.companyId, alertId: alert.alertId }, `route-eld-red-state-${alert.alertId}`)
+  })
+
   watch(latestGenericAlert, (alert) => {
     if (!alert || (alert.notificationKey !== 'speed' && alert.notificationKey !== 'violation')) return
-    if (!hasPermission(authStore.token, `route_eld.alerts.${alert.notificationKey}`)) return
-    showAlert({ type: alert.notificationKey, title: alert.notificationKey === 'speed' ? 'Speed alert' : 'Violation alert',
+    const type = alert.notificationKey
+    if (!hasPermission(authStore.token, `route_eld.alerts.${type}`)) return
+    showAlert({ type, title: type === 'speed' ? 'Speed alert' : 'Violation alert',
       description: plainMessage(alert.message), companyId: alert.companyId, alertId: alert.alertId || undefined },
-    `route-eld-${alert.notificationKey}-${alert.companyId}-${alert.message}`)
+    `route-eld-${type}-${alert.companyId}-${alert.alertId ?? alert.message}`)
   })
 }
 

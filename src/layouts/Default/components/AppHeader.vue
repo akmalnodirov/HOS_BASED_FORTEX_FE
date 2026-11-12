@@ -213,7 +213,7 @@
             </div>
 
             <div
-              class="p-4 border-t border-border bg-background dark:bg-card flex items-center gap-2"
+              class="p-4 border-t border-border bg-background dark:bg-card flex items-stretch gap-2"
             >
               <div
                 class="flex-1 flex items-center gap-3 bg-[#F0F0F0] dark:bg-muted border border-border py-2.5 px-4 rounded cursor-pointer hover:bg-accent transition-colors"
@@ -232,7 +232,7 @@
                 v-if="canViewOwnKpi"
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-auto w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="My KPI"
                 aria-label="My KPI"
                 @click.stop="openMyKpi"
@@ -242,7 +242,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-auto w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="Change password"
                 aria-label="Change password"
                 @click.stop="openChangePassword"
@@ -252,7 +252,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
+                class="h-auto w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
                 @click.stop="handleLogout"
               >
                 <LogOut class="w-5 h-5 text-[#C53030] transition-transform group-hover:scale-110" />
@@ -287,6 +287,7 @@ import {
   Check,
   BadgeDollarSign,
   KeyRound,
+  MapPinned,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -307,7 +308,7 @@ import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
 
-const alertIcons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
+const alertIcons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
 const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead, markAllRead } = useRouteEldNotificationCenter()
 const { viewAlerts } = useRouteEldAlertNavigation()
 const isNotificationsOpen = ref(false)
