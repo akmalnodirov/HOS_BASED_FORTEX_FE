@@ -68,6 +68,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
   const profileFormEditRequest = ref<string | null>(null)
   const isLoading = ref(false)
   const isMutating = ref(false)
+  const isCoDriverSyncing = ref(false)
   const activeOperation = ref<{
     sessionId: string
     type: 'submit' | 'rollback'
@@ -225,6 +226,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
           Boolean(log.coDriverId || log.coDriverEmail || log.coDriverName))) {
         assertCanMutate()
         recordCoDriverSyncAttempt(currentSession.id)
+        isCoDriverSyncing.value = true
         isMutating.value = true
         try {
           const syncResponse = await api.post<RouteEldWorkspace | ApiEnvelope<RouteEldWorkspace>>(
@@ -242,6 +244,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
               'The existing Boost session could not load its co-driver.'
         } finally {
           isMutating.value = false
+          isCoDriverSyncing.value = false
         }
       }
     }
@@ -924,6 +927,7 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     activeTab,
     isLoading,
     isMutating,
+    isCoDriverSyncing,
     fetchSessions,
     fetchSchedule,
     fetchEventEditOptions,

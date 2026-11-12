@@ -20,6 +20,9 @@
       :main-driver-name="session?.driverName"
       :co-driver-id="session?.coDriverId"
       :co-driver-name="session?.coDriverName"
+      :presence-users="presence.users.value"
+      :presence-scope-key="`${session?.id ?? ''}:${activeDriverId}`"
+      :current-user-id="authStore.user?.id ?? ''"
       @update:driver-id="selectedDriverId = $event"
       @initial-click="selectInitialTab"
       @new-click="addNewTab"
@@ -580,6 +583,7 @@ import type {
   RouteEldRepairRequestResponse,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
+import { useBoostPresence } from '../composables/useBoostPresence'
 import CBoostGraphHeaderControls from '../components/CBoostGraphHeaderControls.vue'
 import { cameraPresenceCache } from '@/composables/cameraPresenceCache'
 import CBoostGraph from '../components/CBoostGraph.vue'
@@ -766,6 +770,10 @@ watch(
 )
 const canEditSession = computed(
   () => !store.isLoading && !store.isSessionLocked && session.value?.status === 'DRAFT' && workspace.value?.canEdit === true && store.activeTab?.kind === 'WORKING'
+)
+const presence = useBoostPresence(
+  computed(() => session.value?.id ?? null),
+  computed(() => activeDriverId.value || null)
 )
 watch(() => store.coDriverSyncError, (message) => {
   if (message && route.name === 'ELDBoost') toast.error(message)
@@ -972,6 +980,21 @@ const selectedSourceEvents = computed(() =>
 const rangeBoostSelectedIds = ref<string[]>([])
 const rangeBoostSourceIndex = ref(0)
 const rangeBoostModalOpen = ref(false)
+
+watch(
+  () => Boolean(
+    session.value && (
+      (store.isMutating && !store.isCoDriverSyncing) || sessionActionStarting.value ||
+      showEditEventModal.value && !eventEditorReadonly.value ||
+      showEditDailyFormModal.value || multiUpdateModalOpen.value ||
+      rangeBoostModalOpen.value || reassignModalOpen.value ||
+      normalizeOpen.value || durationOpen.value || repairOpen.value || certificationOpen.value
+    )
+  ),
+  (isEditing) => { if (isEditing) presence.setEditing(true) },
+  { flush: 'post' }
+)
+
 const rangeBoostSelectedEvents = computed(() =>
   rangeBoostSelectedIds.value
     .map((id) => graphEvents.value.find((event) => event.id === id))
