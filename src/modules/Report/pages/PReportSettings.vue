@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -16,6 +16,10 @@ import {
 } from '@/components/ui/select'
 import CReportAdminHeader from '@/modules/Report/components/CReportAdminHeader.vue'
 import CReportSearchSelect from '@/modules/Report/components/CReportSearchSelect.vue'
+import CReportMonthField from '@/modules/Report/components/CReportMonthField.vue'
+import CReportEmployeeDaysOff from '@/modules/Report/components/CReportEmployeeDaysOff.vue'
+import { currentOwnerMonth } from '@/modules/Report/utils/ownerDates'
+import { parseEmployeeDaysOff, serializeEmployeeDaysOff } from '@/modules/Report/utils/employeeDaysOff'
 
 interface ReportSettings {
   clocksterEnabled: boolean
@@ -30,6 +34,8 @@ interface ReportSettings {
   contractsEnabled: boolean
   statementEnabled: boolean
   activityShiftBased: boolean
+  ownerEnabled: boolean
+  ownerDisplayName: string
 }
 interface KpiSettings {
   eachPointValue: number
@@ -37,7 +43,6 @@ interface KpiSettings {
   morningShiftStart: string
   afternoonShiftStart: string
   nightShiftStart: string
-  weekendDays: number[]
   timeZoneId: string
 }
 interface Mapping {
@@ -76,6 +81,13 @@ interface IgnoredEmployee {
   userName: string | null
   shift: number
 }
+interface EmployeeDaysOff {
+  userId: string
+  firstName: string | null
+  lastName: string | null
+  userName: string
+  daysOff: string
+}
 const api = useApi()
 const auth = useAuthStore()
 const canEdit = computed(() => hasPermission(auth.token, 'report.settings.edit'))
@@ -92,6 +104,8 @@ const settings = ref<ReportSettings>({
   contractsEnabled: true,
   statementEnabled: true,
   activityShiftBased: true,
+  ownerEnabled: true,
+  ownerDisplayName: 'NOOR',
 })
 const kpi = ref<KpiSettings>({
   eachPointValue: 0,
@@ -99,11 +113,8 @@ const kpi = ref<KpiSettings>({
   morningShiftStart: '09:00',
   afternoonShiftStart: '14:00',
   nightShiftStart: '22:00',
-  weekendDays: [0, 6],
   timeZoneId: 'Asia/Tashkent',
 })
-// The shift times above are wall-clock times with no zone of their own, so the board needs to be
-// told which zone they are in. It also decides where the day boundary falls.
 const commonTimeZones = [
   'America/New_York',
   'America/Chicago',
@@ -114,30 +125,11 @@ const commonTimeZones = [
   'Europe/Warsaw',
   'UTC',
 ]
-// A deployment may already be on a zone outside the shortlist; keep it selectable rather than
-// silently showing an empty box and resetting it on the next save.
 const timeZones = computed(() =>
   commonTimeZones.includes(kpi.value.timeZoneId)
     ? commonTimeZones
     : [kpi.value.timeZoneId, ...commonTimeZones].filter(Boolean)
 )
-const weekdays = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-  { value: 0, label: 'Sun' },
-]
-
-function toggleWeekend(day: number) {
-  if (!canEdit.value) return
-  const current = kpi.value.weekendDays
-  // Every day being a day off would leave nobody with a working day, which the API rejects.
-  if (current.includes(day)) kpi.value.weekendDays = current.filter((item) => item !== day)
-  else if (current.length < 6) kpi.value.weekendDays = [...current, day].sort((a, b) => a - b)
-}
 const mapping = ref<Mapping[]>([])
 const mappingSearch = ref('')
 const discovering = ref(false)
@@ -172,7 +164,57 @@ const ignoredUserId = ref('')
 const ignoredShift = ref('0')
 const loading = ref(false)
 const saving = ref(false)
-const features: { label: string; key: keyof ReportSettings }[] = [
+const offDayMonth = ref(currentOwnerMonth())
+const offDayEmployees = ref<EmployeeDaysOff[]>([])
+const offDayOriginal = ref<Record<string, string>>({})
+const offDaySearch = ref('')
+const offDayLoading = ref(false)
+const offDaySaving = ref(false)
+const filteredOffDayEmployees = computed(() => offDayEmployees.value.filter((item) =>
+  `${item.firstName ?? ''} ${item.lastName ?? ''} ${item.userName}`.toLowerCase().includes(offDaySearch.value.toLowerCase())
+))
+
+function employeeDays(item: EmployeeDaysOff): number[] {
+  return parseEmployeeDaysOff(item.daysOff)
+}
+
+function offDaySnapshot(item: EmployeeDaysOff) {
+  return item.daysOff
+}
+
+async function loadEmployeeDaysOff() {
+  offDayLoading.value = true
+  try {
+    const response = await api.get<{ successResult: EmployeeDaysOff[] }>('/report/api/settings/employee-days-off', {
+      params: { month: `${offDayMonth.value}-01` },
+    })
+    offDayEmployees.value = response.data.successResult ?? []
+    offDayOriginal.value = Object.fromEntries(offDayEmployees.value.map((item) => [item.userId, offDaySnapshot(item)]))
+  } catch {
+    toast.error('Could not load employee days off.')
+  } finally {
+    offDayLoading.value = false
+  }
+}
+
+async function saveEmployeeDaysOff() {
+  const changed = offDayEmployees.value.filter((item) => offDaySnapshot(item) !== offDayOriginal.value[item.userId])
+  if (!changed.length) return
+  offDaySaving.value = true
+  try {
+    await api.put('/report/api/settings/employee-days-off', {
+      month: `${offDayMonth.value}-01`,
+      assignments: changed.map((item) => ({ userId: item.userId, daysOff: employeeDays(item) })),
+    })
+    await loadEmployeeDaysOff()
+    toast.success('Employee days off saved.')
+  } catch {
+    toast.error('Could not save employee days off.')
+  } finally {
+    offDaySaving.value = false
+  }
+}
+const features: { label: string; key: Exclude<keyof ReportSettings, 'ownerDisplayName'> }[] = [
   { label: 'Statistics', key: 'statisticsEnabled' },
   { label: 'Attendance', key: 'attendanceEnabled' },
   { label: 'Teams', key: 'teamsEnabled' },
@@ -182,6 +224,7 @@ const features: { label: string; key: keyof ReportSettings }[] = [
   { label: 'Notes', key: 'notesEnabled' },
   { label: 'Contracts', key: 'contractsEnabled' },
   { label: 'Statement', key: 'statementEnabled' },
+  { label: 'Owner', key: 'ownerEnabled' },
 ]
 
 function normalizeMapping(items: (Mapping | MappingPayload)[]): Mapping[] {
@@ -216,11 +259,7 @@ async function load() {
     ])
     settings.value = settingsResponse.data.successResult
     const kpiResult = kpiResponse.data.successResult
-    kpi.value = {
-      ...kpiResult,
-      weekendDays: Array.isArray(kpiResult?.weekendDays) ? kpiResult.weekendDays : [0, 6],
-      timeZoneId: kpiResult?.timeZoneId || 'Asia/Tashkent',
-    }
+    kpi.value = { ...kpiResult, timeZoneId: kpiResult?.timeZoneId || 'Asia/Tashkent' }
     mapping.value = normalizeMapping(mappingResponse.data.successResult ?? [])
     notes.value = noteResponse.data.successResult ?? []
     levels.value = levelResponse.data.successResult ?? []
@@ -326,7 +365,8 @@ async function removeIgnored(id: string) {
   }
 }
 
-onMounted(load)
+watch(offDayMonth, loadEmployeeDaysOff)
+onMounted(() => { load(); loadEmployeeDaysOff() })
 </script>
 
 <template>
@@ -385,6 +425,13 @@ onMounted(load)
         </div>
       </section>
       <section class="rounded-lg border border-border bg-card p-5">
+        <h2 class="text-sm font-semibold">Owner display</h2>
+        <p class="mt-1 text-xs text-muted-foreground">Name shown in the header for Owner accounts across this installation.</p>
+        <label class="mt-4 grid max-w-sm gap-1.5 text-sm">Display name
+          <Input v-model="settings.ownerDisplayName" maxlength="80" :disabled="!canEdit" />
+        </label>
+      </section>
+      <section class="rounded-lg border border-border bg-card p-5">
         <h2 class="text-sm font-semibold">KPI calculation</h2>
         <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label class="grid gap-1.5 text-sm"
@@ -409,29 +456,6 @@ onMounted(load)
           /></label>
         </div>
         <div class="mt-5 border-t border-border pt-4">
-          <h3 class="text-sm font-medium">Days off</h3>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Selected days are never counted as worked and are not paid. This applies to employees
-            whose attendance is filled in automatically.
-          </p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button
-              v-for="day in weekdays"
-              :key="day.value"
-              type="button"
-              :disabled="!canEdit"
-              :aria-pressed="kpi.weekendDays.includes(day.value)"
-              class="min-w-14 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              :class="
-                kpi.weekendDays.includes(day.value)
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background hover:bg-muted'
-              "
-              @click="toggleWeekend(day.value)"
-            >
-              {{ day.label }}
-            </button>
-          </div>
           <label class="mt-5 grid max-w-xs gap-1.5 text-sm">
             Time zone
             <Select v-model="kpi.timeZoneId" :disabled="!canEdit">
@@ -446,6 +470,32 @@ onMounted(load)
               The zone the shift times above are in, and the one that decides when a day ends.
             </span>
           </label>
+        </div>
+      </section>
+      <section class="rounded-lg border border-border bg-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold">Employee days off</h2>
+            <p class="mt-1 text-xs text-muted-foreground">Assign days off for each employee and month. These days are excluded from attendance and salary calculations.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <CReportMonthField v-model="offDayMonth" />
+            <Button v-if="canEdit" :disabled="offDaySaving || offDayLoading" @click="saveEmployeeDaysOff">{{ offDaySaving ? 'Saving…' : 'Save off days' }}</Button>
+          </div>
+        </div>
+        <Input v-model="offDaySearch" class="mt-4 max-w-xs" placeholder="Search employees" />
+        <div class="mt-4 max-h-80 overflow-auto rounded-md border border-border">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th class="px-3 py-2 font-medium">Employee</th><th class="px-3 py-2 font-medium">Days off</th></tr></thead>
+            <tbody>
+              <tr v-for="item in filteredOffDayEmployees" :key="item.userId" class="border-t border-border">
+                <td class="px-3 py-2 font-medium">{{ `${item.firstName ?? ''} ${item.lastName ?? ''}`.trim() || item.userName }}<span class="block text-xs font-normal text-muted-foreground">{{ item.userName }}</span></td>
+                <td class="px-3 py-2"><CReportEmployeeDaysOff :model-value="employeeDays(item)" :disabled="!canEdit" @update:model-value="(days) => item.daysOff = serializeEmployeeDaysOff(days)" /></td>
+              </tr>
+              <tr v-if="offDayLoading"><td colspan="2" class="px-3 py-6 text-center text-muted-foreground">Loading employees…</td></tr>
+              <tr v-else-if="!filteredOffDayEmployees.length"><td colspan="2" class="px-3 py-6 text-center text-muted-foreground">No employees found.</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
       <section class="rounded-lg border border-border bg-card p-5">

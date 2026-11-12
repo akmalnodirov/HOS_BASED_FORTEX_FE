@@ -1,6 +1,5 @@
 import type { RoleType } from '../types'
 
-
 export const RoleTypeEnum = {
   1: 'SystemAdmin',
   2: 'Client',
@@ -10,12 +9,20 @@ export const RoleTypeEnum = {
   6: 'PortalUser',
   7: 'Assistant',
   8: 'Checker',
+  9: 'Owner',
 } as const
 
-
 export function getRoleTypes(userRoleType: number = 1): RoleType[] {
-  const rank = (type: number) => type === 1 ? 0 : type === 2 ? 1 : type === 3 ? 2
-    : type === 4 || type === 5 ? 3 : 4
+  const rank = (type: number) =>
+    type === 1
+      ? 0
+      : type === 2 || type === 9
+        ? 1
+        : type === 3
+          ? 2
+          : type === 4 || type === 5
+            ? 3
+            : 4
   return Object.entries(RoleTypeEnum)
     .filter(([key]) => parseInt(key) > 2 && rank(userRoleType) < rank(parseInt(key)))
     .map(([key, value]) => ({
