@@ -5,12 +5,12 @@ import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
 import type { RouteEldCompaniesResponse } from '@/types/company'
-import type { AlprCameraAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
+import type { AlprCameraAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const storageKey = 'route-eld-notification-types'
-export const alertTypes: RouteEldAlertType[] = ['station', 'alpr', 'violation', 'speed']
+export const alertTypes: RouteEldAlertType[] = ['station', 'alpr', 'red_state', 'violation', 'speed']
 export const alertLabels: Record<RouteEldAlertType, string> = {
-  station: 'Station alerts', alpr: 'ALPR camera alerts', violation: 'Violation alerts', speed: 'Speed alerts',
+  station: 'Station alerts', alpr: 'ALPR camera alerts', red_state: 'Red state alerts', violation: 'Violation alerts', speed: 'Speed alerts',
 }
 
 export interface UnreadAlert {
@@ -29,7 +29,14 @@ function unwrap<T>(data: T | { successResult: T }): T {
 function storedTypes(userId: string): RouteEldAlertType[] {
   try {
     const saved = JSON.parse(localStorage.getItem(`${storageKey}:${userId}`) ?? 'null')
-    if (Array.isArray(saved)) return alertTypes.filter((type) => saved.includes(type))
+    if (Array.isArray(saved)) {
+      const migrationKey = `${storageKey}:red-state:${userId}`
+      if (!localStorage.getItem(migrationKey)) {
+        saved.push('red_state')
+        localStorage.setItem(migrationKey, '1')
+      }
+      return alertTypes.filter((type) => saved.includes(type))
+    }
   } catch { /* Use all types when stored preferences are invalid. */ }
   return [...alertTypes]
 }
@@ -98,6 +105,10 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
           const response = await api.get<AlprCameraAlert[] | { successResult: AlprCameraAlert[] }>(ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS, { params: { limit: 100 } })
           return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({ id: a.id, type, companyId: a.companyId, title: `${a.driverName} is approaching an ALPR camera`, detail: a.brand || a.cameraName, occurredAt: a.occurredAt }))
         }
+        if (type === 'red_state') {
+          const response = await api.get<RedStateAlert[] | { successResult: RedStateAlert[] }>(ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS, { params: { limit: 100 } })
+          return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({ id: a.id, type, companyId: a.companyId, title: `${a.driverName} is approaching ${a.stateCode}`, detail: `${a.distanceMiles.toFixed(1)} mi to state border`, occurredAt: a.occurredAt }))
+        }
         if (type === 'speed') {
           const response = await api.get<SpeedAlert[] | { successResult: SpeedAlert[] }>(ApiEndpoints.ROUTE_ELD_SPEED_ALERTS)
           return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({ id: a.id, type, companyId: a.companyId!, title: `${a.driverName} exceeded the speed limit`, detail: `${Math.round(a.speed)} mph · ${a.location || a.stateCode || 'Location unavailable'}`, occurredAt: a.occurredAt }))
@@ -119,6 +130,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
     const endpoint = {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERT_READ,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERT_READ,
+      red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERT_READ,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERT_READ,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERT_READ,
     }[alert.type]
@@ -132,6 +144,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
     const endpoints = {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
+      red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS_READ_ALL,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
     }

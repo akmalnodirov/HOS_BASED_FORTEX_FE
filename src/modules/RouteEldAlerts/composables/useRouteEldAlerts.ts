@@ -3,6 +3,7 @@ import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import type {
   AlprCameraAlert,
+  RedStateAlert,
   RouteEldAlertCompany,
   RouteEldAlertType,
   SpeedAlert,
@@ -38,6 +39,7 @@ export function useRouteEldAlerts() {
   const api = useApi()
   const stationAlerts = ref<StationAlert[]>([])
   const alprCameraAlerts = ref<AlprCameraAlert[]>([])
+  const redStateAlerts = ref<RedStateAlert[]>([])
   const speedAlerts = ref<SpeedAlert[]>([])
   const violationAlerts = ref<ViolationAlert[]>([])
   const companies = ref<RouteEldAlertCompany[]>([])
@@ -88,6 +90,12 @@ export function useRouteEldAlerts() {
           { params: { ...params, limit: 500 } }
         )
         if (version === requestVersion) alprCameraAlerts.value = unwrap(response.data)
+      } else if (type === 'red_state') {
+        const response = await api.get<RedStateAlert[] | ApiEnvelope<RedStateAlert[]>>(
+          ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS,
+          { params: { ...params, limit: 500 } }
+        )
+        if (version === requestVersion) redStateAlerts.value = unwrap(response.data)
       } else if (type === 'speed') {
         const response = await api.get<SpeedAlert[] | ApiEnvelope<SpeedAlert[]>>(
           ApiEndpoints.ROUTE_ELD_SPEED_ALERTS,
@@ -123,6 +131,7 @@ export function useRouteEldAlerts() {
     loadedTypes.clear()
     stationAlerts.value = []
     alprCameraAlerts.value = []
+    redStateAlerts.value = []
     speedAlerts.value = []
     violationAlerts.value = []
     error.value = null
@@ -152,6 +161,15 @@ export function useRouteEldAlerts() {
     }
   }
 
+  async function markRedStateRead(id: string) {
+    markingReadId.value = id
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_RED_STATE_ALERT_READ(id), null)
+      const alert = redStateAlerts.value.find((item) => item.id === id)
+      if (alert) alert.isRead = true
+    } finally { markingReadId.value = null }
+  }
+
   async function markSpeedRead(id: string) {
     markingReadId.value = id
     try {
@@ -174,6 +192,7 @@ export function useRouteEldAlerts() {
     const endpoint = {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
+      red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS_READ_ALL,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
     }[type]
@@ -184,6 +203,7 @@ export function useRouteEldAlerts() {
   return {
     stationAlerts,
     alprCameraAlerts,
+    redStateAlerts,
     speedAlerts,
     violationAlerts,
     companies,
@@ -199,6 +219,7 @@ export function useRouteEldAlerts() {
     resetAlerts,
     markStationRead,
     markAlprCameraRead,
+    markRedStateRead,
     markSpeedRead,
     markViolationRead,
     markAllRead,

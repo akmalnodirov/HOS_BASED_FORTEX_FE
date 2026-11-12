@@ -1,4 +1,41 @@
-export type RouteEldAlertType = 'station' | 'alpr' | 'violation' | 'speed'
+export type RouteEldAlertType = 'station' | 'alpr' | 'red_state' | 'violation' | 'speed'
+
+export interface RedStateSettings {
+  stateCodes: string[]
+  proximityMiles: number
+}
+
+export interface RouteEldRedStateApproachMessage {
+  companyId: string | null
+  alertId: string
+  driverId: string
+  driverName: string
+  stateCode: string
+  distanceMiles: number
+  boundaryLatitude: number
+  boundaryLongitude: number
+  driverLatitude: number
+  driverLongitude: number
+  driverLocation: string | null
+  occurredAt: string
+}
+
+export interface RedStateAlert {
+  companyId: string
+  id: string
+  driverId: string
+  driverName: string
+  stateCode: string
+  boundaryLatitude: number
+  boundaryLongitude: number
+  driverLatitude: number
+  driverLongitude: number
+  driverLocation: string | null
+  distanceMiles: number
+  occurredAt: string
+  resolvedAt: string | null
+  isRead: boolean
+}
 
 export interface RouteEldGenericAlertMessage {
   companyId: string

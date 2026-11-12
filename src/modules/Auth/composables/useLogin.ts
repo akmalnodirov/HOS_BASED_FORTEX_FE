@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type { LoginCredentials, LoginResponse } from '@/modules/Auth/types'
+import { ownerLandingPath } from '@/modules/Report/utils/ownerAccess'
 
 interface LoginErrors {
   username: string
@@ -106,7 +107,9 @@ export function useLogin() {
         console.warn('Could not fetch current user, using login data:', error)
       }
 
-      await router.replace('/initial/companies')
+      await router.replace(
+        ownerLandingPath(authStore.user, authStore.token) ?? '/initial/companies'
+      )
 
       resetForm()
     } catch (error: unknown) {
@@ -130,7 +133,6 @@ export function useLogin() {
           }
         }
       }
-
     } finally {
       isLoading.value = false
     }

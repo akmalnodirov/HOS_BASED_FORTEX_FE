@@ -101,7 +101,8 @@
         <!--        </Button>-->
 
         <!-- Company Dropdown -->
-        <DropdownMenu v-model:open="isDropdownOpen">
+        <div v-if="isOwnerUser" class="flex h-10 items-center px-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ ownerDisplayName }}</div>
+        <DropdownMenu v-else v-model:open="isDropdownOpen">
           <DropdownMenuTrigger as-child>
             <Button
               variant="ghost"
@@ -213,7 +214,7 @@
             </div>
 
             <div
-              class="p-4 border-t border-border bg-background dark:bg-card flex items-center gap-2"
+              class="p-4 border-t border-border bg-background dark:bg-card flex items-stretch gap-2"
             >
               <div
                 class="flex-1 flex items-center gap-3 bg-[#F0F0F0] dark:bg-muted border border-border py-2.5 px-4 rounded cursor-pointer hover:bg-accent transition-colors"
@@ -232,7 +233,7 @@
                 v-if="canViewOwnKpi"
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-auto w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="My KPI"
                 aria-label="My KPI"
                 @click.stop="openMyKpi"
@@ -242,7 +243,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
+                class="h-auto w-11 flex-shrink-0 rounded border border-border bg-[#F0F0F0] dark:bg-muted"
                 title="Change password"
                 aria-label="Change password"
                 @click.stop="openChangePassword"
@@ -252,7 +253,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-20 w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
+                class="h-auto w-11 flex-shrink-0 bg-[#F0F0F0] dark:bg-red-900/10 border border-[#DBDBDB] dark:border-red-900/30 rounded hover:bg-[#FFEBEB] group overflow-hidden"
                 @click.stop="handleLogout"
               >
                 <LogOut class="w-5 h-5 text-[#C53030] transition-transform group-hover:scale-110" />
@@ -265,7 +266,7 @@
   </header>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Menu,
@@ -287,6 +288,7 @@ import {
   Check,
   BadgeDollarSign,
   KeyRound,
+  MapPinned,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -303,11 +305,12 @@ import type { RouteEldCompany } from '@/types/company'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { useApi } from '@/composables/useAxiosService'
 import { hasPermission } from '@/router/permissions'
+import { isOwnerUser as hasOwnerRole } from '@/modules/Report/utils/ownerAccess'
 import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
 
-const alertIcons = { station: Scale, alpr: Camera, speed: Gauge, violation: ShieldAlert }
+const alertIcons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
 const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead, markAllRead } = useRouteEldNotificationCenter()
 const { viewAlerts } = useRouteEldAlertNavigation()
 const isNotificationsOpen = ref(false)
@@ -342,7 +345,21 @@ const emit = defineEmits<{
 
 const { isDarkMode, toggleDarkMode } = useDarkMode()
 const authStore = useAuthStore()
+const isOwnerUser = computed(() => hasOwnerRole(authStore.user))
+const ownerDisplayName = ref('Owner')
 const api = useApi()
+async function loadOwnerDisplayName() {
+  if (!isOwnerUser.value) return
+  try {
+    const response = await api.get<{ successResult: { ownerDisplayName: string } }>('/report/api/features')
+    ownerDisplayName.value = response.data.successResult.ownerDisplayName || 'Owner'
+  } catch {
+    ownerDisplayName.value = 'Owner'
+  }
+}
+watch(isOwnerUser, (owner) => { if (owner) void loadOwnerDisplayName() }, { immediate: true })
+onMounted(() => window.addEventListener('report-features-updated', loadOwnerDisplayName))
+onUnmounted(() => window.removeEventListener('report-features-updated', loadOwnerDisplayName))
 const teamName = ref<string | null>(null)
 const teamInfoLoaded = ref(false)
 const canViewOwnKpi = computed(() => hasPermission(authStore.token, 'report.my_kpi.view'))

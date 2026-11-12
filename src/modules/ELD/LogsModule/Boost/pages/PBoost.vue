@@ -576,6 +576,7 @@ import type {
   RouteEldNormalizeResponse,
   RouteEldNormalizeType,
   RouteEldSessionOperation,
+  RouteEldSessionOperationFailure,
   RouteEldRepairRequestResponse,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
@@ -1385,6 +1386,13 @@ const sessionPeriodLabel = computed(() =>
     ? `${dayjs(session.value.fromDate).format('MMM D, YYYY')} – ${dayjs(session.value.toDate).format('MMM D, YYYY')}`
     : ''
 )
+const failedItemsLabel = (count: number, failures: RouteEldSessionOperationFailure[]) => {
+  const plural = count === 1 ? '' : 's'
+  const forms = failures.filter((failure) => failure.itemType === 'PROFILE_FORM').length
+  if (failures.length && forms === failures.length) return `${count} profile form${plural}`
+  if (!forms) return `${count} event${plural}`
+  return `${count} item${plural} (${forms} profile form${forms === 1 ? '' : 's'})`
+}
 const runSessionAction = async (action: 'submit' | 'rollback') => {
   sessionOperationType.value = action
   sessionOperation.value = null
@@ -1411,7 +1419,7 @@ const runSessionAction = async (action: 'submit' | 'rollback') => {
     if (failedCount || result.error) {
       toast.warning(
         failedCount
-          ? `${failedCount} event${failedCount === 1 ? '' : 's'} could not be processed`
+          ? `${failedItemsLabel(failedCount, result.failures ?? [])} could not be processed. See the details in the progress window.`
           : result.error || 'Session operation finished with issues'
       )
     } else {
