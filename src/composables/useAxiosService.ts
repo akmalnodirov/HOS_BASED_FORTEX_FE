@@ -131,6 +131,9 @@ class ApiService {
         // Handle 401 - Unauthorized
         if (error.response?.status === 401) {
           if (!originalRequest._retry) {
+            const failedToken = this.getBearerToken(originalRequest)
+            originalRequest._retry = true
+
             if (this.isRefreshing) {
               // Wait for token refresh
               return new Promise((resolve, reject) => {
@@ -144,12 +147,10 @@ class ApiService {
                 })
             }
 
-            originalRequest._retry = true
             this.isRefreshing = true
 
             try {
-              // Attempt to refresh token
-              await this.refreshToken()
+              await this.refreshToken(failedToken)
               this.processQueue(null)
               return this.axiosInstance(originalRequest)
             } catch (refreshError) {
@@ -183,53 +184,52 @@ class ApiService {
     this.failedQueue = []
   }
 
-  private async refreshToken(): Promise<void> {
-    const refreshToken = this.getAuthStore().getRefreshToken()
+  private getBearerToken(config: RequestConfig): string | null {
+    const header = config.headers?.Authorization
+    return typeof header === 'string' ? header.replace(/^Bearer /, '') : null
+  }
 
-    if (!refreshToken) {
+  private async refreshToken(failedToken: string | null): Promise<void> {
+    const refresh = () => this.requestNewTokens(failedToken)
+    if (navigator.locks) {
+      await navigator.locks.request('auth-refresh', refresh)
+    } else {
+      await refresh()
+    }
+  }
+
+  private async requestNewTokens(failedToken: string | null): Promise<void> {
+    const authStore = this.getAuthStore()
+    const storedToken = localStorage.getItem('token')
+    const storedRefreshToken = localStorage.getItem('refreshToken')
+
+    if (storedToken && storedToken !== failedToken) {
+      authStore.setTokens(storedToken, storedRefreshToken ?? undefined)
+      return
+    }
+
+    if (!storedRefreshToken) {
       throw new Error('No refresh token available')
     }
 
-    try {
-      // Call refresh token API
-      // Note: Adjust the endpoint based on your actual API
-      interface RefreshTokenResponse {
-        successResult?: {
-          token: string
-          refreshToken: string
-        }
-        token?: string
-        refreshToken?: string
+    interface RefreshTokenResponse {
+      successResult?: {
+        token: string
+        refreshToken: string
       }
-
-      const response = await axios.post<RefreshTokenResponse>(
-        `${this.axiosInstance.defaults.baseURL}/api/auth/refresh`,
-        { refreshToken },
-        {
-          _skipErrorHandling: true, // Skip error handling to avoid infinite loop
-        } as RequestConfig
-      )
-
-      // Handle different response formats
-      let newToken: string
-      let newRefreshToken: string
-
-      if (response.data.successResult) {
-        newToken = response.data.successResult.token
-        newRefreshToken = response.data.successResult.refreshToken
-      } else if (response.data.token) {
-        newToken = response.data.token
-        newRefreshToken = response.data.refreshToken || refreshToken
-      } else {
-        throw new Error('Invalid refresh token response')
-      }
-
-      // Update tokens in store
-      this.getAuthStore().setTokens(newToken, newRefreshToken)
-    } catch (error) {
-      console.error('Token refresh failed:', error)
-      throw error
     }
+
+    const response = await axios.post<RefreshTokenResponse>(
+      `${this.axiosInstance.defaults.baseURL}/api/auth/refresh`,
+      { refreshToken: storedRefreshToken }
+    )
+
+    const result = response.data.successResult
+    if (!result?.token || !result.refreshToken) {
+      throw new Error('Invalid refresh token response')
+    }
+
+    authStore.setTokens(result.token, result.refreshToken)
   }
 
   private handleLogout(): void {
