@@ -329,6 +329,28 @@ export class ApiEndpoints {
     optionId: string
   ) =>
     `${this.ROUTE_ELD_EVENT_SESSION_REPAIRS(sessionId, tabId)}/${repairId}/options/${optionId}/apply`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVIEWS = (sessionId: string, tabId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reviews`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVIEW = (
+    sessionId: string,
+    tabId: string,
+    reviewId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REVIEWS(sessionId, tabId)}/${reviewId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVIEW_HISTORY = (sessionId: string) =>
+    `${this.ROUTE_ELD_EVENT_SESSION(sessionId)}/reviews`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVIEW_FINDING = (
+    sessionId: string,
+    tabId: string,
+    reviewId: string,
+    findingId: string
+  ) => `${this.ROUTE_ELD_EVENT_SESSION_REVIEW(sessionId, tabId, reviewId)}/findings/${findingId}`
+  static readonly ROUTE_ELD_EVENT_SESSION_REVIEW_FINDING_REPAIRS = (
+    sessionId: string,
+    tabId: string,
+    reviewId: string,
+    findingId: string
+  ) =>
+    `${this.ROUTE_ELD_EVENT_SESSION_REVIEW_FINDING(sessionId, tabId, reviewId, findingId)}/repairs`
   static readonly ROUTE_ELD_EVENT_SESSION_REASSIGN = (sessionId: string, tabId: string) =>
     `${this.ROUTE_ELD_EVENT_SESSION_TAB(sessionId, tabId)}/reassign`
   static readonly ROUTE_ELD_EVENT_SESSION_SUBMIT = (sessionId: string) =>

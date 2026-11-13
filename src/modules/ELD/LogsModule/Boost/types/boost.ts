@@ -851,3 +851,103 @@ export interface RouteEldAiAdvice {
   }>
   generatedAt: string
 }
+
+export type RouteEldReviewCategory =
+  | 'HOS_VIOLATION'
+  | 'DUTY_STATUS'
+  | 'TIME_DISTANCE'
+  | 'RECORD_CONSISTENCY'
+  | 'MISSING_RECORDS'
+  | 'OTHER'
+export type RouteEldReviewOrigin =
+  | 'INTRODUCED_BY_EDIT'
+  | 'WORSENED_BY_EDIT'
+  | 'PARTIALLY_FIXED'
+  | 'LEFT_UNFIXED'
+export type RouteEldReviewFindingStatus =
+  | 'OPEN'
+  | 'FIX_PROPOSED'
+  | 'NO_FIX_FOUND'
+  | 'APPLIED'
+  | 'DECLINED'
+  | 'DISMISSED'
+export type RouteEldReviewDecision = 'DECLINED' | 'DISMISSED'
+/** The repair a finding proposes; the same PascalCase values as the repairs endpoints. */
+export type RouteEldReviewRepairKind =
+  | 'RepairShiftViolation'
+  | 'RepairCycleViolation'
+  | 'RepairBreakViolation'
+
+/** One problem the AI draft review found in the edited tab; times are epoch milliseconds. */
+export interface RouteEldReviewFinding {
+  id: string
+  order: number
+  driverId: string
+  category: RouteEldReviewCategory
+  origin: RouteEldReviewOrigin
+  severity: 'ERROR' | 'WARNING'
+  fixMode: 'REPAIR' | 'MANUAL'
+  status: RouteEldReviewFindingStatus
+  code: string
+  eventId: string
+  startedAt: number
+  endedAt: number | null
+  occurrenceCount: number
+  durationMs: number | null
+  baselineDurationMs: number | null
+  isContextDependent: boolean
+  issue: string
+  recommendation: string
+  reason: string
+  proposedFix: string
+  expectedResult: string
+  isAiNarrated: boolean
+  /** Whether the proposed fix also clears the violation once the 7 days before the draft count. */
+  fixCycleCheck: 'NOT_CHECKED' | 'CLEARS' | 'REMAINS'
+  editedByUserId: string | null
+  editedByName: string | null
+  editChangeType: string | null
+  repairKind: RouteEldReviewRepairKind | null
+  repairRequestId: string | null
+  proposedRepairOptionId: string | null
+  appliedRepairOptionId: string | null
+  appliedByUserId: string | null
+  appliedAt: string | null
+  canRepair: boolean
+  decision: RouteEldReviewDecision | null
+  decidedByUserId: string | null
+  decidedAt: string | null
+}
+
+export interface RouteEldReview {
+  id: string
+  sessionId: string
+  tabId: string
+  createdAt: string
+  createdByUserId: string
+  fromDate: string
+  toDate: string
+  cycleContextFromDate: string | null
+  isStale: boolean
+  findingCount: number
+  fixedCount: number
+  isTruncated: boolean
+  findings: RouteEldReviewFinding[]
+}
+
+export interface RouteEldReviewSummary {
+  id: string
+  tabId: string
+  createdAt: string
+  createdByUserId: string
+  findingCount: number
+  fixedCount: number
+  isStale: boolean
+}
+
+export interface RouteEldReviewPage {
+  items: RouteEldReviewSummary[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
