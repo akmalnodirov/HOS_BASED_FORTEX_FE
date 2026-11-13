@@ -3,6 +3,7 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 
 const RECORD_SEPARATOR = '\x1e'
 const MAX_RECONNECT_DELAY_MS = 10_000
+const EDITING_IDLE_DELAY_MS = 2_000
 
 export interface BoostPresenceUser {
   userId: string
@@ -34,6 +35,7 @@ export function useBoostPresence(sessionId: Ref<string | null>, driverId: Ref<st
   let reconnectAttempt = 0
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let pingTimer: ReturnType<typeof setInterval> | null = null
+  let editingIdleTimer: ReturnType<typeof setTimeout> | null = null
   let invocationId = 0
   let lastVersion = -1
 
@@ -63,6 +65,11 @@ export function useBoostPresence(sessionId: Ref<string | null>, driverId: Ref<st
     users.value = []
   }
 
+  function clearEditingIdleTimer() {
+    if (editingIdleTimer) clearTimeout(editingIdleTimer)
+    editingIdleTimer = null
+  }
+
   function scheduleReconnect() {
     if (!enabled.value || !sessionId.value || !driverId.value || !token.value || reconnectTimer) return
     const delay = Math.min(1_000 * 2 ** reconnectAttempt++, MAX_RECONNECT_DELAY_MS)
@@ -77,6 +84,11 @@ export function useBoostPresence(sessionId: Ref<string | null>, driverId: Ref<st
     let message: Record<string, any>
     try { message = JSON.parse(raw) } catch { return }
     if (message.type === undefined && !handshakeComplete) {
+      if (message.error) {
+        console.warn('Boost presence handshake failed:', message.error)
+        socket?.close()
+        return
+      }
       handshakeComplete = true
       reconnectAttempt = 0
       connected.value = true
@@ -137,18 +149,33 @@ export function useBoostPresence(sessionId: Ref<string | null>, driverId: Ref<st
   }
 
   function setEditing(value: boolean) {
-    if (editing.value === value) return
-    editing.value = value
-    if (sessionId.value) send('SetBoostSessionEditing', [sessionId.value, value])
+    if (value) {
+      clearEditingIdleTimer()
+      if (editing.value) return
+      editing.value = true
+      if (sessionId.value) send('SetBoostSessionEditing', [sessionId.value, true])
+      return
+    }
+    if (!editing.value || editingIdleTimer) return
+    editingIdleTimer = setTimeout(() => {
+      editingIdleTimer = null
+      editing.value = false
+      if (sessionId.value) send('SetBoostSessionEditing', [sessionId.value, false])
+    }, EDITING_IDLE_DELAY_MS)
   }
 
-  watch([sessionId, driverId, token], () => {
+  watch([sessionId, driverId], () => {
+    clearEditingIdleTimer()
     editing.value = false
     connect()
   }, { immediate: true })
+  watch(token, (value) => {
+    if (!value) stop()
+    else if (enabled.value && !socket) connect()
+  })
   onActivated(() => { enabled.value = true; if (!socket) connect() })
   onDeactivated(() => { enabled.value = false; stop() })
-  onBeforeUnmount(stop)
+  onBeforeUnmount(() => { clearEditingIdleTimer(); stop() })
 
   return { users, connected, setEditing }
 }

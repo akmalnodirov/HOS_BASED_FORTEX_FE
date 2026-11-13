@@ -51,16 +51,6 @@
             @click="$emit('update:driver-id', driver.id || '')"
           >{{ driver.name }}</button>
         </div>
-        <Button
-          v-if="allowReview"
-          variant="outline"
-          size="sm"
-          class="h-9 px-4 text-xs"
-          :disabled="!selectedTab"
-          @click="$emit('review-click')"
-        >
-          <ClipboardCheck class="mr-2 h-4 w-4" /> AI Review
-        </Button>
         <Popover v-if="presenceUsers.length > 1" :open="presenceOpen" @update:open="onPresenceOpenChange">
           <PopoverTrigger as-child>
             <Button
@@ -100,13 +90,23 @@
                   <span>User ID</span><span class="truncate text-foreground" :title="user.displayName">{{ user.displayName }}</span>
                   <span>Log period</span><span class="text-foreground">{{ user.fromDate }} &ndash; {{ user.toDate }}</span>
                   <span>Date</span><span class="text-foreground">{{ formatPresenceDate(user.accessedAt) }}</span>
-                  <span>Login time</span><span class="text-foreground">{{ formatPresenceTime(user.editingStartedAt || user.accessedAt) }}</span>
+                  <span>Since</span><span class="text-foreground">{{ formatPresenceTime(user.editingStartedAt || user.accessedAt) }}</span>
                   <span>Duration</span><span class="text-foreground">{{ formatPresenceDuration(user.editingStartedAt || user.accessedAt) }}</span>
                 </div>
               </div>
             </div>
           </PopoverContent>
         </Popover>
+        <Button
+          v-if="allowReview"
+          variant="outline"
+          size="sm"
+          class="h-9 px-4 text-xs"
+          :disabled="!selectedTab"
+          @click="$emit('review-click')"
+        >
+          <ClipboardCheck class="mr-2 h-4 w-4" /> AI Review
+        </Button>
         <Button
           v-if="allowAssistant"
           variant="outline"
@@ -266,10 +266,11 @@ onMounted(() => {
 onBeforeUnmount(() => { if (presenceClock) clearInterval(presenceClock) })
 
 watch([() => props.presenceScopeKey, () => props.presenceUsers.length], ([scope, count], [previousScope]) => {
-  if (scope !== previousScope || count <= 1) {
+  if (scope !== previousScope) {
     presenceOpen.value = false
     presenceDismissed.value = false
   }
+  if (count <= 1) presenceOpen.value = false
   if (count > 1) openPresenceWhenReady()
 }, { flush: 'post' })
 

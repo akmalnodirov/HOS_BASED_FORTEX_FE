@@ -1025,7 +1025,7 @@ watch(
       normalizeOpen.value || durationOpen.value || repairOpen.value || certificationOpen.value
     )
   ),
-  (isEditing) => { if (isEditing) presence.setEditing(true) },
+  (isEditing) => presence.setEditing(isEditing),
   { flush: 'post' }
 )
 
