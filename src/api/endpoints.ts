@@ -243,6 +243,10 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_COMPANY = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}`
   static readonly ROUTE_ELD_COMPANY_PROFILE = (id: string) => `${this.ROUTE_ELD_COMPANIES}/${id}/profile`
   static readonly ROUTE_ELD_LOGS = `${this.BASE_URL}/route-eld/logs`
+  static readonly ROUTE_ELD_COMPANY_CERTIFICATION_FIXES = `${this.ROUTE_ELD_LOGS}/certification-fixes`
+  static readonly ROUTE_ELD_COMPANY_CERTIFICATION_PREVIEW = `${this.ROUTE_ELD_COMPANY_CERTIFICATION_FIXES}/preview`
+  static readonly ROUTE_ELD_COMPANY_CERTIFICATION_FIX = (id: string) =>
+    `${this.ROUTE_ELD_COMPANY_CERTIFICATION_FIXES}/${id}`
   static readonly ROUTE_ELD_DRIVER_DAILY_LOGS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/daily`
   static readonly ROUTE_ELD_LOG_DETAIL = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/detail`
   static readonly ROUTE_ELD_LOG_DETAILS = (id: string) => `${this.ROUTE_ELD_LOGS}/${id}/details`
