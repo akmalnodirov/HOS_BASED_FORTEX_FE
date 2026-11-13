@@ -52,6 +52,16 @@
           >{{ driver.name }}</button>
         </div>
         <Button
+          v-if="allowReview"
+          variant="outline"
+          size="sm"
+          class="h-9 px-4 text-xs"
+          :disabled="!selectedTab"
+          @click="$emit('review-click')"
+        >
+          <ClipboardCheck class="mr-2 h-4 w-4" /> AI Review
+        </Button>
+        <Button
           v-if="allowAssistant"
           variant="outline"
           size="sm"
@@ -103,7 +113,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Plus, Sparkles, X } from 'lucide-vue-next'
+import { ClipboardCheck, Plus, Sparkles, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -129,6 +139,7 @@ const props = withDefaults(
     allowSubmit?: boolean
     allowRollback?: boolean
     allowAssistant?: boolean
+    allowReview?: boolean
     tabs?: TabResponse[]
     selectedTab?: TabResponse | null
     driverId?: string
@@ -150,6 +161,7 @@ const props = withDefaults(
     allowSubmit: false,
     allowRollback: false,
     allowAssistant: false,
+    allowReview: false,
     tabs: () => [],
     selectedTab: null,
     driverId: '',
@@ -168,6 +180,7 @@ const emit = defineEmits<{
   (e: 'remove-tab', tabId: string): void
   (e: 'ai-advice-click'): void
   (e: 'assistant-click'): void
+  (e: 'review-click'): void
   (e: 'update:driver-id', driverId: string): void
 }>()
 

@@ -19,6 +19,10 @@ import type {
   RouteEldNormalizeType,
   GenerateRouteEldRepairRequest,
   RouteEldRepairRequestResponse,
+  RouteEldReview,
+  RouteEldReviewDecision,
+  RouteEldReviewFinding,
+  RouteEldReviewPage,
 } from '../types/boost'
 
 interface ApiEnvelope<T> {
@@ -704,6 +708,70 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     }
   }
 
+  function reviewTarget() {
+    if (!session.value || !activeTabId.value)
+      throw new Error('Open a session working tab before running the AI review.')
+    return { sessionId: session.value.id, tabId: activeTabId.value }
+  }
+
+  /** Reviews the active working tab; returns the latest review when the draft is unchanged since. */
+  async function runReview() {
+    const { sessionId, tabId } = reviewTarget()
+    const response = await api.post<RouteEldReview | ApiEnvelope<RouteEldReview>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVIEWS(sessionId, tabId),
+      null
+    )
+    return unwrap(response.data)
+  }
+
+  async function getReview(tabId: string, reviewId: string) {
+    if (!session.value) throw new Error('Open a session before reading a review.')
+    const response = await api.get<RouteEldReview | ApiEnvelope<RouteEldReview>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVIEW(session.value.id, tabId, reviewId)
+    )
+    return unwrap(response.data)
+  }
+
+  async function listReviews(page = 1, pageSize = 20) {
+    if (!session.value) throw new Error('Open a session before listing reviews.')
+    const response = await api.get<RouteEldReviewPage | ApiEnvelope<RouteEldReviewPage>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVIEW_HISTORY(session.value.id),
+      { params: { page, pageSize } }
+    )
+    return unwrap(response.data)
+  }
+
+  /** Generates repair options for one finding and links them to it; nothing changes until one is applied. */
+  async function generateFindingFix(reviewId: string, findingId: string) {
+    const { sessionId, tabId } = reviewTarget()
+    assertEditableSession()
+    isMutating.value = true
+    try {
+      const response = await api.post<
+        RouteEldRepairRequestResponse | ApiEnvelope<RouteEldRepairRequestResponse>
+      >(
+        ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVIEW_FINDING_REPAIRS(sessionId, tabId, reviewId, findingId),
+        null
+      )
+      return unwrap(response.data)
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function decideFinding(
+    reviewId: string,
+    findingId: string,
+    decision: RouteEldReviewDecision | null
+  ) {
+    const { sessionId, tabId } = reviewTarget()
+    const response = await api.patch<RouteEldReviewFinding | ApiEnvelope<RouteEldReviewFinding>>(
+      ApiEndpoints.ROUTE_ELD_EVENT_SESSION_REVIEW_FINDING(sessionId, tabId, reviewId, findingId),
+      { decision }
+    )
+    return unwrap(response.data)
+  }
+
   async function normalize(normalizeList: RouteEldNormalizeType[], applyCertificationFix: boolean) {
     if (!session.value || !activeTabId.value) return null
     if (!canEditWorkingSession.value) {
@@ -950,6 +1018,11 @@ export const useBoostWorkspaceStore = defineStore('routeEldBoostWorkspace', () =
     generateRepair,
     getRepair,
     applyRepair,
+    runReview,
+    getReview,
+    listReviews,
+    generateFindingFix,
+    decideFinding,
     normalize,
     submitOrRollback,
     activeOperation,

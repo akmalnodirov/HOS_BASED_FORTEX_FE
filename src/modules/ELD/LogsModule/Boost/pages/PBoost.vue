@@ -13,6 +13,7 @@
       :allow-submit="allowed('route_eld.log_details.submit')"
       :allow-rollback="allowed('route_eld.log_details.rollback')"
       :allow-assistant="allowAssistant"
+      :allow-review="session?.status === 'DRAFT'"
       :actions-pending="store.isBusy"
       :submit-loading="sessionActionLoading"
       :driver-id="activeDriverId"
@@ -28,6 +29,7 @@
       @remove-tab="removeTab"
       @ai-advice-click="aiAdviceOpen = true"
       @assistant-click="assistant.isOpen = true"
+      @review-click="openReviewPanel"
     />
     <div
       v-if="store.isSessionLocked && !sessionProgressOpen"
@@ -409,6 +411,25 @@
       @generate="generateRepairOptions"
       @apply="applyRepairOption"
     />
+    <CBoostReviewPanel
+      v-model:open="reviewOpen"
+      :loading="reviewLoading"
+      :error="reviewError"
+      :review="reviewResult"
+      :readonly="reviewReadonly"
+      :can-run="canRunReview"
+      :allow-repair="canEditSession && allowed('route_eld.log_details.boost')"
+      :allow-decide="allowed('route_eld.log_details.events.edit')"
+      :busy-finding-id="reviewBusyFindingId"
+      :history="reviewHistory"
+      :history-loading="reviewHistoryLoading"
+      @run="runReviewPanel"
+      @generate-fix="showFindingFix"
+      @decide="decideFinding"
+      @select-event="selectReviewEvent"
+      @load-history="loadReviewHistory"
+      @open-history="openReviewFromHistory"
+    />
 
     <CBoostAlprRouteDialog
       v-model:open="alprRouteOpen"
@@ -578,6 +599,10 @@ import type {
   RouteEldSessionOperation,
   RouteEldSessionOperationFailure,
   RouteEldRepairRequestResponse,
+  RouteEldReview,
+  RouteEldReviewDecision,
+  RouteEldReviewFinding,
+  RouteEldReviewSummary,
 } from '../types/boost'
 import CBoostToolbar from '../components/CBoostToolbar.vue'
 import CBoostGraphHeaderControls from '../components/CBoostGraphHeaderControls.vue'
@@ -599,6 +624,7 @@ import { useAssistantStore } from '@/modules/Assistant/store/assistant'
 import CBoostNormalizeModal from '../components/modals/CBoostNormalizeModal.vue'
 import CBoostDurationModal from '../components/modals/CBoostDurationModal.vue'
 import CBoostRepairModal from '../components/modals/CBoostRepairModal.vue'
+import CBoostReviewPanel from '../components/CBoostReviewPanel.vue'
 import CBoostCertificationModal from '../components/modals/CBoostCertificationModal.vue'
 import CBoostAlprRouteDialog from '../components/modals/CBoostAlprRouteDialog.vue'
 import CBoostEventTableColumnSettings from '../components/CBoostEventTableColumnSettings.vue'
@@ -731,6 +757,14 @@ const repairGenerating = ref(false)
 const applyingRepairOptionId = ref('')
 const repairFailureReason = ref('')
 const repairResult = ref<RouteEldRepairRequestResponse | null>(null)
+const reviewOpen = ref(false)
+const reviewLoading = ref(false)
+const reviewError = ref('')
+const reviewResult = ref<RouteEldReview | null>(null)
+const reviewReadonly = ref(false)
+const reviewBusyFindingId = ref('')
+const reviewHistory = ref<RouteEldReviewSummary[]>([])
+const reviewHistoryLoading = ref(false)
 const reassignTargetsLoading = ref(false)
 const eventEditorReadonly = ref(false)
 const cameraRouteOpen = ref(false)
@@ -1750,12 +1784,110 @@ const applyRepairOption = async (optionId: string) => {
     } else {
       toast.success('Repair option applied to the active working tab.')
     }
+    // The draft changed, so the open review is outdated: re-check it on the new timeline.
+    if (reviewOpen.value && reviewResult.value && !reviewReadonly.value) void runReviewPanel()
   } catch (error) {
     repairFailureReason.value = getApiErrorMessage(error, 'The repair option could not be applied.')
   } finally {
     applyingRepairOptionId.value = ''
   }
 }
+const canRunReview = computed(
+  () => session.value?.status === 'DRAFT' && store.activeTab?.kind === 'WORKING'
+)
+const runReviewPanel = async () => {
+  if (reviewLoading.value) return
+  reviewLoading.value = true
+  reviewError.value = ''
+  try {
+    reviewResult.value = await store.runReview()
+    reviewReadonly.value = false
+  } catch (error) {
+    reviewError.value = getApiErrorMessage(error, 'The draft could not be reviewed.')
+  } finally {
+    reviewLoading.value = false
+  }
+}
+// Re-run on every open: the draft may have changed while the panel was closed, and the server returns the same
+// review cheaply when nothing changed.
+const openReviewPanel = () => {
+  reviewOpen.value = true
+  if (canRunReview.value) void runReviewPanel()
+}
+const replaceFinding = (finding: RouteEldReviewFinding) => {
+  if (!reviewResult.value) return
+  reviewResult.value = {
+    ...reviewResult.value,
+    findings: reviewResult.value.findings.map((item) => (item.id === finding.id ? finding : item)),
+  }
+}
+const showFindingFix = async (finding: RouteEldReviewFinding) => {
+  const review = reviewResult.value
+  if (!review || reviewBusyFindingId.value) return
+  reviewBusyFindingId.value = finding.id
+  try {
+    const repair = await store.generateFindingFix(review.id, finding.id)
+    selectedEventId.value = finding.eventId
+    repairResult.value = repair
+    repairFailureReason.value = ''
+    applyingRepairOptionId.value = ''
+    repairOpen.value = true
+    reviewResult.value = await store.getReview(review.tabId, review.id)
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, 'A fix could not be generated for this finding.'))
+  } finally {
+    reviewBusyFindingId.value = ''
+  }
+}
+const decideFinding = async (
+  finding: RouteEldReviewFinding,
+  decision: RouteEldReviewDecision | null
+) => {
+  const review = reviewResult.value
+  if (!review || reviewBusyFindingId.value) return
+  reviewBusyFindingId.value = finding.id
+  try {
+    replaceFinding(await store.decideFinding(review.id, finding.id, decision))
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, 'The finding could not be updated.'))
+  } finally {
+    reviewBusyFindingId.value = ''
+  }
+}
+const selectReviewEvent = async (eventId: string) => {
+  if (reviewReadonly.value) return
+  reviewOpen.value = false
+  await nextTick()
+  await boostEventsTableRef.value?.focusEvent(eventId)
+  onGraphEventSelect(eventId)
+}
+const loadReviewHistory = async () => {
+  reviewHistoryLoading.value = true
+  try {
+    reviewHistory.value = (await store.listReviews()).items
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, 'The review history could not be loaded.'))
+  } finally {
+    reviewHistoryLoading.value = false
+  }
+}
+const openReviewFromHistory = async (item: RouteEldReviewSummary) => {
+  reviewLoading.value = true
+  reviewError.value = ''
+  try {
+    reviewResult.value = await store.getReview(item.tabId, item.id)
+    reviewReadonly.value = item.isStale || item.tabId !== store.activeTabId
+  } catch (error) {
+    reviewError.value = getApiErrorMessage(error, 'The review could not be loaded.')
+  } finally {
+    reviewLoading.value = false
+  }
+}
+watch([() => session.value?.id, () => store.activeTabId], () => {
+  reviewResult.value = null
+  reviewHistory.value = []
+  reviewError.value = ''
+})
 const openInsertModal = async () => {
   if (!canEditSession.value) return
   try {
