@@ -4,6 +4,7 @@ import { useApi } from '@/composables/useAxiosService'
 import type {
   AlprCameraAlert,
   RedStateAlert,
+  DotAlert,
   RouteEldAlertCompany,
   RouteEldAlertType,
   SpeedAlert,
@@ -40,6 +41,7 @@ export function useRouteEldAlerts() {
   const stationAlerts = ref<StationAlert[]>([])
   const alprCameraAlerts = ref<AlprCameraAlert[]>([])
   const redStateAlerts = ref<RedStateAlert[]>([])
+  const dotAlerts = ref<DotAlert[]>([])
   const speedAlerts = ref<SpeedAlert[]>([])
   const violationAlerts = ref<ViolationAlert[]>([])
   const companies = ref<RouteEldAlertCompany[]>([])
@@ -96,6 +98,12 @@ export function useRouteEldAlerts() {
           { params: { ...params, limit: 500 } }
         )
         if (version === requestVersion) redStateAlerts.value = unwrap(response.data)
+      } else if (type === 'dot') {
+        const response = await api.get<DotAlert[] | ApiEnvelope<DotAlert[]>>(
+          ApiEndpoints.ROUTE_ELD_DOT_ALERTS,
+          { params: { ...params, limit: 500 } }
+        )
+        if (version === requestVersion) dotAlerts.value = unwrap(response.data)
       } else if (type === 'speed') {
         const response = await api.get<SpeedAlert[] | ApiEnvelope<SpeedAlert[]>>(
           ApiEndpoints.ROUTE_ELD_SPEED_ALERTS,
@@ -132,6 +140,7 @@ export function useRouteEldAlerts() {
     stationAlerts.value = []
     alprCameraAlerts.value = []
     redStateAlerts.value = []
+    dotAlerts.value = []
     speedAlerts.value = []
     violationAlerts.value = []
     error.value = null
@@ -170,6 +179,15 @@ export function useRouteEldAlerts() {
     } finally { markingReadId.value = null }
   }
 
+  async function markDotRead(id: string) {
+    markingReadId.value = id
+    try {
+      await api.patch(ApiEndpoints.ROUTE_ELD_DOT_ALERT_READ(id), null)
+      const alert = dotAlerts.value.find((item) => item.id === id)
+      if (alert) alert.isRead = true
+    } finally { markingReadId.value = null }
+  }
+
   async function markSpeedRead(id: string) {
     markingReadId.value = id
     try {
@@ -193,6 +211,7 @@ export function useRouteEldAlerts() {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
       red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS_READ_ALL,
+      dot: ApiEndpoints.ROUTE_ELD_DOT_ALERTS_READ_ALL,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
     }[type]
@@ -204,6 +223,7 @@ export function useRouteEldAlerts() {
     stationAlerts,
     alprCameraAlerts,
     redStateAlerts,
+    dotAlerts,
     speedAlerts,
     violationAlerts,
     companies,
@@ -220,6 +240,7 @@ export function useRouteEldAlerts() {
     markStationRead,
     markAlprCameraRead,
     markRedStateRead,
+    markDotRead,
     markSpeedRead,
     markViolationRead,
     markAllRead,

@@ -24,6 +24,7 @@
             <SelectItem v-if="permittedTypes.includes('station')" value="station">Station alerts</SelectItem>
             <SelectItem v-if="permittedTypes.includes('alpr')" value="alpr">ALPR camera alerts</SelectItem>
             <SelectItem v-if="permittedTypes.includes('red_state')" value="red_state">Red state alerts</SelectItem>
+            <SelectItem v-if="permittedTypes.includes('dot')" value="dot">DOT alerts</SelectItem>
             <SelectItem v-if="permittedTypes.includes('violation')" value="violation">Violation alerts</SelectItem>
             <SelectItem v-if="permittedTypes.includes('speed')" value="speed">Speed alerts</SelectItem>
           </SelectContent>
@@ -371,6 +372,34 @@
         </tbody>
       </table>
 
+      <table v-else-if="alertType === 'dot'" class="w-full min-w-[1200px] border-collapse text-left text-sm">
+        <thead class="sticky top-0 z-20 bg-muted text-xs text-muted-foreground">
+          <tr>
+            <th class="h-12 w-14 px-3">No</th><th class="px-3">Driver</th>
+            <th v-if="allCompanies" class="px-3">Company</th>
+            <th class="px-3">Driver ID</th><th class="px-3">Truck</th><th class="px-3">Location</th>
+            <th class="px-3">Submitted</th><th class="px-3">Log period</th>
+            <th class="px-3">Status</th><th class="w-24 px-3 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="isLoading"><td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">Loading…</td></tr>
+          <tr v-for="(alert, index) in paginatedDotAlerts" v-else :key="alert.id" class="h-12 border-t border-border transition-colors hover:bg-muted/40">
+            <td class="px-3 text-muted-foreground">{{ rowNumber(index) }}</td>
+            <td class="px-3 font-medium">{{ alert.driverName }}</td>
+            <td v-if="allCompanies" class="px-3">{{ companyName(alert.companyId) }}</td>
+            <td class="px-3">{{ alert.externalDriverId }}</td>
+            <td class="px-3 font-semibold text-red-600">{{ alert.truckNumber }}</td>
+            <td class="max-w-64 truncate px-3" :title="alert.driverLocation || undefined">{{ alert.driverLocation || formatCoordinates(alert.driverLatitude, alert.driverLongitude) }}</td>
+            <td class="whitespace-nowrap px-3">{{ formatDate(alert.submittedAt) }}</td>
+            <td class="whitespace-nowrap px-3">{{ formatDate(alert.periodStart) }} – {{ formatDate(alert.periodEnd) }}</td>
+            <td class="px-3"><span v-if="!alert.isRead" class="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">Unread</span><span v-else class="text-muted-foreground">Read</span></td>
+            <td class="px-3 text-center"><div class="flex items-center justify-center gap-1"><Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewDotMap(alert)"><MapPinned class="h-4 w-4" /></Button><Button v-if="!alert.isRead" variant="ghost" size="icon" title="Mark read" aria-label="Mark read" :disabled="markingReadId === alert.id" @click="markDotRead(alert.id)"><LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" /><Check v-else class="h-4 w-4" /></Button></div></td>
+          </tr>
+          <tr v-if="!isLoading && paginatedDotAlerts.length === 0"><td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">No DOT alerts match the selected filters.</td></tr>
+        </tbody>
+      </table>
+
       <table v-else-if="alertType === 'red_state'" class="w-full min-w-[1060px] border-collapse text-left text-sm">
         <thead class="sticky top-0 z-20 bg-muted text-xs text-muted-foreground">
           <tr>
@@ -641,7 +670,7 @@ import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
 import { useRouteEldNotificationCenter } from '../composables/useRouteEldNotificationCenter'
 import CRedStateSettings from '../components/CRedStateSettings.vue'
-import type { AlprCameraAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
+import type { AlprCameraAlert, DotAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const props = withDefaults(defineProps<{
   allCompanies?: boolean
@@ -653,6 +682,7 @@ const {
   stationAlerts,
   alprCameraAlerts,
   redStateAlerts,
+  dotAlerts,
   speedAlerts,
   violationAlerts,
   isLoading,
@@ -665,18 +695,19 @@ const {
   markStationRead,
   markAlprCameraRead,
   markRedStateRead,
+  markDotRead,
   markSpeedRead,
   markViolationRead,
   markAllRead,
 } = useRouteEldAlerts()
-const { latestWeighStationAlert, latestAlprCameraAlert, latestRedStateAlert, latestGenericAlert } = useRouteEldAlertSocket()
+const { latestWeighStationAlert, latestAlprCameraAlert, latestRedStateAlert, latestDotAlert, latestGenericAlert } = useRouteEldAlertSocket()
 const { refresh: refreshUnreadAlerts } = useRouteEldNotificationCenter()
 
 const api = useApi()
 const authStore = useAuthStore()
 const permittedTypes = computed<RouteEldAlertType[]>(() =>
-  (['station', 'alpr', 'red_state', 'violation', 'speed'] as RouteEldAlertType[]).filter((type) =>
-    hasPermission(authStore.token, `route_eld.alerts.${type}`)
+  (['station', 'alpr', 'red_state', 'dot', 'violation', 'speed'] as RouteEldAlertType[]).filter((type) =>
+    hasPermission(authStore.token, `route_eld.alerts.${type === 'dot' ? 'red_state' : type}`)
   )
 )
 const selectedCompanyId = computed(() => authStore.companyId)
@@ -699,6 +730,7 @@ const requestedAlertType = route.query.type
 const alertType = ref<RouteEldAlertType>(
   requestedAlertType === 'alpr' ||
     requestedAlertType === 'red_state' ||
+    requestedAlertType === 'dot' ||
     requestedAlertType === 'violation' ||
     requestedAlertType === 'speed'
     ? requestedAlertType
@@ -735,6 +767,7 @@ const pageDescription = computed(() => {
   if (alertType.value === 'station') return 'Driver approaches to weigh stations'
   if (alertType.value === 'alpr') return 'Drivers approaching ALPR cameras'
   if (alertType.value === 'red_state') return 'Drivers approaching monitored state borders'
+  if (alertType.value === 'dot') return 'Logs submitted to DOT by Route ELD drivers'
   if (alertType.value === 'speed') return 'Drivers exceeding the state speed limit'
   return 'Drivers with HOS violations from Route ELD daily logs'
 })
@@ -743,6 +776,7 @@ const searchPlaceholder = computed(() => {
   if (alertType.value === 'station') return 'Search driver or station'
   if (alertType.value === 'alpr') return 'Search driver or camera'
   if (alertType.value === 'red_state') return 'Search driver or state'
+  if (alertType.value === 'dot') return 'Search driver ID or truck'
   if (alertType.value === 'speed') return 'Search driver or location'
   return 'Search driver, date or note'
 })
@@ -810,6 +844,18 @@ const filteredRedStateAlerts = computed(() => {
   })
 })
 
+const filteredDotAlerts = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  return dotAlerts.value.filter((alert) => {
+    const matchesSearch = !query ||
+      [alert.driverName, alert.externalDriverId, alert.truckNumber, alert.driverLocation].some(value => value?.toLowerCase().includes(query))
+    const matchesStatus = statusFilter.value === 'all' ||
+      (statusFilter.value === 'unread' && !alert.isRead) ||
+      (statusFilter.value === 'read' && alert.isRead)
+    return matchesSearch && matchesStatus
+  })
+})
+
 const filteredSpeedAlerts = computed(() => {
   const query = search.value.trim().toLowerCase()
   return speedAlerts.value.filter((alert) => {
@@ -846,6 +892,7 @@ const filteredCount = computed(() => {
   if (alertType.value === 'station') return filteredStationAlerts.value.length
   if (alertType.value === 'alpr') return filteredAlprCameraAlerts.value.length
   if (alertType.value === 'red_state') return filteredRedStateAlerts.value.length
+  if (alertType.value === 'dot') return filteredDotAlerts.value.length
   if (alertType.value === 'speed') return filteredSpeedAlerts.value.length
   return filteredViolationAlerts.value.length
 })
@@ -881,6 +928,9 @@ const paginatedAlprCameraAlerts = computed(() =>
 )
 const paginatedRedStateAlerts = computed(() =>
   filteredRedStateAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
+)
+const paginatedDotAlerts = computed(() =>
+  filteredDotAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
 )
 const paginatedSpeedAlerts = computed(() =>
   filteredSpeedAlerts.value.slice(pageSlice.value.start, pageSlice.value.end)
@@ -936,6 +986,14 @@ const summaryCards = computed(() => {
       { label: 'Active approaches', value: redStateAlerts.value.filter(alert => !alert.resolvedAt).length, className: 'text-orange-600' },
       { label: 'Passed', value: redStateAlerts.value.filter(alert => !!alert.resolvedAt).length, className: 'text-green-600' },
       { label: 'Unread', value: redStateAlerts.value.filter(alert => !alert.isRead).length, className: 'text-red-600' },
+    ]
+  }
+  if (alertType.value === 'dot') {
+    return [
+      { label: 'Alerts loaded', value: dotAlerts.value.length, className: '' },
+      { label: 'Unread', value: dotAlerts.value.filter(alert => !alert.isRead).length, className: 'text-red-600' },
+      { label: 'Drivers', value: new Set(dotAlerts.value.map(alert => alert.driverId)).size, className: '' },
+      { label: 'Trucks', value: new Set(dotAlerts.value.map(alert => alert.truckNumber)).size, className: '' },
     ]
   }
   if (alertType.value === 'speed') {
@@ -997,7 +1055,7 @@ watch(companyFilter, async () => {
 watch(
   () => route.query.type,
   (value) => {
-    if ((value === 'station' || value === 'alpr' || value === 'red_state' || value === 'violation' || value === 'speed') && permittedTypes.value.includes(value)) {
+    if ((value === 'station' || value === 'alpr' || value === 'red_state' || value === 'dot' || value === 'violation' || value === 'speed') && permittedTypes.value.includes(value)) {
       alertType.value = value
     }
   }
@@ -1013,6 +1071,10 @@ watch(latestAlprCameraAlert, (alert) => {
 watch(latestRedStateAlert, (alert) => {
   if (alertType.value === 'red_state' && matchesAlertCompany(alert?.companyId ?? null))
     void fetchAlerts('red_state', requestCompanyId.value, true)
+})
+watch(latestDotAlert, (alert) => {
+  if (alertType.value === 'dot' && matchesAlertCompany(alert?.companyId ?? null))
+    void fetchAlerts('dot', requestCompanyId.value, true)
 })
 watch(latestGenericAlert, (alert) => {
   const type = alert?.notificationKey
@@ -1138,6 +1200,27 @@ function viewAlprMap(alert: AlprCameraAlert) {
     longitude: alert.driverLongitude,
     targetLatitude: alert.cameraLatitude,
     targetLongitude: alert.cameraLongitude,
+  }
+}
+
+function viewDotMap(alert: DotAlert) {
+  mapSelection.value = {
+    driver: alert.driverName,
+    reason: 'DOT logs submitted',
+    detail: `Truck ${alert.truckNumber} · ${formatDate(alert.periodStart)} – ${formatDate(alert.periodEnd)}`,
+    driverRows: [
+      { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
+      { label: 'Location', value: alert.driverLocation || formatCoordinates(alert.driverLatitude, alert.driverLongitude) },
+      { label: 'Submitted', value: formatDate(alert.submittedAt) },
+      { label: 'Driver ID', value: alert.externalDriverId },
+      { label: 'Truck', value: alert.truckNumber },
+    ],
+    targetName: null,
+    targetRows: [],
+    latitude: alert.driverLatitude,
+    longitude: alert.driverLongitude,
+    targetLatitude: null,
+    targetLongitude: null,
   }
 }
 

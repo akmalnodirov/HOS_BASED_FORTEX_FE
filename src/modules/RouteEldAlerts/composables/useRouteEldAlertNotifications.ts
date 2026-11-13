@@ -16,7 +16,7 @@ function coordinates(latitude: number, longitude: number) {
 }
 
 interface RouteEldAlertToast {
-  type: 'station' | 'alpr' | 'red_state' | 'speed' | 'violation'
+  type: 'station' | 'alpr' | 'red_state' | 'dot' | 'speed' | 'violation'
   title: string
   description: string
   companyId: string
@@ -32,8 +32,8 @@ export function useRouteEldAlertNavigation() {
   const router = useRouter()
   const api = useApi()
   const authStore = useAuthStore()
-  async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'red_state' | 'speed' | 'violation', alertId?: string) {
-    if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type}`)) return false
+  async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'red_state' | 'dot' | 'speed' | 'violation', alertId?: string) {
+    if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type === 'dot' ? 'red_state' : type}`)) return false
     try {
       const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
       const company = response.data.successResult.find((item) =>
@@ -65,7 +65,7 @@ export function useRouteEldAlertNotifications() {
   const { viewAlerts } = useRouteEldAlertNavigation()
   const { enabledTypes, markRead, refresh } = useRouteEldNotificationCenter()
   const authStore = useAuthStore()
-  const { latestWeighStationAlert, latestAlprCameraAlert, latestRedStateAlert, latestGenericAlert } = useRouteEldAlertSocket()
+  const { latestWeighStationAlert, latestAlprCameraAlert, latestRedStateAlert, latestDotAlert, latestGenericAlert } = useRouteEldAlertSocket()
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
   async function readAlert(alert: RouteEldAlertToast, toastId: string) {
@@ -80,8 +80,8 @@ export function useRouteEldAlertNotifications() {
 
   function showAlert(alert: RouteEldAlertToast, id: string) {
     if (!enabledTypes.value.includes(alert.type)) return
-    const icons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
-    const isRedAlert = alert.type === 'violation' || alert.type === 'red_state'
+    const icons = { station: Scale, alpr: Camera, red_state: MapPinned, dot: ShieldAlert, speed: Gauge, violation: ShieldAlert }
+    const isRedAlert = alert.type === 'violation' || alert.type === 'red_state' || alert.type === 'dot'
     const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-background text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
     const content = defineComponent({
       setup: () => () => h('div', { class: 'flex w-full items-start gap-3' }, [
@@ -155,6 +155,20 @@ export function useRouteEldAlertNotifications() {
 
     if (alert.companyId) showAlert({ type: 'red_state', title: `${alert.driverName} is approaching ${alert.stateCode}`,
       description: details, companyId: alert.companyId, alertId: alert.alertId }, `route-eld-red-state-${alert.alertId}`)
+  })
+
+  watch(latestDotAlert, (alert) => {
+    if (!alert) return
+    if (!hasPermission(authStore.token, 'route_eld.alerts.red_state')) return
+    const location = alert.driverLocation ||
+      (alert.driverLatitude !== null && alert.driverLongitude !== null
+        ? coordinates(alert.driverLatitude, alert.driverLongitude)
+        : 'Location unavailable')
+    if (alert.companyId) showAlert({
+      type: 'dot', title: `${alert.driverName} submitted DOT logs`,
+      description: `Truck ${alert.truckNumber} · ID ${alert.externalDriverId} · ${location} · ${new Date(alert.periodStart).toLocaleString()} – ${new Date(alert.periodEnd).toLocaleString()}`,
+      companyId: alert.companyId, alertId: alert.alertId,
+    }, `route-eld-dot-${alert.alertId}`)
   })
 
   watch(latestGenericAlert, (alert) => {
