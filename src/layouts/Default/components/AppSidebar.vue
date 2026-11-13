@@ -200,6 +200,10 @@ import {
   ChartColumn,
   ListPlus,
   ClipboardPenLine,
+  Camera,
+  MapPinned,
+  ShieldAlert,
+  Gauge,
 } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
@@ -323,17 +327,24 @@ const allMenuItems: MenuItem[] = [
         path: '/vehicle-reports',
       },
       {
-        id: 'route-eld-alerts',
-        label: 'Alerts',
-        icon: '/icons/bell.svg',
-        path: '/route-eld-alerts',
-      },
-      {
         id: 'company',
         label: 'Company',
         icon: '/icons/bank.svg',
         path: '/company',
       },
+    ],
+  },
+  {
+    id: 'alerts',
+    label: 'Alerts',
+    icon: null,
+    children: [
+      { id: 'station-alerts', label: 'Station alerts', icon: Scale, path: '/route-eld-alerts/station' },
+      { id: 'alpr-alerts', label: 'ALPR camera alerts', icon: Camera, path: '/route-eld-alerts/alpr' },
+      { id: 'red-state-alerts', label: 'Red state alerts', icon: MapPinned, path: '/route-eld-alerts/red-state' },
+      { id: 'dot-alerts', label: 'DOT alerts', icon: ClipboardPenLine, path: '/route-eld-alerts/dot' },
+      { id: 'violation-alerts', label: 'Violation alerts', icon: ShieldAlert, path: '/route-eld-alerts/violation' },
+      { id: 'speed-alerts', label: 'Speed alerts', icon: Gauge, path: '/route-eld-alerts/speed' },
     ],
   },
   {

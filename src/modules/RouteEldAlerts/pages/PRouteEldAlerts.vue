@@ -5,7 +5,7 @@
   >
     <div class="mb-4 flex flex-none flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-foreground">Alerts</h1>
+        <h1 class="text-xl font-semibold text-foreground">{{ allCompanies ? 'Alerts' : alertLabels[alertType] }}</h1>
         <p class="mt-1 text-sm text-muted-foreground">{{ pageDescription }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -18,7 +18,7 @@
             </SelectItem>
           </SelectContent>
         </Select>
-        <Select v-model="alertType">
+        <Select v-if="allCompanies" v-model="alertType">
           <SelectTrigger class="h-10 w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem v-if="permittedTypes.includes('station')" value="station">Station alerts</SelectItem>
@@ -668,13 +668,14 @@ import { hasPermission } from '@/router/permissions'
 import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
-import { useRouteEldNotificationCenter } from '../composables/useRouteEldNotificationCenter'
+import { alertLabels, useRouteEldNotificationCenter } from '../composables/useRouteEldNotificationCenter'
 import CRedStateSettings from '../components/CRedStateSettings.vue'
 import type { AlprCameraAlert, DotAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const props = withDefaults(defineProps<{
   allCompanies?: boolean
   companies?: RouteEldCompany[]
+  alertType?: RouteEldAlertType
 }>(), { allCompanies: false, companies: () => [] })
 const { formatToTimeZone } = useTimeZoneHelper()
 const route = useRoute()
@@ -726,18 +727,9 @@ const matchesAlertCompany = (companyId: string | null) => {
     company.externalCompanyId === companyFilter.value
   )
 }
-const requestedAlertType = route.query.type
 const alertType = ref<RouteEldAlertType>(
-  requestedAlertType === 'alpr' ||
-    requestedAlertType === 'red_state' ||
-    requestedAlertType === 'dot' ||
-    requestedAlertType === 'violation' ||
-    requestedAlertType === 'speed'
-    ? requestedAlertType
-    : 'station'
+  props.alertType ?? permittedTypes.value.find((type) => type === route.query.type) ?? permittedTypes.value[0] ?? 'station'
 )
-if (!permittedTypes.value.includes(alertType.value) && permittedTypes.value.length)
-  alertType.value = permittedTypes.value[0]
 const search = ref('')
 const statusFilter = ref('all')
 const pageNumber = ref(1)
@@ -1044,6 +1036,9 @@ watch(alertType, async (value) => {
   pageNumber.value = 1
   if (props.allCompanies || requestCompanyId.value) await ensureAlerts(value, requestCompanyId.value)
 })
+watch(() => props.alertType, (value) => {
+  if (value) alertType.value = value
+})
 watch(companyFilter, async () => {
   if (!props.allCompanies) return
   requestCompanyId.value = companyFilter.value === 'all' ? null : companyFilter.value
@@ -1055,7 +1050,7 @@ watch(companyFilter, async () => {
 watch(
   () => route.query.type,
   (value) => {
-    if ((value === 'station' || value === 'alpr' || value === 'red_state' || value === 'dot' || value === 'violation' || value === 'speed') && permittedTypes.value.includes(value)) {
+    if (props.allCompanies && (value === 'station' || value === 'alpr' || value === 'red_state' || value === 'dot' || value === 'violation' || value === 'speed') && permittedTypes.value.includes(value)) {
       alertType.value = value
     }
   }
@@ -1207,7 +1202,7 @@ function viewDotMap(alert: DotAlert) {
   mapSelection.value = {
     driver: alert.driverName,
     reason: 'DOT logs submitted',
-    detail: `Truck ${alert.truckNumber} · ${formatDate(alert.periodStart)} – ${formatDate(alert.periodEnd)}`,
+    detail: `Truck ${alert.truckNumber} · ${formatDate(alert.periodStart)} → ${formatDate(alert.periodEnd)}`,
     driverRows: [
       { label: 'Company', value: props.allCompanies ? companyName(alert.companyId) : selectedCompanyName.value },
       { label: 'Location', value: alert.driverLocation || formatCoordinates(alert.driverLatitude, alert.driverLongitude) },

@@ -10,6 +10,7 @@ import type { RouteEldCompaniesResponse } from '@/types/company'
 import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 import { useRouteEldAlertSocket } from './useRouteEldAlertSocket'
 import { useRouteEldNotificationCenter } from './useRouteEldNotificationCenter'
+import { routeEldAlertPath } from '../alertPages'
 
 function coordinates(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
@@ -50,7 +51,7 @@ export function useRouteEldAlertNavigation() {
         if (authStore.companyId?.toLowerCase() !== company.id.toLowerCase())
           throw new Error('The alert company could not be selected.')
       }
-      await router.push({ name: 'RouteEldAlerts', query: { type, ...(alertId ? { alert: alertId } : {}) } })
+      await router.push({ path: routeEldAlertPath(type), query: alertId ? { alert: alertId } : {} })
       return true
     } catch (error: any) {
       toast.error(error.response?.data?.message || error.message || 'Could not open alerts')
