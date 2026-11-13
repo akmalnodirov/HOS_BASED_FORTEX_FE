@@ -65,7 +65,7 @@
           <Label>Shift distance (mi)</Label>
           <Input
             v-model.number="form.insertInfo.shiftDistance"
-            :disabled="disabled"
+            :disabled="disabled || order !== 1"
             type="number"
             placeholder="Maximum miles per shift"
           />
@@ -338,7 +338,9 @@ const form = reactive({
   insertInfo: {
     odometer: props.trip.odometer || (props.order !== 1 ? props.constants.odometer : 0),
     engHours: props.trip.engineHours || (props.order !== 1 ? props.constants.engineHours : 0),
-    shiftDistance: props.trip.shiftDistanceInMile || props.trip.dailyDistanceInMile || (props.order !== 1 ? props.constants.distance : 0),
+    shiftDistance: props.order === 1
+      ? props.trip.shiftDistanceInMile || props.trip.dailyDistanceInMile || 0
+      : props.constants.distance,
   },
   fromLocations: (props.trip.fromLocations?.length ? props.trip.fromLocations : [props.trip.from]).map((location, index) => ({
     id: Date.now() + index,
@@ -388,10 +390,10 @@ watch(
     form.driver = newVal.driverId
     form.startDateTime.date = newVal.startDate
     form.startDateTime.time = newVal.startTime
+    form.insertInfo.shiftDistance = newVal.distance
     if (props.order === 1) {
       form.insertInfo.odometer = newVal.odometer
       form.insertInfo.engHours = newVal.engineHours
-      form.insertInfo.shiftDistance = newVal.distance
     }
   },
   { deep: true }

@@ -101,6 +101,9 @@ export function useAuditForm() {
 
   const disableAuditForm = computed(() => {
     if (!auditFormAll.carrierId || !auditFormAll.driverId) return true
+    const shiftDistance = auditFormAll.trips[0]?.shiftDistanceInMile ||
+      auditFormAll.trips[0]?.dailyDistanceInMile || 0
+    if (!Number.isFinite(shiftDistance) || shiftDistance <= 0) return true
 
     for (const trip of auditFormAll.trips) {
       if (
