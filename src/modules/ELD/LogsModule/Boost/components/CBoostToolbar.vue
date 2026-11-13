@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center flex-col gap-1">
-    <div class="flex items-center justify-between bg-white dark:bg-card w-full py-4 px-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-card w-full py-4 px-6">
       <div class="flex items-center gap-2 flex-wrap">
         <div v-if="tabs.length > 0 || canManageTabs" class="flex items-center gap-1 flex-wrap">
           <button
@@ -39,7 +39,7 @@
         </span>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center justify-end gap-2">
         <div v-if="coDriverId" class="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1" aria-label="Active driver">
           <button
             v-for="driver in [{ id: mainDriverId, name: mainDriverName || 'Driver', tone: 'text-blue-600' }, { id: coDriverId, name: coDriverName || 'Co-driver', tone: 'text-red-600' }]"
@@ -51,6 +51,52 @@
             @click="$emit('update:driver-id', driver.id || '')"
           >{{ driver.name }}</button>
         </div>
+        <Popover v-if="presenceUsers.length > 1" :open="presenceOpen" @update:open="onPresenceOpenChange">
+          <PopoverTrigger as-child>
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-9 gap-2 animate-pulse border-red-500 bg-red-100 px-3 text-xs font-bold text-red-800 shadow-lg shadow-red-500/40 ring-2 ring-red-200 hover:bg-red-200 motion-reduce:animate-none dark:border-red-500 dark:bg-red-950 dark:text-red-200 dark:shadow-red-500/30 dark:ring-red-900 dark:hover:bg-red-900"
+              :aria-label="`${presenceUsers.length} users on this driver log`"
+            >
+              <span class="h-2.5 w-2.5 rounded-full bg-red-600" />
+              <UsersRound class="h-4 w-4" />
+              {{ presenceUsers.length }} users on this log
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="end"
+            class="w-80 border-red-400 p-0 shadow-xl shadow-red-500/30 dark:border-red-600 dark:shadow-red-950/60"
+            @interact-outside="(event) => event.preventDefault()"
+            @escape-key-down="(event) => event.preventDefault()"
+          >
+            <div class="flex items-start justify-between gap-2 border-b border-red-200 px-4 py-3 dark:border-red-900">
+              <div>
+                <div class="text-sm font-semibold text-foreground">Concurrent access</div>
+                <p class="mt-1 text-xs text-muted-foreground">Another user may be changing this log. Review their activity before saving.</p>
+              </div>
+              <button type="button" class="rounded p-1 text-muted-foreground hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950" aria-label="Close concurrent access" @click="closePresence">
+                <X class="h-4 w-4" />
+              </button>
+            </div>
+            <div class="max-h-80 divide-y divide-border overflow-y-auto">
+              <div v-for="user in presenceUsers" :key="user.userId" class="space-y-2 px-4 py-3 text-xs">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-semibold text-foreground">{{ user.displayName }}{{ user.userId === currentUserId ? ' (You)' : '' }}</span>
+                  <span class="rounded px-1.5 py-0.5 font-medium" :class="user.action === 'Editing' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-muted text-muted-foreground'">{{ user.action }}</span>
+                </div>
+                <div class="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 text-muted-foreground">
+                  <span>User ID</span><span class="truncate text-foreground" :title="user.displayName">{{ user.displayName }}</span>
+                  <span>Log period</span><span class="text-foreground">{{ user.fromDate }} &ndash; {{ user.toDate }}</span>
+                  <span>Date</span><span class="text-foreground">{{ formatPresenceDate(user.accessedAt) }}</span>
+                  <span>Since</span><span class="text-foreground">{{ formatPresenceTime(user.editingStartedAt || user.accessedAt) }}</span>
+                  <span>Duration</span><span class="text-foreground">{{ formatPresenceDuration(user.editingStartedAt || user.accessedAt) }}</span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <Button
           v-if="allowReview"
           variant="outline"
@@ -112,9 +158,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { ClipboardCheck, Plus, Sparkles, X } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ClipboardCheck, Plus, Sparkles, UsersRound, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Dialog,
   DialogContent,
@@ -124,6 +171,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { TabResponse } from '../types/boost.ts'
+import type { BoostPresenceUser } from '../composables/useBoostPresence'
 
 const props = withDefaults(
   defineProps<{
@@ -147,6 +195,9 @@ const props = withDefaults(
     mainDriverName?: string
     coDriverId?: string | null
     coDriverName?: string | null
+    presenceUsers?: BoostPresenceUser[]
+    presenceScopeKey?: string
+    currentUserId?: string
   }>(),
   {
     submitDisabled: false,
@@ -169,6 +220,9 @@ const props = withDefaults(
     mainDriverName: '',
     coDriverId: null,
     coDriverName: null,
+    presenceUsers: () => [],
+    presenceScopeKey: '',
+    currentUserId: '',
   }
 )
 
@@ -201,6 +255,59 @@ const primarySessionActionLabel = computed(() => {
 })
 
 const showDeleteConfirm = ref(false)
+const presenceOpen = ref(false)
+const presenceDismissed = ref(false)
+const presenceNow = ref(Date.now())
+let presenceClock: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  presenceClock = setInterval(() => { presenceNow.value = Date.now() }, 15_000)
+  openPresenceWhenReady()
+})
+onBeforeUnmount(() => { if (presenceClock) clearInterval(presenceClock) })
+
+watch([() => props.presenceScopeKey, () => props.presenceUsers.length], ([scope, count], [previousScope]) => {
+  if (scope !== previousScope) {
+    presenceOpen.value = false
+    presenceDismissed.value = false
+  }
+  if (count <= 1) presenceOpen.value = false
+  if (count > 1) openPresenceWhenReady()
+}, { flush: 'post' })
+
+async function openPresenceWhenReady() {
+  if (props.presenceUsers.length <= 1 || presenceDismissed.value) return
+  const scope = props.presenceScopeKey
+  await nextTick()
+  requestAnimationFrame(() => {
+    if (props.presenceScopeKey === scope && props.presenceUsers.length > 1 && !presenceDismissed.value)
+      presenceOpen.value = true
+  })
+}
+
+function onPresenceOpenChange(open: boolean) {
+  if (open) presenceOpen.value = true
+}
+
+function closePresence() {
+  presenceDismissed.value = true
+  presenceOpen.value = false
+}
+
+function formatPresenceDate(value: string) {
+  return new Date(value).toLocaleDateString()
+}
+
+function formatPresenceTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatPresenceDuration(value: string) {
+  const seconds = Math.max(0, Math.floor((presenceNow.value - new Date(value).getTime()) / 1000))
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return hours ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
 const pendingRemoveTabId = ref<string | null>(null)
 
 const requestRemoveTab = (tabId: string) => {

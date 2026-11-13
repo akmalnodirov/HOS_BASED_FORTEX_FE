@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!isAiPage" class="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+  <div v-if="!isAiPage" class="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3" :class="isBoostPage ? '-translate-y-20' : ''">
     <section
       v-if="assistant.isOpen"
       class="flex h-[600px] max-h-[calc(100vh-120px)] w-[420px] max-w-[calc(100vw-48px)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
@@ -73,6 +73,7 @@ const workspace = useBoostWorkspaceStore()
 
 // The AI page shows the same chat inline, so the floating one stays out of the way there.
 const isAiPage = computed(() => route.name === 'ELDAi')
+const isBoostPage = computed(() => route.name === 'ELDBoost')
 const canBoost = computed(() => hasPermission(auth.token, 'route_eld.log_details.boost'))
 const focusLabel = computed(() => {
   const value = focus.value
