@@ -872,6 +872,11 @@ export type RouteEldReviewFindingStatus =
   | 'DECLINED'
   | 'DISMISSED'
 export type RouteEldReviewDecision = 'DECLINED' | 'DISMISSED'
+/** The repair a finding proposes; the same PascalCase values as the repairs endpoints. */
+export type RouteEldReviewRepairKind =
+  | 'RepairShiftViolation'
+  | 'RepairCycleViolation'
+  | 'RepairBreakViolation'
 
 /** One problem the AI draft review found in the edited tab; times are epoch milliseconds. */
 export interface RouteEldReviewFinding {
@@ -902,10 +907,10 @@ export interface RouteEldReviewFinding {
   editedByUserId: string | null
   editedByName: string | null
   editChangeType: string | null
-  repairKind: string | null
-  repairId: string | null
-  proposedOptionId: string | null
-  appliedOptionId: string | null
+  repairKind: RouteEldReviewRepairKind | null
+  repairRequestId: string | null
+  proposedRepairOptionId: string | null
+  appliedRepairOptionId: string | null
   appliedByUserId: string | null
   appliedAt: string | null
   canRepair: boolean

@@ -186,7 +186,7 @@
                     {{
                       busyFindingId === finding.id
                         ? 'Generating…'
-                        : finding.repairId
+                        : finding.repairRequestId
                           ? 'Show fix again'
                           : 'Show fix'
                     }}
