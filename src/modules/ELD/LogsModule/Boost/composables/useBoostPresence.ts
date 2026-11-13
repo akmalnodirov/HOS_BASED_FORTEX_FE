@@ -6,8 +6,7 @@ const MAX_RECONNECT_DELAY_MS = 10_000
 
 export interface BoostPresenceUser {
   userId: string
-  userName: string
-  employeeId: string
+  displayName: string
   accessedAt: string
   editingStartedAt: string | null
   action: 'Viewing' | 'Editing'

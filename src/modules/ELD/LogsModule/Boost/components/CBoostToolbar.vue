@@ -83,12 +83,12 @@
             <div class="max-h-80 divide-y divide-border overflow-y-auto">
               <div v-for="user in presenceUsers" :key="user.userId" class="space-y-2 px-4 py-3 text-xs">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="font-semibold text-foreground">{{ user.userName }}{{ user.userId === currentUserId ? ' (You)' : '' }}</span>
+                  <span class="font-semibold text-foreground">{{ user.displayName }}{{ user.userId === currentUserId ? ' (You)' : '' }}</span>
                   <span class="rounded px-1.5 py-0.5 font-medium" :class="user.action === 'Editing' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-muted text-muted-foreground'">{{ user.action }}</span>
                 </div>
                 <div class="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 text-muted-foreground">
-                  <span>User ID</span><span class="truncate text-foreground" :title="user.employeeId">{{ user.employeeId || user.userId }}</span>
-                  <span>Log period</span><span class="text-foreground">{{ user.fromDate }} –> {{ user.toDate }}</span>
+                  <span>User ID</span><span class="truncate text-foreground" :title="user.displayName">{{ user.displayName }}</span>
+                  <span>Log period</span><span class="text-foreground">{{ user.fromDate }} &ndash; {{ user.toDate }}</span>
                   <span>Date</span><span class="text-foreground">{{ formatPresenceDate(user.accessedAt) }}</span>
                   <span>Login time</span><span class="text-foreground">{{ formatPresenceTime(user.editingStartedAt || user.accessedAt) }}</span>
                   <span>Duration</span><span class="text-foreground">{{ formatPresenceDuration(user.editingStartedAt || user.accessedAt) }}</span>
