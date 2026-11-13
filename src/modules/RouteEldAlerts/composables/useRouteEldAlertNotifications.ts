@@ -81,17 +81,17 @@ export function useRouteEldAlertNotifications() {
   function showAlert(alert: RouteEldAlertToast, id: string) {
     if (!enabledTypes.value.includes(alert.type)) return
     const icons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
-    const isViolation = alert.type === 'violation'
+    const isRedAlert = alert.type === 'violation' || alert.type === 'red_state'
     const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-background text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
     const content = defineComponent({
       setup: () => () => h('div', { class: 'flex w-full items-start gap-3' }, [
-        h('span', { class: isViolation
+        h('span', { class: isRedAlert
           ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300'
           : 'flex h-8 w-8 shrink-0 items-center justify-center text-amber-500' }, [
           h(icons[alert.type], { class: 'h-5 w-5' }),
         ]),
         h('div', { class: 'min-w-0 flex-1' }, [
-          h('div', { class: isViolation
+          h('div', { class: isRedAlert
             ? 'text-sm font-bold text-red-900 dark:text-red-100'
             : 'text-sm font-semibold text-foreground' }, alert.title),
           h('div', { class: 'mt-1 text-xs text-muted-foreground' }, alert.description),
@@ -106,7 +106,7 @@ export function useRouteEldAlertNotifications() {
       id,
       duration: 1_500,
       position: 'top-right',
-      class: isViolation ? 'route-eld-alert-toast route-eld-violation-toast' : 'route-eld-alert-toast',
+      class: isRedAlert ? 'route-eld-alert-toast route-eld-violation-toast' : 'route-eld-alert-toast',
     })
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => { refreshTimer = null; void refresh() }, 400)

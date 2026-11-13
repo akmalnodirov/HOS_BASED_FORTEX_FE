@@ -27,9 +27,11 @@ function createEmptyTrip(): Trip {
     trailerNumber: '',
     odometer: 0,
     engineHours: 0,
-    dailyDistanceInMile: 0,
+    shiftDistanceInMile: 0,
     from: { latitude: 0, longitude: 0, address: '', locationType: 2 },
     to: { latitude: 0, longitude: 0, address: '', locationType: 3 },
+    fromLocations: [{ latitude: 0, longitude: 0, address: '', locationType: 2 }],
+    toLocations: [{ latitude: 0, longitude: 0, address: '', locationType: 3 }],
     fuelLocations: [],
   }
 }
@@ -99,6 +101,9 @@ export function useAuditForm() {
 
   const disableAuditForm = computed(() => {
     if (!auditFormAll.carrierId || !auditFormAll.driverId) return true
+    const shiftDistance = auditFormAll.trips[0]?.shiftDistanceInMile ||
+      auditFormAll.trips[0]?.dailyDistanceInMile || 0
+    if (!Number.isFinite(shiftDistance) || shiftDistance <= 0) return true
 
     for (const trip of auditFormAll.trips) {
       if (
@@ -106,16 +111,16 @@ export function useAuditForm() {
         !trip.trailerNumber ||
         typeof trip.odometer !== 'number' ||
         typeof trip.engineHours !== 'number' ||
-        !Number.isFinite(trip.from.latitude) ||
-        !Number.isFinite(trip.from.longitude) ||
-        !trip.from.address ||
-        !Number.isFinite(trip.to.latitude) ||
-        !Number.isFinite(trip.to.longitude) ||
-        !trip.to.address ||
         !trip.fuelLocations
       ) {
         return true
       }
+      const pickups = trip.fromLocations?.length ? trip.fromLocations : [trip.from]
+      const deliveries = trip.toLocations?.length ? trip.toLocations : [trip.to]
+      if (!pickups.length || !deliveries.length ||
+        [...pickups, ...deliveries].some((location) => !location?.address ||
+          !Number.isFinite(location.latitude) || Math.abs(location.latitude) > 90 ||
+          !Number.isFinite(location.longitude) || Math.abs(location.longitude) > 180)) return true
       for (const fuel of trip.fuelLocations) {
         if (!fuel.address || !fuel.latitude || !fuel.longitude) return true
       }
@@ -174,7 +179,7 @@ export function useAuditForm() {
     auditFormAll.endTime = newConstants.endTime
     auditFormAll.trips[0].odometer = newConstants.odometer
     auditFormAll.trips[0].engineHours = newConstants.engineHours
-    auditFormAll.trips[0].dailyDistanceInMile = newConstants.distance
+    auditFormAll.trips[0].shiftDistanceInMile = newConstants.distance
   }
 
   async function resolveAddress(latitude: number, longitude: number): Promise<string> {

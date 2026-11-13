@@ -51,15 +51,15 @@
                 <div v-if="!notificationsLoading && !unreadAlerts.length" class="p-4 text-center text-sm text-muted-foreground">No unread alerts</div>
                 <div v-for="alert in unreadAlerts" :key="`${alert.type}:${alert.id}`"
                   class="flex items-start gap-2 rounded-md border-b border-border px-2 py-3 last:border-b-0"
-                  :class="alert.type === 'violation'
+                  :class="alert.type === 'violation' || alert.type === 'red_state'
                     ? 'border-l-4 border-l-red-600 bg-red-50 hover:bg-red-100 dark:border-l-red-400 dark:bg-red-950/40 dark:hover:bg-red-950/60'
                     : 'hover:bg-muted/50'">
                   <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
-                    :class="alert.type === 'violation' ? 'bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300' : 'text-amber-600'">
+                    :class="alert.type === 'violation' || alert.type === 'red_state' ? 'bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300' : 'text-amber-600'">
                     <component :is="alertIcons[alert.type]" class="h-4 w-4" />
                   </span>
                   <div class="min-w-0 flex-1">
-                    <div class="text-xs font-semibold" :class="alert.type === 'violation' ? 'text-red-900 dark:text-red-100' : 'text-foreground'">{{ alert.title }}</div>
+                    <div class="text-xs font-semibold" :class="alert.type === 'violation' || alert.type === 'red_state' ? 'text-red-900 dark:text-red-100' : 'text-foreground'">{{ alert.title }}</div>
                     <div class="mt-1 truncate text-xs text-muted-foreground" :title="alert.detail">{{ alert.detail }}</div>
                     <div class="mt-1 text-[11px] text-muted-foreground">{{ companyNames[alert.companyId.toLowerCase()] || alert.companyId }} · {{ alertLabels[alert.type] }} · {{ new Date(alert.occurredAt).toLocaleString() }}</div>
                   </div>

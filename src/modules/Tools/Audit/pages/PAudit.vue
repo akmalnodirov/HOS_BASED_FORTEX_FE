@@ -4,19 +4,22 @@
       <div class="flex items-center gap-x-6">
         <h1 class="text-2xl font-semibold text-[#1A1A1A]">Trips</h1>
         <div class="flex items-center gap-x-2">
-          <div
+          <button
             v-for="(trip, ind) in auditFormAll.trips"
             :key="ind"
-            class="w-9.5 h-9.5 flex items-center justify-center rounded-lg cursor-pointer transition-colors border border-transparent"
+            type="button"
+            class="w-9.5 h-9.5 flex items-center justify-center rounded-lg cursor-pointer transition-colors border"
             :class="[
               selectedTripIndex === ind
-                ? 'bg-[#F3F4F6] border-[#B5B5B5]'
-                : 'bg-[#F3F4F6] text-[#666666] hover:bg-gray-200',
+                ? 'bg-[#1A1A1A] border-[#1A1A1A] text-white shadow-sm'
+                : 'bg-[#F3F4F6] border-transparent text-[#666666] hover:bg-gray-200',
             ]"
+            :aria-label="`Trip ${ind + 1}`"
+            :aria-current="selectedTripIndex === ind ? 'step' : undefined"
             @click="selectTrip(ind)"
           >
-            <span class="text-lg font-medium text-[#1A1A1A]">{{ ind + 1 }}</span>
-          </div>
+            <span class="text-lg font-medium">{{ ind + 1 }}</span>
+          </button>
 
           <button
             v-if="!tripsSaved"
@@ -91,16 +94,16 @@
             endDate: auditFormAll.endDate as Dayjs,
             odometer: auditFormAll.trips[0].odometer || 0,
             engineHours: auditFormAll.trips[0].engineHours || 0,
-            distance: auditFormAll.trips[0].dailyDistanceInMile || 0,
+            distance: auditFormAll.trips[0].shiftDistanceInMile || auditFormAll.trips[0].dailyDistanceInMile || 0,
           }"
           @trip:update="updateTrip($event, ind)"
           @constants:update="updateConstants"
-          @copy:from="handleCopy('from', ind)"
-          @paste:from="handlePaste('from', ind)"
-          @copy:to="handleCopy('to', ind)"
-          @paste:to="handlePaste('to', ind)"
-          @copy:fuel="handleCopy('fuel', ind)"
-          @paste:fuel="handlePaste('fuel', ind)"
+          @copy:from="handleCopy('from', $event)"
+          @paste:from="handlePaste('from', $event)"
+          @copy:to="handleCopy('to', $event)"
+          @paste:to="handlePaste('to', $event)"
+          @copy:fuel="handleCopy('fuel')"
+          @paste:fuel="handlePaste('fuel')"
         />
       </KeepAlive>
     </section>
@@ -120,7 +123,7 @@
         <div v-for="audit in previousAudits" :key="audit.id" class="flex items-center justify-between gap-4 py-3 text-sm">
           <div>
             <div class="font-medium">{{ audit.driverName }}</div>
-            <div class="text-muted-foreground">{{ audit.fromDate }} – {{ audit.toDate }} · {{ audit.status }}</div>
+            <div class="text-muted-foreground">{{ audit.fromDate }} → {{ audit.toDate }} · {{ audit.status }}</div>
           </div>
           <div class="flex items-center gap-2">
             <Button variant="outline" size="sm" :disabled="loadingAuditId === audit.id" @click="restoreAudit(audit.id)">
@@ -238,16 +241,20 @@ function getFormRef() {
   return formRefs.value?.[0]
 }
 
-function handleCopy(type: 'from' | 'to' | 'fuel', _index: number) {
+function handleCopy(type: 'from' | 'to' | 'fuel', index = 0) {
   const form = getFormRef()?.form
   if (!form) return
-  copyLongLat(form[type])
+  const location = type === 'from' ? form.fromLocations[index] :
+    type === 'to' ? form.toLocations[index] : form.fuel
+  if (location) copyLongLat(location)
 }
 
-function handlePaste(type: 'from' | 'to' | 'fuel', _index: number) {
+function handlePaste(type: 'from' | 'to' | 'fuel', index = 0) {
   const form = getFormRef()?.form
   if (!form) return
-  pasteLongLat(form[type])
+  const location = type === 'from' ? form.fromLocations[index] :
+    type === 'to' ? form.toLocations[index] : form.fuel
+  if (location) pasteLongLat(location)
 }
 
 async function handleSave() {
