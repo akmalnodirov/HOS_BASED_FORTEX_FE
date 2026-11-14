@@ -394,6 +394,9 @@ export class ApiEndpoints {
   static readonly ROUTE_ELD_RED_STATE_ALERT_READ = (id: string) =>
     `${this.ROUTE_ELD_RED_STATE_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_RED_STATE_SETTINGS = `${this.BASE_URL}/route-eld/red-state-settings`
+  static readonly ROUTE_ELD_DOT_ALERTS = `${this.BASE_URL}/route-eld/dot-alerts`
+  static readonly ROUTE_ELD_DOT_ALERTS_READ_ALL = `${this.ROUTE_ELD_DOT_ALERTS}/read-all`
+  static readonly ROUTE_ELD_DOT_ALERT_READ = (id: string) => `${this.ROUTE_ELD_DOT_ALERTS}/${id}/read`
   static readonly ROUTE_ELD_SPEED_ALERTS = `${this.BASE_URL}/route-eld/speed-alerts`
   static readonly ROUTE_ELD_SPEED_ALERTS_READ_ALL = `${this.ROUTE_ELD_SPEED_ALERTS}/read-all`
   static readonly ROUTE_ELD_SPEED_ALERT_READ = (id: string) =>

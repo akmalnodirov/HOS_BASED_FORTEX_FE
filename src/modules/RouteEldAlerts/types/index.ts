@@ -1,4 +1,35 @@
-export type RouteEldAlertType = 'station' | 'alpr' | 'red_state' | 'violation' | 'speed'
+export type RouteEldAlertType = 'station' | 'alpr' | 'red_state' | 'dot' | 'violation' | 'speed'
+
+export interface DotAlert {
+  companyId: string
+  id: string
+  driverId: string
+  driverName: string
+  externalDriverId: string
+  truckNumber: string
+  driverLocation: string | null
+  driverLatitude: number | null
+  driverLongitude: number | null
+  submittedAt: string
+  periodStart: string
+  periodEnd: string
+  isRead: boolean
+}
+
+export interface RouteEldDotAlertMessage {
+  companyId: string | null
+  alertId: string
+  driverId: string
+  driverName: string
+  externalDriverId: string
+  truckNumber: string
+  driverLocation: string | null
+  driverLatitude: number | null
+  driverLongitude: number | null
+  submittedAt: string
+  periodStart: string
+  periodEnd: string
+}
 
 export interface RedStateSettings {
   stateCodes: string[]

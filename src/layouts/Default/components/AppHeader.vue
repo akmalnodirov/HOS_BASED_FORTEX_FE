@@ -51,18 +51,20 @@
                 <div v-if="!notificationsLoading && !unreadAlerts.length" class="p-4 text-center text-sm text-muted-foreground">No unread alerts</div>
                 <div v-for="alert in unreadAlerts" :key="`${alert.type}:${alert.id}`"
                   class="flex items-start gap-2 rounded-md border-b border-border px-2 py-3 last:border-b-0"
-                  :class="alert.type === 'violation' || alert.type === 'red_state'
+                  :class="alert.type === 'violation' || alert.type === 'red_state' || alert.type === 'dot'
                     ? 'border-l-4 border-l-red-600 bg-red-50 hover:bg-red-100 dark:border-l-red-400 dark:bg-red-950/40 dark:hover:bg-red-950/60'
                     : 'hover:bg-muted/50'">
-                  <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
-                    :class="alert.type === 'violation' || alert.type === 'red_state' ? 'bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300' : 'text-amber-600'">
-                    <component :is="alertIcons[alert.type]" class="h-4 w-4" />
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <div class="text-xs font-semibold" :class="alert.type === 'violation' || alert.type === 'red_state' ? 'text-red-900 dark:text-red-100' : 'text-foreground'">{{ alert.title }}</div>
-                    <div class="mt-1 truncate text-xs text-muted-foreground" :title="alert.detail">{{ alert.detail }}</div>
-                    <div class="mt-1 text-[11px] text-muted-foreground">{{ companyNames[alert.companyId.toLowerCase()] || alert.companyId }} · {{ alertLabels[alert.type] }} · {{ new Date(alert.occurredAt).toLocaleString() }}</div>
-                  </div>
+                  <button type="button" class="flex min-w-0 flex-1 items-start gap-2 text-left" :aria-label="`Open ${alertLabels[alert.type]}`" @click="openAlert(alert)">
+                    <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                      :class="alert.type === 'violation' || alert.type === 'red_state' || alert.type === 'dot' ? 'bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-300' : 'text-amber-600'">
+                      <component :is="alertIcons[alert.type]" class="h-4 w-4" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-semibold" :class="alert.type === 'violation' || alert.type === 'red_state' || alert.type === 'dot' ? 'text-red-900 dark:text-red-100' : 'text-foreground'">{{ alert.title }}</div>
+                      <div class="mt-1 truncate text-xs text-muted-foreground" :title="alert.detail">{{ alert.detail }}</div>
+                      <div class="mt-1 text-[11px] text-muted-foreground">{{ companyNames[alert.companyId.toLowerCase()] || alert.companyId }} · {{ alertLabels[alert.type] }} · {{ new Date(alert.occurredAt).toLocaleString() }}</div>
+                    </div>
+                  </button>
                   <div class="flex shrink-0 gap-1">
                     <Button variant="ghost" size="icon" class="h-7 w-7" title="View alerts" aria-label="View alerts" @click.stop="openAlert(alert)"><Eye class="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" class="h-7 w-7" title="Mark as read" aria-label="Mark as read" @click.stop="readAlert(alert)"><Check class="h-4 w-4" /></Button>
@@ -310,7 +312,7 @@ import { toast } from 'vue-sonner'
 import { alertLabels, useRouteEldNotificationCenter, type UnreadAlert } from '@/modules/RouteEldAlerts/composables/useRouteEldNotificationCenter'
 import { useRouteEldAlertNavigation } from '@/modules/RouteEldAlerts/composables/useRouteEldAlertNotifications'
 
-const alertIcons = { station: Scale, alpr: Camera, red_state: MapPinned, speed: Gauge, violation: ShieldAlert }
+const alertIcons = { station: Scale, alpr: Camera, red_state: MapPinned, dot: ShieldAlert, speed: Gauge, violation: ShieldAlert }
 const { selectedTypes, availableTypes, alerts: unreadAlerts, loading: notificationsLoading, error: notificationsError, companyNames, setType, refresh: refreshNotifications, markRead, markAllRead } = useRouteEldNotificationCenter()
 const { viewAlerts } = useRouteEldAlertNavigation()
 const isNotificationsOpen = ref(false)
@@ -440,6 +442,12 @@ const pageTitle = computed(() => {
     '/ifta': 'IFTA',
     '/vehicle-reports': 'Vehicle reports',
     '/route-eld-alerts': 'Alerts',
+    '/route-eld-alerts/station': 'Alerts / Station alerts',
+    '/route-eld-alerts/alpr': 'Alerts / ALPR camera alerts',
+    '/route-eld-alerts/red-state': 'Alerts / Red state alerts',
+    '/route-eld-alerts/dot': 'Alerts / DOT alerts',
+    '/route-eld-alerts/violation': 'Alerts / Violation alerts',
+    '/route-eld-alerts/speed': 'Alerts / Speed alerts',
     '/company': 'Company',
     '/portal-users': 'Portal Users',
 

@@ -1,3 +1,7 @@
+import { routeEldAlertPages, routeEldAlertPermission } from '@/modules/RouteEldAlerts/alertPages'
+
+const alertPermissions = routeEldAlertPages.map((page) => page.permission)
+
 const pagePermissions: { pattern: RegExp; any: string[] }[] = [
   { pattern: /^\/report\/owner\/dashboard(?:\/|$)/, any: ['report.owner.dashboard.view'] },
   { pattern: /^\/report\/owner\/inspections(?:\/|$)/, any: ['report.owner.inspections.view'] },
@@ -36,13 +40,19 @@ const pagePermissions: { pattern: RegExp; any: string[] }[] = [
   { pattern: /^\/vehicles(?:\/|$)/, any: ['vehicle.manage'] },
   { pattern: /^\/drivers(?:\/|$)/, any: ['route_eld.drivers'] },
   { pattern: /^\/driver-alerts(?:\/|$)/, any: ['route_eld.live_tracking'] },
-  { pattern: /^\/notifications(?:\/|$)/, any: ['route_eld.alerts.station', 'route_eld.alerts.alpr', 'route_eld.alerts.red_state', 'route_eld.alerts.speed', 'route_eld.alerts.violation'] },
+  { pattern: /^\/notifications(?:\/|$)/, any: alertPermissions },
   { pattern: /^\/chat(?:\/|$)/, any: ['chat.manage'] },
   { pattern: /^\/ifta(?:\/|$)/, any: ['route_eld.ifta_reports'] },
   { pattern: /^\/eld\/weight-stations(?:\/|$)/, any: ['route_eld.weight_stations'] },
   { pattern: /^\/vehicle-reports(?:\/|$)/, any: ['route_eld.vehicle_reports'] },
-  { pattern: /^\/route-eld-alerts(?:\/|$)/, any: ['route_eld.alerts.station', 'route_eld.alerts.alpr', 'route_eld.alerts.red_state', 'route_eld.alerts.speed', 'route_eld.alerts.violation'] },
-  { pattern: /^\/dvir(?:\/|$)/, any: ['route_eld.alerts.station', 'route_eld.alerts.alpr', 'route_eld.alerts.red_state', 'route_eld.alerts.speed', 'route_eld.alerts.violation'] },
+  { pattern: /^\/route-eld-alerts\/station(?:\/|$)/, any: [routeEldAlertPermission('station')] },
+  { pattern: /^\/route-eld-alerts\/alpr(?:\/|$)/, any: [routeEldAlertPermission('alpr')] },
+  { pattern: /^\/route-eld-alerts\/red-state(?:\/|$)/, any: [routeEldAlertPermission('red_state')] },
+  { pattern: /^\/route-eld-alerts\/dot(?:\/|$)/, any: [routeEldAlertPermission('dot')] },
+  { pattern: /^\/route-eld-alerts\/violation(?:\/|$)/, any: [routeEldAlertPermission('violation')] },
+  { pattern: /^\/route-eld-alerts\/speed(?:\/|$)/, any: [routeEldAlertPermission('speed')] },
+  { pattern: /^\/route-eld-alerts(?:\/|$)/, any: alertPermissions },
+  { pattern: /^\/dvir(?:\/|$)/, any: alertPermissions },
   { pattern: /^\/company(?:\/|$)/, any: ['company.manage'] },
   { pattern: /^\/users\/roles(?:\/|$)/, any: ['roles.manage'] },
   { pattern: /^\/users\/permissions(?:\/|$)/, any: ['permissions.manage'] },

@@ -4,13 +4,14 @@ import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
+import { routeEldAlertPermission } from '../alertPages'
 import type { RouteEldCompaniesResponse } from '@/types/company'
-import type { AlprCameraAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
+import type { AlprCameraAlert, DotAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
 const storageKey = 'route-eld-notification-types'
-export const alertTypes: RouteEldAlertType[] = ['station', 'alpr', 'red_state', 'violation', 'speed']
+export const alertTypes: RouteEldAlertType[] = ['station', 'alpr', 'red_state', 'dot', 'violation', 'speed']
 export const alertLabels: Record<RouteEldAlertType, string> = {
-  station: 'Station alerts', alpr: 'ALPR camera alerts', red_state: 'Red state alerts', violation: 'Violation alerts', speed: 'Speed alerts',
+  station: 'Station alerts', alpr: 'ALPR camera alerts', red_state: 'Red state alerts', dot: 'DOT alerts', violation: 'Violation alerts', speed: 'Speed alerts',
 }
 
 export interface UnreadAlert {
@@ -26,6 +27,13 @@ function unwrap<T>(data: T | { successResult: T }): T {
   return data && typeof data === 'object' && 'successResult' in data ? data.successResult : data
 }
 
+function dotLocation(alert: DotAlert) {
+  if (alert.driverLocation) return alert.driverLocation
+  if (alert.driverLatitude !== null && alert.driverLongitude !== null)
+    return `${alert.driverLatitude.toFixed(5)}, ${alert.driverLongitude.toFixed(5)}`
+  return 'Location unavailable'
+}
+
 function storedTypes(userId: string): RouteEldAlertType[] {
   try {
     const saved = JSON.parse(localStorage.getItem(`${storageKey}:${userId}`) ?? 'null')
@@ -34,6 +42,11 @@ function storedTypes(userId: string): RouteEldAlertType[] {
       if (!localStorage.getItem(migrationKey)) {
         saved.push('red_state')
         localStorage.setItem(migrationKey, '1')
+      }
+      const dotKey = `${storageKey}:dot:${userId}`
+      if (!localStorage.getItem(dotKey)) {
+        saved.push('dot')
+        localStorage.setItem(dotKey, '1')
       }
       return alertTypes.filter((type) => saved.includes(type))
     }
@@ -47,7 +60,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
   const userId = computed(() => authStore.user?.id ?? null)
   const selectedTypes = ref<RouteEldAlertType[]>([...alertTypes])
   const availableTypes = computed(() => alertTypes.filter((type) =>
-    hasPermission(authStore.token, `route_eld.alerts.${type}`)))
+    hasPermission(authStore.token, routeEldAlertPermission(type))))
   const enabledTypes = computed(() => availableTypes.value.filter((type) => selectedTypes.value.includes(type)))
   const alerts = ref<UnreadAlert[]>([])
   const loading = ref(false)
@@ -109,6 +122,15 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
           const response = await api.get<RedStateAlert[] | { successResult: RedStateAlert[] }>(ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS, { params: { limit: 100 } })
           return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({ id: a.id, type, companyId: a.companyId, title: `${a.driverName} is approaching ${a.stateCode}`, detail: `${a.distanceMiles.toFixed(1)} mi to state border`, occurredAt: a.occurredAt }))
         }
+        if (type === 'dot') {
+          const response = await api.get<DotAlert[] | { successResult: DotAlert[] }>(ApiEndpoints.ROUTE_ELD_DOT_ALERTS, { params: { limit: 100 } })
+          return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({
+            id: a.id, type, companyId: a.companyId,
+            title: `${a.driverName} submitted DOT logs`,
+            detail: `Truck ${a.truckNumber} · ID ${a.externalDriverId} · ${dotLocation(a)} · ${new Date(a.periodStart).toLocaleString()} – ${new Date(a.periodEnd).toLocaleString()}`,
+            occurredAt: a.submittedAt,
+          }))
+        }
         if (type === 'speed') {
           const response = await api.get<SpeedAlert[] | { successResult: SpeedAlert[] }>(ApiEndpoints.ROUTE_ELD_SPEED_ALERTS)
           return unwrap(response.data).filter((a) => !a.isRead && !!a.companyId).map((a) => ({ id: a.id, type, companyId: a.companyId!, title: `${a.driverName} exceeded the speed limit`, detail: `${Math.round(a.speed)} mph · ${a.location || a.stateCode || 'Location unavailable'}`, occurredAt: a.occurredAt }))
@@ -131,6 +153,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERT_READ,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERT_READ,
       red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERT_READ,
+      dot: ApiEndpoints.ROUTE_ELD_DOT_ALERT_READ,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERT_READ,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERT_READ,
     }[alert.type]
@@ -145,6 +168,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
       station: ApiEndpoints.ROUTE_ELD_STATION_ALERTS_READ_ALL,
       alpr: ApiEndpoints.ROUTE_ELD_ALPR_CAMERA_ALERTS_READ_ALL,
       red_state: ApiEndpoints.ROUTE_ELD_RED_STATE_ALERTS_READ_ALL,
+      dot: ApiEndpoints.ROUTE_ELD_DOT_ALERTS_READ_ALL,
       speed: ApiEndpoints.ROUTE_ELD_SPEED_ALERTS_READ_ALL,
       violation: ApiEndpoints.ROUTE_ELD_VIOLATION_ALERTS_READ_ALL,
     }
