@@ -4,6 +4,7 @@ import { ApiEndpoints } from '@/api/endpoints'
 import { useApi } from '@/composables/useAxiosService'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
+import { routeEldAlertPermission } from '../alertPages'
 import type { RouteEldCompaniesResponse } from '@/types/company'
 import type { AlprCameraAlert, DotAlert, RedStateAlert, RouteEldAlertType, SpeedAlert, StationAlert, ViolationAlert } from '../types'
 
@@ -59,7 +60,7 @@ export const useRouteEldNotificationCenter = createGlobalState(() => {
   const userId = computed(() => authStore.user?.id ?? null)
   const selectedTypes = ref<RouteEldAlertType[]>([...alertTypes])
   const availableTypes = computed(() => alertTypes.filter((type) =>
-    hasPermission(authStore.token, `route_eld.alerts.${type === 'dot' ? 'red_state' : type}`)))
+    hasPermission(authStore.token, routeEldAlertPermission(type))))
   const enabledTypes = computed(() => availableTypes.value.filter((type) => selectedTypes.value.includes(type)))
   const alerts = ref<UnreadAlert[]>([])
   const loading = ref(false)

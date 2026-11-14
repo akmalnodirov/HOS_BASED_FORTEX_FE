@@ -10,7 +10,7 @@ import type { RouteEldCompaniesResponse } from '@/types/company'
 import { setCompanyId, setCompanyTimeZoneId } from '@/utils/company'
 import { useRouteEldAlertSocket } from './useRouteEldAlertSocket'
 import { useRouteEldNotificationCenter } from './useRouteEldNotificationCenter'
-import { routeEldAlertPath } from '../alertPages'
+import { routeEldAlertPath, routeEldAlertPermission } from '../alertPages'
 
 function coordinates(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
@@ -34,7 +34,7 @@ export function useRouteEldAlertNavigation() {
   const api = useApi()
   const authStore = useAuthStore()
   async function viewAlerts(companyId: string | null, type: 'station' | 'alpr' | 'red_state' | 'dot' | 'speed' | 'violation', alertId?: string) {
-    if (!companyId || !hasPermission(authStore.token, `route_eld.alerts.${type === 'dot' ? 'red_state' : type}`)) return false
+    if (!companyId || !hasPermission(authStore.token, routeEldAlertPermission(type))) return false
     try {
       const response = await api.get<RouteEldCompaniesResponse>(ApiEndpoints.ROUTE_ELD_COMPANIES)
       const company = response.data.successResult.find((item) =>
@@ -160,7 +160,7 @@ export function useRouteEldAlertNotifications() {
 
   watch(latestDotAlert, (alert) => {
     if (!alert) return
-    if (!hasPermission(authStore.token, 'route_eld.alerts.red_state')) return
+    if (!hasPermission(authStore.token, routeEldAlertPermission('dot'))) return
     const location = alert.driverLocation ||
       (alert.driverLatitude !== null && alert.driverLongitude !== null
         ? coordinates(alert.driverLatitude, alert.driverLongitude)

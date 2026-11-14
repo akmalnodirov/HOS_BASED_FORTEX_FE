@@ -394,7 +394,16 @@
             <td class="whitespace-nowrap px-3">{{ formatDate(alert.submittedAt) }}</td>
             <td class="whitespace-nowrap px-3">{{ formatDate(alert.periodStart) }} – {{ formatDate(alert.periodEnd) }}</td>
             <td class="px-3"><span v-if="!alert.isRead" class="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">Unread</span><span v-else class="text-muted-foreground">Read</span></td>
-            <td class="px-3 text-center"><div class="flex items-center justify-center gap-1"><Button variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewDotMap(alert)"><MapPinned class="h-4 w-4" /></Button><Button v-if="!alert.isRead" variant="ghost" size="icon" title="Mark read" aria-label="Mark read" :disabled="markingReadId === alert.id" @click="markDotRead(alert.id)"><LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" /><Check v-else class="h-4 w-4" /></Button></div></td>
+            <td class="px-3 text-center">
+              <div class="flex items-center justify-center gap-1">
+                <Button v-if="alert.driverLatitude !== null && alert.driverLongitude !== null" variant="ghost" size="icon" title="View map" aria-label="View map" @click="viewDotMap(alert)">
+                  <MapPinned class="h-4 w-4" />
+                </Button>
+                <Button v-if="!alert.isRead" variant="ghost" size="icon" title="Mark read" aria-label="Mark read" :disabled="markingReadId === alert.id" @click="markDotRead(alert.id)">
+                  <LoaderCircle v-if="markingReadId === alert.id" class="h-4 w-4 animate-spin" /><Check v-else class="h-4 w-4" />
+                </Button>
+              </div>
+            </td>
           </tr>
           <tr v-if="!isLoading && paginatedDotAlerts.length === 0"><td :colspan="allCompanies ? 10 : 9" class="h-28 text-center text-muted-foreground">No DOT alerts match the selected filters.</td></tr>
         </tbody>
@@ -665,6 +674,7 @@ import { useApi } from '@/composables/useAxiosService'
 import { ApiEndpoints } from '@/api/endpoints'
 import { useAuthStore } from '@/modules/Auth/store/authStore'
 import { hasPermission } from '@/router/permissions'
+import { routeEldAlertPermission } from '../alertPages'
 import type { RouteEldCompaniesResponse, RouteEldCompany } from '@/types/company'
 import { useRouteEldAlerts } from '../composables/useRouteEldAlerts'
 import { useRouteEldAlertSocket } from '../composables/useRouteEldAlertSocket'
@@ -708,7 +718,7 @@ const api = useApi()
 const authStore = useAuthStore()
 const permittedTypes = computed<RouteEldAlertType[]>(() =>
   (['station', 'alpr', 'red_state', 'dot', 'violation', 'speed'] as RouteEldAlertType[]).filter((type) =>
-    hasPermission(authStore.token, `route_eld.alerts.${type === 'dot' ? 'red_state' : type}`)
+    hasPermission(authStore.token, routeEldAlertPermission(type))
   )
 )
 const selectedCompanyId = computed(() => authStore.companyId)

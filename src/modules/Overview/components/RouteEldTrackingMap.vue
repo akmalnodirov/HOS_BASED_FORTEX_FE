@@ -544,10 +544,11 @@ async function resolveRoadBatch(points: LatLng[]) {
   if (cached) return cached
 
   try {
-    const route = await fetchMapRoute(
-      points.map((point) => ({ latitude: point.lat, longitude: point.lng })),
-      true
-    )
+    const routePoints = points.map((point) => ({ latitude: point.lat, longitude: point.lng }))
+    const route =
+      points.length === 2
+        ? await fetchMapRoute(routePoints, false)
+        : await fetchMapRoute(routePoints, true).catch(() => fetchMapRoute(routePoints, false))
     const path: LatLng[] = []
     for (const point of route.path ?? []) {
       if (Number.isFinite(point.latitude) && Number.isFinite(point.longitude))
