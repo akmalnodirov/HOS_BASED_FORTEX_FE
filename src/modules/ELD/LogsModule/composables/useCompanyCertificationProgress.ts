@@ -6,8 +6,10 @@ import { useAuthStore } from '@/modules/Auth/store/authStore'
 import type { CompanyCertificationBatch } from '../[Id]/types/companyCertification'
 
 const STORAGE_KEY_PREFIX = 'route-eld:company-certification:active-batches'
+const MAX_CONSECUTIVE_POLL_FAILURES = 20
 const batches = ref<Record<string, CompanyCertificationBatch>>({})
 const trackedIds = new Set<string>()
+const pollFailures = new Map<string, number>()
 let initialized = false
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let activeUserId: string | null = null
@@ -37,10 +39,19 @@ function clearTracking(removePersisted: boolean) {
   }
   for (const id of trackedIds) toast.dismiss(`company-certification:${id}`)
   trackedIds.clear()
+  pollFailures.clear()
   batches.value = {}
   if (removePersisted && activeUserId && typeof window !== 'undefined') {
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}:${activeUserId}`)
   }
+}
+
+function stopTracking(id: string) {
+  trackedIds.delete(id)
+  pollFailures.delete(id)
+  const { [id]: _removed, ...remainingBatches } = batches.value
+  batches.value = remainingBatches
+  toast.dismiss(`company-certification:${id}`)
 }
 
 function loadTrackedIds(userId: string) {
@@ -118,6 +129,7 @@ async function poll() {
         )
         if (activeUserId !== pollingUserId) return
         const batch = response.data.successResult
+        pollFailures.delete(id)
         batches.value = { ...batches.value, [id]: batch }
         notify(batch)
         if (isTerminal(batch.status)) trackedIds.delete(id)
@@ -125,13 +137,30 @@ async function poll() {
         if (activeUserId !== pollingUserId) return
         const status = (error as { response?: { status?: number } })?.response?.status
         if (status === 400 || status === 403 || status === 404) {
-          trackedIds.delete(id)
-          const { [id]: _, ...remainingBatches } = batches.value
-          batches.value = remainingBatches
-          toast.dismiss(`company-certification:${id}`)
-        } else {
-          requestFailed = true
+          stopTracking(id)
+          return
         }
+
+        // Give up after a bounded number of consecutive failures so a persistently
+        // failing poll cannot retry forever behind an indefinite loading toast.
+        const failures = (pollFailures.get(id) ?? 0) + 1
+        if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+          const batch = batches.value[id]
+          stopTracking(id)
+          toast.error(
+            batch
+              ? `Lost track of the certification run for ${batch.companyName}`
+              : 'Lost track of a company certification run',
+            {
+              id: `company-certification:${id}`,
+              description: 'Open the certification history to check the final result.',
+            }
+          )
+          return
+        }
+
+        pollFailures.set(id, failures)
+        requestFailed = true
       }
     })
   )

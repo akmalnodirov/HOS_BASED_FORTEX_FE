@@ -71,7 +71,7 @@
         <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
           <Label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Checkbox :model-value="allDriversSelectionState" @update:model-value="toggleAllDrivers" />
-            All drivers
+            {{ search.trim() ? 'All matching drivers' : 'All drivers' }}
           </Label>
           <span class="text-xs text-muted-foreground">
             {{ selectedDriverIds.size }} selected
@@ -356,10 +356,11 @@ const filteredDrivers = computed(() => {
   )
 })
 const allDriversSelectionState = computed<boolean | 'indeterminate'>(() => {
-  const drivers = preview.value?.drivers ?? []
-  if (!drivers.length || selectedDriverIds.value.size === 0) return false
-  if (drivers.every((driver) => selectedDriverIds.value.has(driver.driverId))) return true
-  return 'indeterminate'
+  const drivers = filteredDrivers.value
+  if (!drivers.length) return false
+  const selected = drivers.filter((driver) => selectedDriverIds.value.has(driver.driverId)).length
+  if (selected === 0) return false
+  return selected === drivers.length ? true : 'indeterminate'
 })
 watch(
   () => props.open,
@@ -464,9 +465,14 @@ function toggleDriver(id: string) {
 }
 
 function toggleAllDrivers(value: boolean | 'indeterminate') {
-  selectedDriverIds.value = value === true
-    ? new Set((preview.value?.drivers ?? []).map((driver) => driver.driverId))
-    : new Set()
+  // Only the drivers currently visible are affected, so a narrowed search can
+  // never select drivers the user cannot see.
+  const next = new Set(selectedDriverIds.value)
+  for (const driver of filteredDrivers.value) {
+    if (value === true) next.add(driver.driverId)
+    else next.delete(driver.driverId)
+  }
+  selectedDriverIds.value = next
 }
 
 function calendarDateToString(value: any): string {
@@ -508,20 +514,18 @@ function certificationStatusClass(day: CompanyCertificationDayPreview) {
 }
 
 function profileFormHistoryLabel(status: CompanyCertificationItemStatus) {
-  return status === 'PRESENT' || status === 'VALID' || status === 'INVALID'
-    ? 'Available'
-    : 'Missing'
+  return status === 'PRESENT' ? 'Available' : 'Missing'
 }
 
 function certificationHistoryLabel(status: CompanyCertificationItemStatus) {
-  return status === 'SIGNED' || status === 'VALID' ? 'Signed' : 'Not signed'
+  return status === 'SIGNED' ? 'Signed' : 'Not signed'
 }
 
 function itemStatusClass(status: CompanyCertificationItemStatus) {
-  if (status === 'PRESENT' || status === 'SIGNED' || status === 'VALID') {
+  if (status === 'PRESENT' || status === 'SIGNED') {
     return 'text-emerald-600 dark:text-emerald-400'
   }
-  if (status === 'NOT_SIGNED' || status === 'INVALID') return 'text-amber-600 dark:text-amber-400'
+  if (status === 'NOT_SIGNED') return 'text-amber-600 dark:text-amber-400'
   return 'text-muted-foreground'
 }
 

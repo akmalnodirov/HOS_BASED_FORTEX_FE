@@ -29,13 +29,7 @@ export interface CompanyCertificationAction {
   error: string | null
 }
 
-export type CompanyCertificationItemStatus =
-  | 'MISSING'
-  | 'PRESENT'
-  | 'NOT_SIGNED'
-  | 'SIGNED'
-  | 'INVALID'
-  | 'VALID'
+export type CompanyCertificationItemStatus = 'MISSING' | 'PRESENT' | 'NOT_SIGNED' | 'SIGNED'
 
 export interface CompanyCertificationDayResult {
   logDate: string
