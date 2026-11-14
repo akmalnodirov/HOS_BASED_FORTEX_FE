@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { provide } from 'vue'
-import { RefreshCw, Search } from 'lucide-vue-next'
+import { computed, provide, ref } from 'vue'
+import { BadgeCheck, RefreshCw, Search } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -13,7 +14,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import CELDLogsTable from '../components/CELDLogsTable.vue'
+import CCompanyCertificationModal from '../components/CCompanyCertificationModal.vue'
 import { useELDLogs } from '../composables/useELDLogs'
+import { useAuthStore } from '@/modules/Auth/store/authStore'
+import { hasPermission } from '@/router/permissions'
+import { getCompanyId } from '@/utils/company'
 
 const eventOptions = [
   { value: 'all', label: 'All events' },
@@ -35,6 +40,20 @@ const statusOptions = [
 
 const logsInstance = useELDLogs()
 provide('eldLogs', logsInstance)
+const authStore = useAuthStore()
+const certificationOpen = ref(false)
+const selectedCompanyId = computed(() => getCompanyId() ?? '')
+const canCertifyCompany = computed(() =>
+  hasPermission(authStore.token, 'route_eld.logs.company_certification_fix')
+)
+
+function openCertification() {
+  if (!selectedCompanyId.value) {
+    toast.warning('Select a company before certifying drivers.')
+    return
+  }
+  certificationOpen.value = true
+}
 
 const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilter, fetchLogs } =
   logsInstance
@@ -53,6 +72,10 @@ const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilte
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <Button v-if="canCertifyCompany" class="h-10" @click="openCertification">
+          <BadgeCheck class="mr-2 h-4 w-4" />
+          Certify all
+        </Button>
         <div class="relative min-w-56 flex-1 sm:w-64 sm:flex-none">
           <Search
             class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -126,5 +149,10 @@ const { loading, summary, searchQuery, eventFilter, violationFilter, statusFilte
     </div>
 
     <CELDLogsTable class="min-h-0 flex-1" />
+
+    <CCompanyCertificationModal
+      v-model:open="certificationOpen"
+      :company-id="selectedCompanyId"
+    />
   </div>
 </template>

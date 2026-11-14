@@ -13,12 +13,16 @@ import {
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
-  defineProps<DialogContentProps & { class?: HTMLAttributes['class']; showClose?: boolean }>(),
+  defineProps<DialogContentProps & {
+    class?: HTMLAttributes['class']
+    overlayClass?: HTMLAttributes['class']
+    showClose?: boolean
+  }>(),
   { showClose: true }
 )
 const emits = defineEmits<DialogContentEmits>()
 
-const delegatedProps = reactiveOmit(props, 'class', 'showClose')
+const delegatedProps = reactiveOmit(props, 'class', 'overlayClass', 'showClose')
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
@@ -26,7 +30,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <DialogPortal to="body">
     <DialogOverlay
-      class="fixed inset-0 z-[60] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      :class="
+        cn(
+          'fixed inset-0 z-[60] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+          props.overlayClass
+        )
+      "
     />
     <DialogContent
       v-bind="forwarded"
