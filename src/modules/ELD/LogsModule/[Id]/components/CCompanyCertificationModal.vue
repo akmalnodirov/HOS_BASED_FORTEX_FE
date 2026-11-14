@@ -1,6 +1,9 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-6xl">
+    <DialogContent
+      class="z-[1000000001] flex max-h-[90vh] flex-col overflow-hidden sm:max-w-6xl"
+      overlay-class="z-[1000000000]"
+    >
       <DialogHeader>
         <DialogTitle>Certify company drivers</DialogTitle>
         <DialogDescription>
@@ -44,7 +47,7 @@
                     {{ rangeLabel }}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent class="w-auto p-0" align="start">
+                <PopoverContent class="z-[1000000002] w-auto p-0" align="start">
                   <RangeCalendar v-model="dateRange" initial-focus />
                 </PopoverContent>
               </Popover>
@@ -62,6 +65,9 @@
         </div>
 
         <p v-if="rangeError" class="text-xs text-destructive">{{ rangeError }}</p>
+        <p v-else-if="preview && !isPreviewCurrent" class="text-xs text-amber-600 dark:text-amber-400">
+          Check statuses again before certifying the changed company or date range.
+        </p>
         <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
           <Label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Checkbox :model-value="allDriversSelectionState" @update:model-value="toggleAllDrivers" />
@@ -135,7 +141,7 @@
         <DialogFooter>
           <Button variant="outline" @click="emit('update:open', false)">Close</Button>
           <Button
-            :disabled="starting || loading || !!rangeError || selectedDriverIds.size === 0"
+            :disabled="starting || loading || !!rangeError || !isPreviewCurrent || selectedDriverIds.size === 0"
             @click="startCertification"
           >
             <LoaderCircle v-if="starting" class="mr-2 h-4 w-4 animate-spin" />
@@ -288,16 +294,19 @@ const certificationProgress = useCompanyCertificationProgress()
 certificationProgress.initialize()
 
 const current = new Date()
+const end = new Date(current)
+end.setDate(end.getDate() - 1)
 const start = new Date(current)
-start.setDate(start.getDate() - 8)
+start.setDate(start.getDate() - 9)
 const dateRange = ref<any>({
   start: new CalendarDate(start.getFullYear(), start.getMonth() + 1, start.getDate()),
-  end: new CalendarDate(current.getFullYear(), current.getMonth() + 1, current.getDate()),
+  end: new CalendarDate(end.getFullYear(), end.getMonth() + 1, end.getDate()),
 })
 const calendarOpen = ref(false)
 const loading = ref(false)
 const starting = ref(false)
 const preview = ref<CompanyCertificationPreview | null>(null)
+const previewedRequest = ref<{ companyId: string; fromDate: string; toDate: string } | null>(null)
 const selectedDriverIds = ref(new Set<string>())
 const search = ref('')
 const view = ref<'repair' | 'history'>('repair')
@@ -318,6 +327,11 @@ const rangeLabel = computed(() =>
     ? `${formatDate(fromDate.value)} – ${formatDate(toDate.value)}`
     : 'Select a date range'
 )
+const isPreviewCurrent = computed(() =>
+  previewedRequest.value?.companyId === props.companyId &&
+  previewedRequest.value?.fromDate === fromDate.value &&
+  previewedRequest.value?.toDate === toDate.value
+)
 const rangeError = computed(() => {
   if (!fromDate.value || !toDate.value) return 'Select a date range.'
   const days = Math.round(
@@ -326,10 +340,9 @@ const rangeError = computed(() => {
   )
   if (days < 0) return 'The end date must be after the start date.'
   if (days > 30) return 'Select no more than 31 days.'
-  const tomorrow = new Date()
-  tomorrow.setHours(0, 0, 0, 0)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  if (new Date(`${toDate.value}T00:00:00`) >= tomorrow) return 'The range cannot include future dates.'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (new Date(`${toDate.value}T00:00:00`) >= today) return 'The range must end before today.'
   return null
 })
 const filteredDrivers = computed(() => {
@@ -359,14 +372,23 @@ watch(
 
 async function loadPreview() {
   if (rangeError.value || !props.companyId) return
+  const requestedPreview = {
+    companyId: props.companyId,
+    fromDate: fromDate.value,
+    toDate: toDate.value,
+  }
   loading.value = true
+  preview.value = null
+  previewedRequest.value = null
+  selectedDriverIds.value = new Set()
   try {
     const response = await api.post<{ successResult: CompanyCertificationPreview }>(
       ApiEndpoints.ROUTE_ELD_COMPANY_CERTIFICATION_PREVIEW,
-      { companyId: props.companyId, fromDate: fromDate.value, toDate: toDate.value }
+      requestedPreview
     )
     preview.value = response.data.successResult
-    // selectedDriverIds.value = new Set(preview.value.drivers.map((driver) => driver.driverId))
+    previewedRequest.value = requestedPreview
+    selectedDriverIds.value = new Set(preview.value.drivers.map((driver) => driver.driverId))
   } catch (error) {
     toast.error(getApiErrorMessage(error, 'Could not load company certification statuses.'))
   } finally {
@@ -375,18 +397,21 @@ async function loadPreview() {
 }
 
 async function startCertification() {
-  if (rangeError.value || selectedDriverIds.value.size === 0) return
+  const request = previewedRequest.value
+  if (rangeError.value || !request || !isPreviewCurrent.value || selectedDriverIds.value.size === 0) {
+    toast.error('Check statuses for the selected date range before certifying.')
+    return
+  }
   starting.value = true
   try {
     const response = await api.post<{ successResult: CompanyCertificationBatch }>(
       ApiEndpoints.ROUTE_ELD_COMPANY_CERTIFICATION_FIXES,
       {
-        companyId: props.companyId,
-        fromDate: fromDate.value,
-        toDate: toDate.value,
+        companyId: request.companyId,
+        fromDate: request.fromDate,
+        toDate: request.toDate,
         driverIds: [...selectedDriverIds.value],
-      },
-      { _successMessage: 'Company certification fix was queued.' }
+      }
     )
     certificationProgress.track(response.data.successResult)
   } catch (error) {
@@ -433,7 +458,8 @@ async function toggleBatch(id: string) {
 
 function toggleDriver(id: string) {
   const next = new Set(selectedDriverIds.value)
-  next.has(id) ? next.delete(id) : next.add(id)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
   selectedDriverIds.value = next
 }
 
